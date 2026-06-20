@@ -1,0 +1,21 @@
+﻿$output = "C:\Users\Administrator\Desktop\nhat-ky-fullstack\frontend\frontend.txt"
+$rootPath = "C:\Users\Administrator\Desktop\nhat-ky-fullstack\frontend"
+$extensions = @("*.js", "*.html", "*.jsx", "*.csproj", "*.css", "*.config")
+
+# Các thư mục cần loại bỏ
+$excludeDirs = @("bin", "obj", "node_modules")
+
+# Xóa file cũ nếu có
+if (Test-Path $output) { Remove-Item $output }
+
+Get-ChildItem -Path $rootPath -Recurse -File -Include $extensions | Where-Object {
+    $fullPath = $_.FullName.ToLower()
+    -not ($excludeDirs | ForEach-Object { $fullPath -like "*\$_\*" } | Where-Object { $_ })
+} | ForEach-Object {
+
+    $relativePath = $_.FullName.Replace($rootPath, "")
+    Add-Content $output "`n===== $relativePath =====`n"
+    Get-Content $_.FullName | Add-Content $output
+}
+
+Write-Host "Done! Output: $output"

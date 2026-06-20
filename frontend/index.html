@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Soul Diary - Nhật ký cảm xúc</title>
+  <link rel="icon" href="app-icon.jpg" />
+  <link rel="apple-touch-icon" href="app-icon.jpg" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#2563eb" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Soul Diary" />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet" />
+  <!-- Markdown editor (dùng trong trang Quản trị) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.js"></script>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ══════════════ AUTH SCREEN ══════════════ -->
+  <div id="auth-screen">
+    <div class="auth-bg">
+      <div class="auth-blob b1"></div>
+      <div class="auth-blob b2"></div>
+      <div class="auth-blob b3"></div>
+    </div>
+    <div class="auth-card">
+      <!-- Logo -->
+      <div class="auth-logo-wrap">
+        <img src="soul-diary-logo.jpg" alt="Soul Diary" class="auth-logo-img" />
+      </div>
+      <div class="auth-slogan">"Khi cảm xúc được gọi tên, tâm trí sẽ tìm thấy lối về."</div>
+
+      <!-- Tab switcher -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-login"    onclick="Auth.showTab('login')">Đăng nhập</button>
+        <button class="auth-tab"        id="tab-register" onclick="Auth.showTab('register')">Đăng ký</button>
+      </div>
+
+      <div class="auth-alert" id="auth-alert"></div>
+
+      <!-- LOGIN -->
+      <div id="form-login">
+        <div class="form-group">
+          <label class="form-label">Tên đăng nhập hoặc Email</label>
+          <input class="text-input" type="text" id="login-username" placeholder="Nhập username hoặc email" autocomplete="username" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mật khẩu</label>
+          <div class="input-wrap">
+            <input class="text-input" type="password" id="login-password" placeholder="Nhập mật khẩu" autocomplete="current-password" />
+            <button class="eye-btn" onclick="Auth.togglePwd('login-password',this)">👁</button>
+          </div>
+        </div>
+        <button class="btn-auth" id="btn-login" onclick="Auth.login()"><span>Đăng nhập</span></button>
+      </div>
+
+      <!-- REGISTER -->
+      <div id="form-register" style="display:none">
+        <div class="form-group">
+          <label class="form-label">Họ và tên</label>
+          <input class="text-input" type="text" id="reg-fullname" placeholder="Nguyễn Văn A" autocomplete="name" />
+        </div>
+        <div class="grid-2" style="gap:12px">
+          <div class="form-group">
+            <label class="form-label">Tên đăng nhập</label>
+            <input class="text-input" type="text" id="reg-username" placeholder="vd: souldiary01" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input class="text-input" type="email" id="reg-email" placeholder="abc@email.com" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mật khẩu (ít nhất 6 ký tự)</label>
+          <div class="input-wrap">
+            <input class="text-input" type="password" id="reg-password" placeholder="Tạo mật khẩu" />
+            <button class="eye-btn" onclick="Auth.togglePwd('reg-password',this)">👁</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Xác nhận mật khẩu</label>
+          <input class="text-input" type="password" id="reg-confirm" placeholder="Nhập lại mật khẩu" />
+        </div>
+        <button class="btn-auth" id="btn-register" onclick="Auth.register()"><span>Tạo tài khoản</span></button>
+      </div>
+      <div class="auth-disclaimer">⚠️ Ứng dụng không thay thế liệu pháp tâm lý chuyên môn</div>
+    </div>
+  </div>
+
+  <!-- ══════════════ MAIN APP ══════════════ -->
+  <div id="app-screen" style="display:none">
+    <div class="app">
+      <aside class="sidebar">
+        <div class="sidebar-logo">
+          <img src="soul-diary-logo.jpg" alt="Soul Diary" class="sidebar-logo-img" />
+          <div class="sidebar-brand-text">
+            <div class="logo-title">Soul Diary</div>
+            <div class="logo-sub">Nhật ký cảm xúc</div>
+          </div>
+          <button class="logo-about-btn" onclick="App.openAboutModal()">!</button>
+        </div>
+        <nav class="nav">
+          <button class="nav-item active" data-page="dashboard"><span class="nav-icon">🏠</span> Tổng quan</button>
+          <button class="nav-item" data-page="diary">          <span class="nav-icon">📖</span> Nhật ký</button>
+          <button class="nav-item" data-page="chart">          <span class="nav-icon">📊</span> Biểu đồ</button>
+          <button class="nav-item" data-page="library">        <span class="nav-icon">📚</span> Thư viện</button>
+          <button class="nav-item" data-page="exercises">      <span class="nav-icon">🧘</span> Bài tập</button>
+          <button class="nav-item" data-page="music">          <span class="nav-icon">🎧</span> Nhạc thư giãn</button>
+          <button class="nav-item" data-page="checkin" id="nav-checkin" style="display:none">
+            <span class="nav-icon">🧪</span> Check-in tâm lý<span id="checkin-badge" class="nav-badge-dot" style="display:none"></span>
+          </button>
+          <button class="nav-item" data-page="sos">            <span class="nav-icon">📞</span> Đường dây hỗ trợ</button>
+          <button class="nav-item" data-page="admin" id="nav-admin" style="display:none"><span class="nav-icon">🛠️</span> Quản trị</button>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="user-badge">
+            <div class="user-avatar" id="user-avatar">SD</div>
+            <div>
+              <div class="user-name"   id="user-display-name">Đang tải...</div>
+              <div class="user-streak" id="streak-display">🔥 0 ngày</div>
+            </div>
+          </div>
+          <button class="btn-logout" onclick="Auth.logout()">⬅ Đăng xuất</button>
+        </div>
+      </aside>
+      <main class="main" id="main-content"></main>
+    </div>
+    <!-- Phát nhạc thư giãn xuyên suốt khi chuyển trang trong app — chỉ dừng khi rời khỏi web -->
+    <audio id="music-audio"></audio>
+  </div>
+
+  <!-- Streak Celebration Modal -->
+  <div class="modal-overlay" id="streak-modal">
+    <div class="modal streak-modal-inner">
+      <div class="streak-confetti" id="streak-confetti"></div>
+      <div style="text-align:center;padding:10px 0">
+        <div style="font-size:56px">🎉</div>
+        <div class="streak-modal-title" id="streak-modal-title">Tuyệt vời!</div>
+        <div class="streak-modal-sub"  id="streak-modal-sub">Bạn đã duy trì chuỗi 7 ngày liên tiếp!</div>
+        <div class="streak-badge-big" id="streak-badge-num">7</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">ngày 🔥</div>
+        <div id="streak-modal-reward"></div>
+        <button class="btn-primary" style="max-width:200px;margin:0 auto;margin-top:16px" onclick="App.closeStreakModal()">Tiếp tục ✨</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Breathing Modal -->
+  <div class="modal-overlay" id="breath-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">🌬️ Thở 4-7-8</div>
+        <button class="modal-close" id="close-breath-modal">✕</button>
+      </div>
+      <div style="text-align:center;padding:10px 0">
+        <div class="breath-circle" id="breath-circle">Sẵn sàng</div>
+        <div class="breath-status"    id="breath-status">—</div>
+        <div class="breath-cycle"     id="breath-cycle-text">Nhấn bắt đầu để khởi động</div>
+        <button class="breath-btn"    id="breath-start-btn">▶ Bắt đầu</button>
+      </div>
+      <div class="breath-info">
+        <p><strong>Cách thực hiện:</strong> Hít vào 4 giây · Nín thở 7 giây · Thở ra 8 giây.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Box Breathing Modal -->
+  <div class="modal-overlay" id="box-breath-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">🔲 Hộp Thở (Box Breathing)</div>
+        <button class="modal-close" id="close-box-breath-modal">✕</button>
+      </div>
+      <div style="text-align:center;padding:10px 0">
+        <div class="box-breath-square" id="box-breath-square">
+          <div class="bb-edge bb-top"></div>
+          <div class="bb-edge bb-right"></div>
+          <div class="bb-edge bb-bottom"></div>
+          <div class="bb-edge bb-left"></div>
+          <div class="box-breath-label" id="box-breath-label">Sẵn sàng</div>
+        </div>
+        <div class="breath-status"    id="box-breath-status">—</div>
+        <div class="breath-cycle"     id="box-breath-cycle-text">Nhấn bắt đầu để khởi động</div>
+        <button class="breath-btn"    id="box-breath-start-btn">▶ Bắt đầu</button>
+      </div>
+      <div class="breath-info">
+        <p><strong>Cách thực hiện:</strong> Hít vào 4 giây · Nín thở 4 giây · Thở ra 4 giây · Nín thở 4 giây — lặp lại 4 chu kỳ.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Unsent Letter Modal -->
+  <div class="modal-overlay" id="letter-modal">
+    <div class="modal" style="max-width:520px">
+      <div class="modal-header">
+        <div class="modal-title">✉️ Bức thư chưa gửi</div>
+        <button class="modal-close" id="close-letter-modal">✕</button>
+      </div>
+      <div class="letter-paper" id="letter-paper">
+        <div class="letter-flame" id="letter-flame">🔥</div>
+        <textarea class="letter-textarea" id="letter-textarea" placeholder="Viết hết những gì bạn muốn nói ra đây... Sẽ không ai đọc được, kể cả Soul Diary."></textarea>
+      </div>
+      <button class="breath-btn" id="letter-burn-btn">🔥 Đốt thư</button>
+      <div class="breath-info">
+        <p><strong>Lưu ý riêng tư:</strong> Nội dung sẽ <strong>không được lưu lại</strong> dưới bất kỳ hình thức nào — đây là không gian an toàn để bạn xả bỏ cảm xúc.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Evidence Testing Modal -->
+  <div class="modal-overlay" id="evidence-modal">
+    <div class="modal" style="max-width:560px">
+      <div class="modal-header">
+        <div class="modal-title">⚖️ Thử thách Bằng chứng</div>
+        <button class="modal-close" id="close-evidence-modal">✕</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">1. Suy nghĩ độc hại hiện tại <span class="cbt-step-hint">VD: "Mình là một kẻ bất tài"</span></label>
+        <textarea class="diary-textarea" id="ev-thought" style="min-height:70px" placeholder="Suy nghĩ tiêu cực đang lặp đi lặp lại trong đầu bạn là gì?"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">2. Bằng chứng ủng hộ <span class="cbt-step-hint">Chỉ ghi sự thật khách quan, không ghi cảm xúc</span></label>
+        <textarea class="diary-textarea" id="ev-support" style="min-height:70px" placeholder="Có bằng chứng thực tế nào CHỨNG MINH suy nghĩ này đúng không?"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">3. Bằng chứng phản bác <span class="cbt-step-hint">Những điều cho thấy điều ngược lại</span></label>
+        <textarea class="diary-textarea" id="ev-against" style="min-height:70px" placeholder="Có bằng chứng thực tế nào PHẢN BÁC suy nghĩ này không?"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">4. Kết luận công bằng hơn <span class="cbt-step-hint">Viết lại suy nghĩ ở mục 1</span></label>
+        <textarea class="diary-textarea" id="ev-conclusion" style="min-height:70px" placeholder="Sau khi nhìn vào bằng chứng phản bác, bạn có thể viết lại suy nghĩ ban đầu công bằng hơn không?"></textarea>
+      </div>
+      <button class="breath-btn" id="evidence-done-btn">✅ Hoàn thành</button>
+      <div class="breath-info">
+        <p>Nội dung chỉ hiển thị tạm thời trong phiên này và <strong>không được lưu lại</strong>.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Article / Exercise Detail Modal -->
+  <div class="modal-overlay" id="article-modal">
+    <div class="modal" style="max-width:640px">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" id="article-modal-title">—</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px" id="article-modal-meta"></div>
+        </div>
+        <button class="modal-close" onclick="App.closeArticleModal()">✕</button>
+      </div>
+      <div id="article-modal-body" style="color:var(--text-muted);line-height:1.7"></div>
+    </div>
+  </div>
+
+  <!-- Diary Entry Detail Modal -->
+  <div class="modal-overlay" id="entry-modal">
+    <div class="modal" style="max-width:560px">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" id="entry-modal-title">—</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px" id="entry-modal-date"></div>
+        </div>
+        <button class="modal-close" onclick="App.closeEntryModal()">✕</button>
+      </div>
+      <div id="entry-modal-body" style="color:var(--text-muted);line-height:1.7"></div>
+    </div>
+  </div>
+
+  <!-- Photo Lightbox -->
+  <div class="modal-overlay" id="photo-lightbox">
+    <img id="photo-lightbox-img" src="" alt="" style="max-width:90vw;max-height:90vh;border-radius:var(--radius);object-fit:contain" />
+  </div>
+
+  <!-- About Modal -->
+  <div class="modal-overlay" id="about-modal">
+    <div class="modal" style="max-width:380px">
+      <div class="modal-header">
+        <div class="modal-title">ℹ️ Giới thiệu</div>
+        <button class="modal-close" onclick="App.closeAboutModal()">✕</button>
+      </div>
+      <div style="text-align:center;padding:6px 0">
+        <img src="soul-diary-logo.jpg" alt="Soul Diary" style="width:56px;height:56px;border-radius:14px;object-fit:contain;margin-bottom:10px" />
+        <div style="font-family:'Nunito',sans-serif;font-weight:800;font-size:18px;color:var(--text)">Soul Diary</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Nhật ký cảm xúc số</div>
+        <div class="about-credit-row"><span>Tác giả - ý tưởng</span><strong>Nguyễn Trần Anh Ngân</strong></div>
+        <div class="about-credit-row"><span>Cốt đơ</span><strong>Tài Đầu Bạc</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin: Article / Exercise Editor -->
+  <div class="adm-editor-overlay" id="adm-editor-overlay">
+    <div class="adm-editor-card">
+      <div class="adm-editor-header">
+        <div class="adm-editor-title" id="adm-editor-mode-title">✏️ Viết bài mới</div>
+        <button class="adm-btn-ghost" onclick="Admin.closeEditor()">✕</button>
+      </div>
+
+      <input type="hidden" id="adm-editing-id" value="" />
+
+      <div class="form-group">
+        <label class="form-label">Tiêu đề bài viết *</label>
+        <input class="form-input" type="text" id="adm-art-title" placeholder="Nhập tiêu đề hấp dẫn..." />
+      </div>
+
+      <div class="adm-form-row">
+        <div class="form-group">
+          <label class="form-label">Đăng vào mục *</label>
+          <select class="form-input" id="adm-art-type">
+            <option value="library">📚 Thư viện kiến thức</option>
+            <option value="exercise">🧘 Bài tập thực hành</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Danh mục *</label>
+          <select class="form-input" id="adm-art-category">
+            <option value="stress">😤 Stress</option>
+            <option value="sleep">🌙 Giấc ngủ</option>
+            <option value="depression">💙 Trầm cảm</option>
+            <option value="relationship">💛 Mối quan hệ</option>
+            <option value="study">📚 Học tập</option>
+            <option value="other">📌 Khác</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Thời gian đọc</label>
+        <input class="form-input" type="text" id="adm-art-readtime" placeholder="vd: 5 phút" value="5 phút" style="max-width:200px" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Tóm tắt (hiển thị ở thẻ bài viết)</label>
+        <input class="form-input" type="text" id="adm-art-summary" placeholder="Mô tả ngắn gọn nội dung bài viết..." />
+      </div>
+
+      <div class="adm-form-row">
+        <div class="form-group">
+          <label class="form-label">Icon bài viết</label>
+          <div class="adm-emoji-grid" id="adm-emoji-grid">
+            <div class="adm-emoji-opt sel" data-emoji="🧠" onclick="Admin.selectEmoji(this)">🧠</div>
+            <div class="adm-emoji-opt" data-emoji="🌙" onclick="Admin.selectEmoji(this)">🌙</div>
+            <div class="adm-emoji-opt" data-emoji="💙" onclick="Admin.selectEmoji(this)">💙</div>
+            <div class="adm-emoji-opt" data-emoji="💛" onclick="Admin.selectEmoji(this)">💛</div>
+            <div class="adm-emoji-opt" data-emoji="📚" onclick="Admin.selectEmoji(this)">📚</div>
+            <div class="adm-emoji-opt" data-emoji="🎯" onclick="Admin.selectEmoji(this)">🎯</div>
+            <div class="adm-emoji-opt" data-emoji="🤝" onclick="Admin.selectEmoji(this)">🤝</div>
+            <div class="adm-emoji-opt" data-emoji="⏰" onclick="Admin.selectEmoji(this)">⏰</div>
+            <div class="adm-emoji-opt" data-emoji="🌱" onclick="Admin.selectEmoji(this)">🌱</div>
+            <div class="adm-emoji-opt" data-emoji="🧘" onclick="Admin.selectEmoji(this)">🧘</div>
+            <div class="adm-emoji-opt" data-emoji="🔥" onclick="Admin.selectEmoji(this)">🔥</div>
+            <div class="adm-emoji-opt" data-emoji="✨" onclick="Admin.selectEmoji(this)">✨</div>
+          </div>
+          <input type="hidden" id="adm-art-thumbnail" value="🧠" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Màu nền thẻ</label>
+          <div class="adm-color-grid" id="adm-color-grid">
+            <div class="adm-color-opt sel" data-color="#eef2ff" style="background:#eef2ff;border-color:#6366f1" onclick="Admin.selectColor(this)"></div>
+            <div class="adm-color-opt" data-color="#f0fdfa" style="background:#f0fdfa" onclick="Admin.selectColor(this)"></div>
+            <div class="adm-color-opt" data-color="#eff6ff" style="background:#eff6ff" onclick="Admin.selectColor(this)"></div>
+            <div class="adm-color-opt" data-color="#fffbeb" style="background:#fffbeb" onclick="Admin.selectColor(this)"></div>
+            <div class="adm-color-opt" data-color="#f0fdf4" style="background:#f0fdf4" onclick="Admin.selectColor(this)"></div>
+            <div class="adm-color-opt" data-color="#fff1f2" style="background:#fff1f2" onclick="Admin.selectColor(this)"></div>
+            <div class="adm-color-opt" data-color="#fdf4ff" style="background:#fdf4ff" onclick="Admin.selectColor(this)"></div>
+            <div class="adm-color-opt" data-color="#f7fee7" style="background:#f7fee7" onclick="Admin.selectColor(this)"></div>
+          </div>
+          <input type="hidden" id="adm-art-color" value="#eef2ff" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Nội dung bài viết * (Markdown)</label>
+        <textarea id="adm-art-content"></textarea>
+      </div>
+
+      <div class="adm-editor-actions">
+        <button class="adm-btn adm-btn-outline" onclick="Admin.closeEditor()">Hủy</button>
+        <button class="adm-btn adm-btn-outline" onclick="Admin.saveArticle(false)">💾 Lưu nháp</button>
+        <button class="adm-btn adm-btn-primary" onclick="Admin.saveArticle(true)">🚀 Đăng bài</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/admin.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
