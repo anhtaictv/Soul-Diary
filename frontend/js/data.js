@@ -14,6 +14,18 @@ const MOOD_DATA = {
 
 const EMOTION_TAGS = ['😊 Vui vẻ','😔 Buồn bã','😰 Lo lắng','😤 Tức giận','😴 Mệt mỏi','😌 Bình yên','🤩 Hứng khởi','😕 Bối rối'];
 
+// Lịch sử phiên bản — dùng để tính "phiên bản hiện tại" hiển thị ở modal Giới thiệu.
+// Bản không có flags (v1.0/v1.01/v1.2) là baseline luôn active. Bản có flags chỉ được
+// tính là "hiện tại" khi TẤT CẢ flag của bản đó đã được bật trong Admin > Tính năng.
+const VERSION_LADDER = [
+  { version:'v1.0',  title:'Ra mắt ứng dụng',                 flags:[] },
+  { version:'v1.01', title:'Hoàn thiện nền tảng',              flags:[] },
+  { version:'v1.2',  title:'Giữ chân & Nâng cấp trải nghiệm',  flags:[] },
+  { version:'v1.3',  title:'AI Thấu hiểu cảm xúc',             flags:['ai_emotion_analysis','enhanced_mental_dashboard','cbt_guided_writing'] },
+  { version:'v1.4',  title:'Check-in Tâm lý',                  flags:['weekly_checkin'] },
+  { version:'v1.5',  title:'Nuôi dưỡng Tâm hồn',               flags:['mood_calendar','soul_companion','mood_ambience','soul_seed'] },
+];
+
 const ARTICLES = [
   { id:1, cat:'stress',       emoji:'🧠', bg:'#eef2ff', title:'Stress học đường: Nhận biết và vượt qua',     desc:'Phân biệt stress lành mạnh và stress độc hại. 5 chiến lược CBT được chứng minh giúp sinh viên quản lý áp lực.', time:'8 phút' },
   { id:2, cat:'sleep',        emoji:'🌙', bg:'#f0fdfa', title:'Vệ sinh giấc ngủ cho sinh viên',             desc:'Tại sao thiếu ngủ làm giảm 40% hiệu suất học tập? Quy trình 10 bước để ngủ đủ và sâu hơn.', time:'6 phút' },

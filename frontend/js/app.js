@@ -278,7 +278,11 @@ const App = (() => {
       document.getElementById('photo-lightbox').classList.remove('open');
   }
 
-  function openAboutModal()  { document.getElementById('about-modal').classList.add('open'); }
+  function openAboutModal()  {
+    const el = document.getElementById('about-version');
+    if (el && window.CURRENT_VERSION) el.textContent = `${window.CURRENT_VERSION.version} — ${window.CURRENT_VERSION.title}`;
+    document.getElementById('about-modal').classList.add('open');
+  }
   function closeAboutModal() { document.getElementById('about-modal').classList.remove('open'); }
 
   // ── Diary ────────────────────────────────────────────────────────────
@@ -1661,6 +1665,18 @@ const App = (() => {
       window.FEATURES = {};
       (data.features || []).forEach(f => { window.FEATURES[f.key] = !!f.enabled; });
     } catch(e) { window.FEATURES = {}; }
+    window.CURRENT_VERSION = computeCurrentVersion();
+  }
+
+  // Phiên bản hiện tại = mốc cao nhất trong VERSION_LADDER mà TẤT CẢ flag của nó đã bật
+  // (mốc không có flags coi như baseline, luôn tính là active).
+  function computeCurrentVersion() {
+    let current = VERSION_LADDER[0];
+    for (const v of VERSION_LADDER) {
+      const allOn = v.flags.length === 0 || v.flags.every(k => window.FEATURES && window.FEATURES[k]);
+      if (allOn) current = v;
+    }
+    return current;
   }
 
   // ── Init ─────────────────────────────────────────────────────────────
