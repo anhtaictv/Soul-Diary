@@ -87,6 +87,15 @@ After editing backend files, restart the PM2 process (`pm2 restart souldiary-api
 - **Dashboard sức khỏe tâm thần nâng cao** (`enhanced_mental_dashboard`) — endpoint `GET /api/diary/mental-health` trả 4 chỉ số: `topEmotion` (từ `ai_emotion` JSON hoặc tags), `stressDay` (ngày trong tuần avg mood thấp nhất, ≥2 mẫu), `topTheme` (chủ đề khi mood ≤ 5), `monthTrend` (`{this, last, diff}`). Section ẩn trên dashboard, hiện khi flag bật.
 - **Viết nhật ký theo hướng dẫn CBT** (`cbt_guided_writing`) — cột `DiaryEntries.cbt_data NVARCHAR(MAX)` (JSON `{event, thoughts, feelings, behavior}`). Nút chọn chế độ ✍️ Tự do / 🧠 Hướng dẫn CBT trong diary page (ẩn nếu flag tắt). Entry CBT hiển thị badge `🧠 CBT` trong danh sách.
 
+### v1.4 — Check-in Tâm lý *(tính năng gate sau feature flags — bật trong admin)*
+- **Check-in Sức khỏe Tinh thần hàng tuần** (`weekly_checkin`) — bảng `CheckIns` (PHQ-9/GAD-7/PSS-10/WHO-5, 31 câu, kết quả + `ai_analysis` JSON). Route `routes/checkin.js`. Nhắc nhở mỗi Thứ 7, nav item ẩn cho đến khi flag bật.
+
+### v1.5 — Nuôi dưỡng Tâm hồn *(tính năng gate sau feature flags — bật trong admin)*
+- **Bản đồ thời tiết tâm hồn** (`mood_calendar`) — endpoint `GET /api/diary/calendar?month=YYYY-MM`. Lịch tháng hiển thị icon thời tiết (☀️🌤️⛅🌧️⛈️) suy từ `avg_mood` mỗi ngày. Toggle "📈 Biểu đồ / 📅 Lịch tâm trạng" trong trang Biểu đồ.
+- **Trợ lý Tâm hồn AI** (`soul_companion`) — cột `DiaryEntries.ai_companion_message NVARCHAR(MAX)`. Endpoint `GET /api/diary/:id/companion`: Gemini trả 2-3 câu phản hồi ấm áp + câu hỏi gợi mở, fallback rule-based theo dải mood. Fire-and-forget sau khi lưu nhật ký, hiển thị trong `#companion-message-box` và khi mở lại entry. Kèm `GET /api/diary/daily-prompt` — gợi ý chủ đề viết hàng ngày (25 câu cố định theo ngày-trong-năm, không tốn quota Gemini).
+- **Không gian theo cảm xúc** (`mood_ambience`) — frontend-only: nền `#diary-form-card` đổi gradient theo `MOOD_DATA[score].color` khi đổi mood; nút gợi nhạc map mood→category (`sleep/chill/focus/nature`) rồi tự chuyển sang trang Nhạc và phát đúng mood (tái dùng `GET /api/music/tracks`).
+- **Hạt mầm tâm hồn** (`soul_seed`) — frontend-only: cây ảo trên dashboard, stage suy từ `user.streak` (🌰→🌱→🌿→🌳→🌳🌸→🌳🌺), héo 🥀 nếu `last_entry` cách hôm nay ≥2 ngày.
+
 ## Feature Flag — cách dùng
 
 - `window.FEATURES` là object global được load tại `App.init()` → `loadFeatures()` từ `GET /api/features`.

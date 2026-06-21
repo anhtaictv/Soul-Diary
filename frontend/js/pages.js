@@ -21,6 +21,9 @@ const PAGES = {
       <!-- Thanh cấp độ cảm xúc -->
       <div id="dash-level-bar"></div>
 
+      <!-- Hạt mầm tâm hồn (ẩn cho đến khi feature soul_seed được bật) -->
+      <div id="soul-seed-section" style="display:none"></div>
+
       <div class="quick-mood-section">
         <div class="quick-mood-title">Chấm điểm nhanh hôm nay</div>
         <div class="quick-mood-sub">Mất chưa đến 30 giây</div>
@@ -59,14 +62,22 @@ const PAGES = {
       </div>
       <div class="grid-2">
         <div>
-          <div class="card">
+          <div class="card" id="diary-form-card">
             <div class="form-group">
               <label class="form-label">Điểm tâm trạng hôm nay</label>
               <div class="mood-icon-scale" id="diary-mood-scale" style="justify-content:flex-start;gap:4px;flex-wrap:wrap;margin:8px 0"></div>
+              <div id="ambience-music-suggest" style="display:none;margin-top:6px"></div>
             </div>
             <div class="form-group">
               <label class="form-label">Cảm xúc chủ đạo</label>
               <div class="tag-row" id="emotion-tags"></div>
+            </div>
+
+            <!-- Gợi ý chủ đề viết hôm nay (ẩn cho đến khi feature soul_companion được bật) -->
+            <div class="daily-prompt-card" id="daily-prompt-card" style="display:none">
+              <div class="daily-prompt-label">💭 Gợi ý hôm nay</div>
+              <div class="daily-prompt-text" id="daily-prompt-text">—</div>
+              <button class="daily-prompt-refresh" onclick="App.refreshDailyPrompt()" title="Gợi ý khác">🔄</button>
             </div>
 
             <!-- Chọn chế độ viết (ẩn cho đến khi feature cbt_guided_writing được bật) -->
@@ -133,6 +144,7 @@ const PAGES = {
             </div>
 
             <button class="btn-primary" id="btn-save-diary" onclick="App.saveDiaryEntry()">💾 Lưu nhật ký</button>
+            <div class="companion-message-box" id="companion-message-box" style="display:none"></div>
           </div>
         </div>
         <div>
@@ -152,33 +164,53 @@ const PAGES = {
       <!-- Streak calendar full -->
       <div class="streak-calendar-card" id="chart-streak-calendar" style="margin-bottom:16px"></div>
 
-      <div class="card" style="margin-bottom:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <div style="font-size:15px;font-weight:600">Điểm tâm trạng theo ngày</div>
-          <div style="display:flex;gap:8px">
-            <button class="btn-outline" onclick="App.renderChart(7)"  style="padding:6px 14px;font-size:12px">7 ngày</button>
-            <button class="btn-outline" onclick="App.renderChart(14)" style="padding:6px 14px;font-size:12px">14 ngày</button>
-            <button class="btn-outline" onclick="App.renderChart(30)" style="padding:6px 14px;font-size:12px">30 ngày</button>
+      <!-- Toggle biểu đồ / lịch tâm trạng (ẩn cho đến khi feature mood_calendar được bật) -->
+      <div id="chart-view-toggle" style="display:none;margin-bottom:16px">
+        <button class="tag sel" id="chart-view-btn-chart"    onclick="App.switchChartView('chart',this)">📈 Biểu đồ</button>
+        <button class="tag"     id="chart-view-btn-calendar" onclick="App.switchChartView('calendar',this)">📅 Lịch tâm trạng</button>
+      </div>
+
+      <div id="chart-line-section">
+        <div class="card" style="margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+            <div style="font-size:15px;font-weight:600">Điểm tâm trạng theo ngày</div>
+            <div style="display:flex;gap:8px">
+              <button class="btn-outline" onclick="App.renderChart(7)"  style="padding:6px 14px;font-size:12px">7 ngày</button>
+              <button class="btn-outline" onclick="App.renderChart(14)" style="padding:6px 14px;font-size:12px">14 ngày</button>
+              <button class="btn-outline" onclick="App.renderChart(30)" style="padding:6px 14px;font-size:12px">30 ngày</button>
+            </div>
+          </div>
+          <div class="chart-wrapper"><canvas id="moodChart"></canvas></div>
+        </div>
+
+        <!-- Colorful stat cards -->
+        <div class="grid-3" style="margin-bottom:16px">
+          <div class="stat-card-colored" style="background:linear-gradient(135deg,#6366f1,#818cf8)">
+            <div class="stat-val-white" id="stat-avg">—</div><div class="stat-lbl-white">Điểm trung bình</div>
+          </div>
+          <div class="stat-card-colored" style="background:linear-gradient(135deg,#10b981,#34d399)">
+            <div class="stat-val-white" id="stat-high">—</div><div class="stat-lbl-white">Điểm cao nhất</div>
+          </div>
+          <div class="stat-card-colored" style="background:linear-gradient(135deg,#f97316,#fb923c)">
+            <div class="stat-val-white" id="stat-low">—</div><div class="stat-lbl-white">Điểm thấp nhất</div>
           </div>
         </div>
-        <div class="chart-wrapper"><canvas id="moodChart"></canvas></div>
+
+        <div class="section-label">Tần suất cảm xúc</div>
+        <div id="emotion-frequency" class="grid-4"></div>
       </div>
 
-      <!-- Colorful stat cards -->
-      <div class="grid-3" style="margin-bottom:16px">
-        <div class="stat-card-colored" style="background:linear-gradient(135deg,#6366f1,#818cf8)">
-          <div class="stat-val-white" id="stat-avg">—</div><div class="stat-lbl-white">Điểm trung bình</div>
-        </div>
-        <div class="stat-card-colored" style="background:linear-gradient(135deg,#10b981,#34d399)">
-          <div class="stat-val-white" id="stat-high">—</div><div class="stat-lbl-white">Điểm cao nhất</div>
-        </div>
-        <div class="stat-card-colored" style="background:linear-gradient(135deg,#f97316,#fb923c)">
-          <div class="stat-val-white" id="stat-low">—</div><div class="stat-lbl-white">Điểm thấp nhất</div>
+      <!-- Bản đồ thời tiết tâm hồn (ẩn cho đến khi chọn view "Lịch tâm trạng") -->
+      <div id="mood-calendar-section" style="display:none">
+        <div class="card">
+          <div class="mood-cal-nav">
+            <button class="btn-outline" style="padding:6px 12px;font-size:12px" onclick="App.calendarMonthNav(-1)">◀</button>
+            <div class="mood-cal-month-label" id="mood-cal-month-label">—</div>
+            <button class="btn-outline" style="padding:6px 12px;font-size:12px" onclick="App.calendarMonthNav(1)">▶</button>
+          </div>
+          <div class="mood-calendar-grid" id="mood-calendar-grid"></div>
         </div>
       </div>
-
-      <div class="section-label">Tần suất cảm xúc</div>
-      <div id="emotion-frequency" class="grid-4"></div>
     </div>`,
 
   library: () => `

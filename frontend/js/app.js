@@ -23,6 +23,8 @@ const App = (() => {
   let musicAudioBound = false;
   let diaryMode = 'free';   // 'free' hoặc 'cbt' — chỉ hiệu lực khi cbt_guided_writing được bật
   let checkinAnswers = [];  // mảng 31 phần tử của bài Check-in Sức khỏe Tinh thần đang làm dở
+  let calendarMonth   = new Date(); // tháng đang xem ở Bản đồ thời tiết tâm hồn (mood_calendar)
+  let pendingMusicMood = null;      // mood chờ tự phát khi chuyển sang trang Nhạc (mood_ambience)
 
   // ── Navigation ──────────────────────────────────────────────────────
   function nav(page) {
@@ -33,7 +35,15 @@ const App = (() => {
     switch (page) {
       case 'dashboard': initDashboard();              break;
       case 'diary':     initDiaryPage();              break;
-      case 'chart':     setTimeout(() => { renderStreakCalendar('chart-streak-calendar'); renderChart(14); }, 80); break;
+      case 'chart':
+        calendarMonth = new Date();
+        setTimeout(() => {
+          renderStreakCalendar('chart-streak-calendar');
+          renderChart(14);
+          const toggle = document.getElementById('chart-view-toggle');
+          if (toggle) toggle.style.display = (window.FEATURES && window.FEATURES.mood_calendar) ? '' : 'none';
+        }, 80);
+        break;
       case 'library':   initLibrary(); break;
       case 'exercises': renderExercises();            break;
       case 'music':     initMusicPage();              break;
@@ -124,6 +134,7 @@ const App = (() => {
 
       renderStreakCalendar('streak-calendar-card');
       renderLevelBar(totalEntries);
+      if (window.FEATURES && window.FEATURES.soul_seed) renderSoulSeed(user);
       renderRecommendations(todayEntry ? todayEntry.mood_score : null);
       initPushOptIn();
       renderWeeklyRecap(statsRes.stats || []);
@@ -232,6 +243,9 @@ const App = (() => {
     if (e.gratitude) {
       bodyHtml += `<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px">🙏 Biết ơn</div><div style="white-space:pre-wrap">${escapeHtml(e.gratitude)}</div></div>`;
     }
+    if (e.ai_companion_message) {
+      bodyHtml += `<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px">💬 Lời nhắn từ AI</div><div style="white-space:pre-wrap;font-style:italic">${escapeHtml(e.ai_companion_message)}</div></div>`;
+    }
     if (tags.length) {
       bodyHtml += `<div class="entry-tags" style="margin-bottom:12px">${tags.map(t=>`<span class="entry-tag">${escapeHtml(t)}</span>`).join('')}</div>`;
     }
@@ -268,9 +282,20 @@ const App = (() => {
   function closeAboutModal() { document.getElementById('about-modal').classList.remove('open'); }
 
   // ── Diary ────────────────────────────────────────────────────────────
+
+  // Gắn thang điểm mood của trang Nhật ký — tách riêng vì cần gọi lại y hệt từ resetDiaryForm()
+  // sau khi lưu, để gradient/gợi ý nhạc theo cảm xúc (mood_ambience) không bị mất hook khi reset form.
+  function bindDiaryMoodScale(defaultVal) {
+    buildMoodScale('diary-mood-scale', v => {
+      selectedMood = v;
+      if (window.FEATURES && window.FEATURES.mood_ambience) { applyMoodAmbience(v); renderAmbienceSuggestion(v); }
+    }, defaultVal);
+    if (window.FEATURES && window.FEATURES.mood_ambience) { applyMoodAmbience(defaultVal); renderAmbienceSuggestion(defaultVal); }
+  }
+
   async function initDiaryPage() {
     selectedTags = []; uploadedPhotos = []; diaryMode = 'free';
-    buildMoodScale('diary-mood-scale', v => { selectedMood = v; }, selectedMood);
+    bindDiaryMoodScale(selectedMood);
     document.getElementById('emotion-tags').innerHTML = EMOTION_TAGS.map(tag =>
       `<span class="tag" data-tag="${tag}" onclick="App.toggleTag(this)">${tag}</span>`).join('');
     const textarea = document.getElementById('diary-event');
@@ -283,6 +308,12 @@ const App = (() => {
       const toggle = document.getElementById('diary-mode-toggle');
       if (toggle) toggle.style.display = '';
     }
+    // Gợi ý chủ đề viết hôm nay (Trợ lý Tâm hồn AI)
+    if (window.FEATURES && window.FEATURES.soul_companion) {
+      const promptCard = document.getElementById('daily-prompt-card');
+      if (promptCard) { promptCard.style.display = ''; loadDailyPrompt(); }
+    }
+    document.getElementById('companion-message-box').style.display = 'none';
     await loadDiaryEntries();
   }
 
@@ -311,6 +342,50 @@ const App = (() => {
       if (freeSection) freeSection.style.display = '';
       if (cbtForm)     cbtForm.style.display     = 'none';
     }
+  }
+
+  // ── Trợ lý Tâm hồn AI — gợi ý chủ đề viết hôm nay ───────────────────
+  async function loadDailyPrompt(refresh = false) {
+    const el = document.getElementById('daily-prompt-text');
+    if (!el) return;
+    try {
+      const res = await API.getDailyPrompt(refresh);
+      el.textContent = res.prompt || '—';
+    } catch (err) { /* giữ nguyên gợi ý cũ nếu lỗi tải */ }
+  }
+  function refreshDailyPrompt() { loadDailyPrompt(true); }
+
+  function showCompanionMessage(msg) {
+    const box = document.getElementById('companion-message-box');
+    if (!box) return;
+    box.innerHTML = `<div class="companion-msg-label">💬 Lời nhắn từ AI</div><div class="companion-msg-text">${escapeHtml(msg)}</div>`;
+    box.style.display = '';
+  }
+
+  // ── Không gian theo cảm xúc — gradient nền + gợi ý nhạc theo mood đang chọn ──
+  function ambienceMoodCategory(score) {
+    if (score <= 3) return 'sleep';
+    if (score <= 6) return 'chill';
+    if (score <= 8) return 'focus';
+    return 'nature';
+  }
+  function applyMoodAmbience(score) {
+    const card = document.getElementById('diary-form-card');
+    if (!card) return;
+    card.style.transition = 'background .6s ease';
+    card.style.background = `linear-gradient(135deg, ${MOOD_DATA[score].color}14, var(--bg) 60%)`;
+  }
+  function renderAmbienceSuggestion(score) {
+    const box = document.getElementById('ambience-music-suggest');
+    if (!box) return;
+    const moodCat = ambienceMoodCategory(score);
+    const labels  = { chill:'🌿 Thư giãn', focus:'📖 Tập trung học bài', sleep:'🌙 Dễ ngủ', nature:'🍃 Thiên nhiên' };
+    box.style.display = '';
+    box.innerHTML = `<button class="tag ambience-suggest-btn" onclick="App.suggestAmbienceMusic('${moodCat}')">🎵 Nghe nhạc ${labels[moodCat]} phù hợp tâm trạng này</button>`;
+  }
+  function suggestAmbienceMusic(moodCat) {
+    pendingMusicMood = moodCat;
+    nav('music');
   }
 
   async function loadDiaryEntries() {
@@ -477,7 +552,9 @@ const App = (() => {
     document.getElementById('record-btn')?.classList.remove('recording');
 
     selectedMood = 5;
-    buildMoodScale('diary-mood-scale', v => { selectedMood = v; }, selectedMood);
+    bindDiaryMoodScale(selectedMood);
+    const companionBox = document.getElementById('companion-message-box');
+    if (companionBox) companionBox.style.display = 'none';
   }
 
   async function saveDiaryEntry() {
@@ -529,6 +606,10 @@ const App = (() => {
       // Kích hoạt phân tích AI cảm xúc nền sau khi lưu (fire and forget)
       if (window.FEATURES && window.FEATURES.ai_emotion_analysis && res.entry?.id) {
         API.getEntryEmotion(res.entry.id).catch(() => {});
+      }
+      // Trợ lý Tâm hồn AI — lấy lời phản hồi ấm áp sau khi lưu (fire and forget)
+      if (window.FEATURES && window.FEATURES.soul_companion && res.entry?.id) {
+        API.getEntryCompanion(res.entry.id).then(d => { if (d && d.message) showCompanionMessage(d.message); }).catch(() => {});
       }
       await loadDiaryEntries();
       showToast('✅ Đã lưu nhật ký!');
@@ -621,6 +702,76 @@ const App = (() => {
         ?sorted.map(([tag,cnt])=>`<div class="card-sm" style="text-align:center"><div style="font-size:22px">${tag.split(' ')[0]}</div><div style="font-size:15px;font-weight:700;color:var(--primary)">${cnt}</div><div style="font-size:11px;color:var(--text-muted)">${tag.split(' ').slice(1).join(' ')}</div></div>`).join('')
         :'<div style="color:var(--text-hint);font-size:13px;grid-column:1/-1">Chưa có dữ liệu. Hãy thêm nhãn khi viết nhật ký!</div>';
     } catch(err) { showToast('⚠️ Không thể tải biểu đồ: '+err.message); }
+  }
+
+  // ── Bản đồ thời tiết tâm hồn (Mood Calendar) ───────────────────────────
+  function switchChartView(view, btn) {
+    document.querySelectorAll('#chart-view-toggle .tag').forEach(b => b.classList.remove('sel'));
+    (btn || document.getElementById(`chart-view-btn-${view}`))?.classList.add('sel');
+    const lineEl = document.getElementById('chart-line-section');
+    const calEl  = document.getElementById('mood-calendar-section');
+    if (view === 'calendar') {
+      if (lineEl) lineEl.style.display = 'none';
+      if (calEl)  calEl.style.display  = '';
+      renderMoodCalendar();
+    } else {
+      if (lineEl) lineEl.style.display = '';
+      if (calEl)  calEl.style.display  = 'none';
+    }
+  }
+
+  function moodWeatherIcon(avg) {
+    if (avg === null || avg === undefined) return null;
+    if (avg >= 8) return '☀️';
+    if (avg >= 6) return '🌤️';
+    if (avg >= 4) return '⛅';
+    if (avg >= 2) return '🌧️';
+    return '⛈️';
+  }
+
+  async function renderMoodCalendar() {
+    const grid  = document.getElementById('mood-calendar-grid');
+    const label = document.getElementById('mood-cal-month-label');
+    if (!grid) return;
+    const year = calendarMonth.getFullYear(), month = calendarMonth.getMonth();
+    if (label) label.textContent = `Tháng ${month + 1}, ${year}`;
+    const ym = `${year}-${String(month + 1).padStart(2, '0')}`;
+    grid.innerHTML = '<div class="loading-text">Đang tải...</div>';
+    try {
+      const res = await API.getMoodCalendar(ym);
+      const byDate = {};
+      (res.days || []).forEach(d => { byDate[(d.entry_date || '').split('T')[0]] = d; });
+
+      const firstDow    = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const dowLabels    = ['CN','T2','T3','T4','T5','T6','T7'];
+      let html = dowLabels.map(d => `<div class="mood-cal-dow">${d}</div>`).join('');
+      for (let i = 0; i < firstDow; i++) html += `<div class="mood-cal-day empty"></div>`;
+      for (let day = 1; day <= daysInMonth; day++) {
+        const ds   = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const info = byDate[ds];
+        const avg  = info ? Math.round(info.avg_mood * 10) / 10 : null;
+        const icon = moodWeatherIcon(avg);
+        const bg   = avg ? MOOD_DATA[Math.round(avg)].color + '1f' : '';
+        const title = info ? `Mood TB: ${avg}/10 — ${info.entry_count} nhật ký` : 'Chưa có nhật ký';
+        html += `<div class="mood-cal-day${info ? '' : ' empty'}" style="background:${bg}" title="${title}">
+          <span class="mood-cal-daynum">${day}</span>
+          ${icon ? `<span class="mood-cal-icon">${icon}</span>` : ''}
+        </div>`;
+      }
+      grid.innerHTML = html;
+    } catch (err) {
+      grid.innerHTML = `<div class="loading-text" style="color:var(--rose)">Lỗi: ${err.message}</div>`;
+    }
+  }
+
+  function calendarMonthNav(delta) {
+    const next = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + delta, 1);
+    const now  = new Date();
+    if (next.getFullYear() > now.getFullYear() ||
+        (next.getFullYear() === now.getFullYear() && next.getMonth() > now.getMonth())) return;
+    calendarMonth = next;
+    renderMoodCalendar();
   }
 
   // ── Library (API-driven) ──────────────────────────────────────────────
@@ -737,7 +888,9 @@ const App = (() => {
       musicAudioBound = true;
       audio.addEventListener('ended', stopMusic);
     }
-    loadMusicMood(currentMood);
+    const mood = pendingMusicMood || currentMood;
+    pendingMusicMood = null;
+    loadMusicMood(mood);
   }
 
   function fmtDuration(sec) {
@@ -1373,6 +1526,40 @@ const App = (() => {
       </div>`;
   }
 
+  // ── Hạt mầm tâm hồn (Soul Seed) ─────────────────────────────────────
+  function renderSoulSeed(user) {
+    const el = document.getElementById('soul-seed-section');
+    if (!el) return;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const last  = user.last_entry ? new Date(user.last_entry) : null;
+    if (last) last.setHours(0,0,0,0);
+    const daysSince = last ? Math.round((today - last) / 86400000) : Infinity;
+    const withered  = daysSince >= 2;
+    const streak    = user.streak || 0;
+
+    const STAGES = [
+      { min:0,  icon:'🌰',   name:'Hạt giống',    desc:'Viết nhật ký hôm nay để gieo hạt!' },
+      { min:1,  icon:'🌱',   name:'Mầm non',      desc:'Một mầm xanh đã nhô lên' },
+      { min:3,  icon:'🌿',   name:'Cây non',      desc:'Cây đang lớn dần mỗi ngày' },
+      { min:7,  icon:'🌳',   name:'Cây xanh tốt', desc:'Một cái cây vững chắc' },
+      { min:14, icon:'🌳🌸', name:'Cây ra hoa',   desc:'Những bông hoa đầu tiên đã nở' },
+      { min:30, icon:'🌳🌺', name:'Cây nở rộ',    desc:'Cây cổ thụ rực rỡ sắc hoa' },
+    ];
+    const stage = withered
+      ? { icon:'🥀', name:'Cây đang héo', desc:`Đã ${daysSince} ngày chưa viết — hãy tưới nước cho cây nào!` }
+      : [...STAGES].reverse().find(s => streak >= s.min) || STAGES[0];
+
+    el.style.display = '';
+    el.innerHTML = `
+      <div class="soul-seed-card ${withered ? 'withered' : ''}">
+        <div class="soul-seed-icon">${stage.icon}</div>
+        <div>
+          <div class="soul-seed-name">${stage.name}</div>
+          <div class="soul-seed-desc">${stage.desc}</div>
+        </div>
+      </div>`;
+  }
+
   // ── Weekly recap ─────────────────────────────────────────────────────
   function renderWeeklyRecap(stats14) {
     const el = document.getElementById('weekly-recap');
@@ -1505,5 +1692,5 @@ const App = (() => {
     nav('dashboard');
   }
 
-  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal};
+  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,refreshDailyPrompt,suggestAmbienceMusic};
 })();
