@@ -112,6 +112,83 @@ Nhật ký: "${text.slice(0,800)}"
   return ruleBasedAnalysis(text, moodScore);
 }
 
+// ── Helper: Trợ lý Tâm hồn AI — lời phản hồi ấm áp sau khi lưu nhật ký ──
+const COMPANION_FALLBACK = {
+  low: [
+    'Hôm nay có vẻ là một ngày không dễ dàng với bạn. Cảm xúc của bạn hoàn toàn hợp lý — bạn đã dũng cảm khi viết ra. Điều gì sẽ giúp bạn cảm thấy nhẹ nhõm hơn một chút ngay bây giờ?',
+    'Mình nghe thấy sự mệt mỏi trong những dòng chữ này. Bạn không cần phải mạnh mẽ mọi lúc. Nếu ngày mai có một điều nhỏ thay đổi, bạn muốn điều đó là gì?',
+    'Cảm ơn bạn đã chia sẻ những điều khó nói này. Mỗi cảm xúc đều xứng đáng được lắng nghe, kể cả những cảm xúc nặng nề nhất. Ai là người bạn có thể tâm sự thêm về điều này?',
+  ],
+  mid: [
+    'Một ngày bình thường cũng đáng được ghi lại — không phải lúc nào cũng cần điều gì đó lớn lao. Điều gì trong hôm nay khiến bạn suy nghĩ nhiều nhất?',
+    'Cảm ơn bạn đã dành thời gian nhìn lại ngày hôm nay. Nếu có thể thay đổi một phần nhỏ của ngày mai, bạn sẽ chọn điều gì?',
+    'Những cảm xúc xen lẫn như vậy là điều rất con người. Bạn nghĩ điều gì đã giúp bạn giữ được sự bình thản hôm nay?',
+  ],
+  high: [
+    'Thật vui khi đọc được những dòng tích cực này! Bạn đã làm gì khiến hôm nay trở nên đặc biệt như vậy?',
+    'Cảm xúc tốt đẹp này xứng đáng được ăn mừng. Bạn muốn giữ lại điều gì từ hôm nay cho những ngày sau này?',
+    'Năng lượng tích cực của bạn lan tỏa qua từng câu chữ. Điều gì đã góp phần lớn nhất tạo nên ngày hôm nay của bạn?',
+  ],
+};
+
+function ruleBasedCompanion(moodScore) {
+  const bucket = moodScore <= 4 ? 'low' : moodScore <= 7 ? 'mid' : 'high';
+  const list = COMPANION_FALLBACK[bucket];
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+async function companionMessage(text, moodScore) {
+  if (genai && (text || '').trim().length > 20) {
+    const prompt = `Bạn là người đồng hành ấm áp, không phán xét, trong ứng dụng nhật ký "Soul Diary" dành cho học sinh/sinh viên Việt Nam. Họ vừa viết:
+"${text.slice(0,800)}"
+Điểm tâm trạng: ${moodScore}/10
+Hãy viết đúng 2-3 câu tiếng Việt thuần văn xuôi (không markdown, không gạch đầu dòng, không JSON): một lời phản hồi ấm áp, đồng cảm, KHÔNG lặp lại nguyên văn nhật ký, và kết thúc bằng một câu hỏi gợi mở nhẹ nhàng để họ suy ngẫm thêm. Giọng văn tự nhiên, gần gũi, không giáo điều, không dùng emoji.`;
+    try {
+      const model  = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      const result = await model.generateContent(prompt);
+      const text2  = result.response.text().trim();
+      if (text2) return text2;
+    } catch (e) {
+      console.error('Gemini companion error:', e.message);
+    }
+  }
+  return ruleBasedCompanion(moodScore);
+}
+
+// ── Gợi ý chủ đề viết hàng ngày — cố định theo ngày, không tốn quota Gemini ──
+const DAILY_PROMPTS = [
+  'Điều gì làm bạn mỉm cười hôm nay?',
+  'Nếu được gửi một lời khuyên cho chính mình 5 năm trước, bạn sẽ nói gì?',
+  'Một điều nhỏ bạn biết ơn ngay lúc này là gì?',
+  'Hôm nay bạn đã tử tế với ai, hoặc ai đã tử tế với bạn?',
+  'Có điều gì đang khiến bạn lo lắng mà bạn chưa nói ra với ai?',
+  'Nếu hôm nay có một màu sắc, bạn sẽ chọn màu gì và vì sao?',
+  'Điều gì bạn đã học được về bản thân trong tuần này?',
+  'Bạn muốn ngày mai của mình khác hôm nay ở điểm nào?',
+  'Một kỷ niệm vui nào vừa chợt đến trong đầu bạn?',
+  'Bạn đang chờ đợi điều gì nhất trong những ngày tới?',
+  'Điều gì khiến bạn cảm thấy an toàn khi mọi thứ trở nên quá tải?',
+  'Nếu có thể nói một câu với người đã làm bạn buồn, bạn sẽ nói gì?',
+  'Bạn đã đối xử với bản thân như thế nào hôm nay?',
+  'Một nỗi sợ bạn muốn vượt qua trong năm nay là gì?',
+  'Điều gì khiến bạn cảm thấy tự hào về bản thân gần đây?',
+  'Nếu hôm nay là một trang sách, tiêu đề của trang đó sẽ là gì?',
+  'Bạn đang mang theo gánh nặng nào mà muốn đặt xuống?',
+  'Một người bạn muốn cảm ơn nhưng chưa có cơ hội là ai?',
+  'Điều gì khiến bạn thấy bình yên nhất lúc này?',
+  'Nếu được nghỉ một ngày không lo nghĩ gì, bạn sẽ làm gì?',
+  'Bạn nghĩ phiên bản tốt nhất của mình trông như thế nào?',
+  'Có điều gì bạn đang trì hoãn vì sợ thất bại không?',
+  'Điều gì trong quá khứ bạn đã buông bỏ được, và cảm giác đó ra sao?',
+  'Bạn muốn được lắng nghe điều gì nhất ngay bây giờ?',
+  'Một thói quen nhỏ nào đang giúp bạn từng ngày?',
+];
+
+function dayOfYear(d) {
+  const start = new Date(d.getFullYear(), 0, 0);
+  return Math.floor((d - start) / 86400000);
+}
+
 // ── GET /api/diary — danh sách nhật ký (có phân trang) ──────────────────
 router.get('/', async (req, res) => {
   try {
@@ -127,7 +204,7 @@ router.get('/', async (req, res) => {
         .input('limit',   sql.Int, limit)
         .input('offset',  sql.Int, offset)
         .query(`
-          SELECT id, mood_score, event_text, thoughts, gratitude, tags, audio_data, ai_emotion, cbt_data, photos, created_at
+          SELECT id, mood_score, event_text, thoughts, gratitude, tags, audio_data, ai_emotion, ai_companion_message, cbt_data, photos, created_at
           FROM DiaryEntries
           WHERE user_id = @user_id
           ORDER BY created_at DESC
@@ -286,6 +363,48 @@ router.get('/stats', async (req, res) => {
     console.error('Stats error:', err);
     res.status(500).json({ message: 'Lỗi server.' });
   }
+});
+
+// ── GET /api/diary/calendar?month=YYYY-MM — bản đồ thời tiết tâm hồn theo tháng ──
+router.get('/calendar', async (req, res) => {
+  try {
+    const m = /^\d{4}-\d{2}$/.test(req.query.month || '') ? req.query.month : null;
+    const now   = new Date();
+    const year  = m ? parseInt(m.slice(0,4)) : now.getFullYear();
+    const month = m ? parseInt(m.slice(5,7)) - 1 : now.getMonth();
+    const start = new Date(year, month, 1);
+    const end   = new Date(year, month + 1, 1);
+    const monthLabel = `${year}-${String(month+1).padStart(2,'0')}`;
+
+    const db = await getPool();
+    const result = await db.request()
+      .input('user_id', sql.Int,      req.user.id)
+      .input('start',   sql.DateTime, start)
+      .input('end',     sql.DateTime, end)
+      .query(`
+        SELECT
+          CAST(created_at AS DATE) AS entry_date,
+          AVG(CAST(mood_score AS FLOAT)) AS avg_mood,
+          COUNT(*) AS entry_count
+        FROM DiaryEntries
+        WHERE user_id = @user_id AND created_at >= @start AND created_at < @end
+        GROUP BY CAST(created_at AS DATE)
+        ORDER BY entry_date ASC
+      `);
+
+    res.json({ month: monthLabel, days: result.recordset });
+  } catch (err) {
+    console.error('Calendar error:', err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+// ── GET /api/diary/daily-prompt — gợi ý chủ đề viết hôm nay ─────────────
+router.get('/daily-prompt', async (req, res) => {
+  const idx = req.query.refresh === '1'
+    ? Math.floor(Math.random() * DAILY_PROMPTS.length)
+    : dayOfYear(new Date()) % DAILY_PROMPTS.length;
+  res.json({ prompt: DAILY_PROMPTS[idx] });
 });
 
 // ── GET /api/diary/smart-recap — AI tóm tắt tuần (cache 1 lần/ngày) ────
@@ -610,6 +729,38 @@ router.get('/:id/emotion', async (req, res) => {
     res.json({ analysis, cached: false });
   } catch (err) {
     console.error('Emotion analysis error:', err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+// ── GET /api/diary/:id/companion — lời phản hồi ấm áp của Trợ lý Tâm hồn AI ──
+router.get('/:id/companion', async (req, res) => {
+  try {
+    const db  = await getPool();
+    const row = await db.request()
+      .input('id',      sql.Int, req.params.id)
+      .input('user_id', sql.Int, req.user.id)
+      .query(`SELECT id, mood_score, event_text, thoughts, gratitude, ai_companion_message
+              FROM DiaryEntries WHERE id=@id AND user_id=@user_id`);
+    if (!row.recordset.length) return res.status(404).json({ message: 'Không tìm thấy.' });
+
+    const entry = row.recordset[0];
+    if (entry.ai_companion_message) {
+      return res.json({ message: entry.ai_companion_message, cached: true });
+    }
+
+    const text = [entry.event_text, entry.thoughts, entry.gratitude].filter(Boolean).join('\n');
+    if (!text.trim()) return res.json({ message: null });
+
+    const message = await companionMessage(text, entry.mood_score);
+    await db.request()
+      .input('id', sql.Int,      req.params.id)
+      .input('m',  sql.NVarChar, message)
+      .query(`UPDATE DiaryEntries SET ai_companion_message=@m WHERE id=@id`);
+
+    res.json({ message, cached: false });
+  } catch (err) {
+    console.error('Companion message error:', err);
     res.status(500).json({ message: 'Lỗi server.' });
   }
 });

@@ -213,6 +213,15 @@ async function initSchema() {
     ALTER TABLE DiaryEntries ADD photos NVARCHAR(MAX) NULL
   `);
 
+  // Lời phản hồi ấm áp của Trợ lý Tâm hồn AI — cache plain text sau khi lưu nhật ký
+  await db.request().query(`
+    IF NOT EXISTS (
+      SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME='DiaryEntries' AND COLUMN_NAME='ai_companion_message'
+    )
+    ALTER TABLE DiaryEntries ADD ai_companion_message NVARCHAR(MAX) NULL
+  `);
+
   // Articles table
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Articles' AND xtype='U')
@@ -316,6 +325,36 @@ async function initSchema() {
     VALUES ('weekly_checkin',N'Check-in Sức khỏe Tinh thần hàng tuần',
             N'Bài test sàng lọc PHQ-9/GAD-7/PSS-10/WHO-5 (31 câu), nhắc nhở mỗi Thứ 7',
             'v1.4',N'Check-in Tâm lý',0,4)
+  `);
+
+  // Seed feature flags v1.5 — Nuôi dưỡng Tâm hồn (disabled by default, chờ admin bật)
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='mood_calendar')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('mood_calendar',N'Bản đồ thời tiết tâm hồn',
+            N'Lịch tâm trạng theo tháng dạng icon thời tiết, trực quan hóa chu kỳ cảm xúc',
+            'v1.5',N'Nuôi dưỡng Tâm hồn',0,5)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='soul_companion')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('soul_companion',N'Trợ lý Tâm hồn AI',
+            N'AI phản hồi ấm áp sau mỗi nhật ký và gợi ý chủ đề viết khi bí ý tưởng',
+            'v1.5',N'Nuôi dưỡng Tâm hồn',0,6)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='mood_ambience')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('mood_ambience',N'Không gian theo cảm xúc',
+            N'Gợi ý nhạc thư giãn và đổi màu nền theo tâm trạng khi viết nhật ký',
+            'v1.5',N'Nuôi dưỡng Tâm hồn',0,7)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='soul_seed')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('soul_seed',N'Hạt mầm tâm hồn',
+            N'Cây ảo trên dashboard lớn dần theo chuỗi ngày viết, héo nếu bỏ bê',
+            'v1.5',N'Nuôi dưỡng Tâm hồn',0,8)
   `);
 
   // Index

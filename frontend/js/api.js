@@ -65,6 +65,9 @@ const API = (() => {
 
     getDiary:         (page = 1, limit = 20) => request(`/diary?page=${page}&limit=${limit}`),
     getStats:         (days = 14)            => request(`/diary/stats?days=${days}`),
+    getMoodCalendar:  (month)                => request(`/diary/calendar${month ? '?month='+month : ''}`),
+    getDailyPrompt:   (refresh)              => request(`/diary/daily-prompt${refresh ? '?refresh=1' : ''}`),
+    getEntryCompanion:(id)                   => request(`/diary/${id}/companion`),
     getSmartRecap:    ()                     => request('/diary/smart-recap'),
     getMentalHealth:  ()                     => request('/diary/mental-health'),
     getEntryEmotion:  (id)                   => request(`/diary/${id}/emotion`),

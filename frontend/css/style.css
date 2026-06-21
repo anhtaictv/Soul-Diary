@@ -603,4 +603,39 @@ select.form-input{cursor:pointer}
 .ai-emotion-themes{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
 .ai-theme-chip{background:#e0e7ff;color:#4338ca;font-size:11px;padding:2px 8px;border-radius:12px;font-weight:600}
 .ai-emotion-suggestions{font-size:12px;color:var(--text-muted);line-height:1.6}
+
+/* ══════════════ v1.5 — NUÔI DƯỠNG TÂM HỒN ══════════════ */
+
+/* ── Trợ lý Tâm hồn AI: gợi ý chủ đề viết + lời nhắn sau khi lưu ── */
+.daily-prompt-card{display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,#fdf4ff,#fae8ff);border:1px solid #e9b9f5;border-radius:var(--radius);padding:12px 14px;margin-bottom:16px}
+.daily-prompt-label{font-size:10px;font-weight:700;color:#a21caf;text-transform:uppercase;letter-spacing:.6px;flex-shrink:0}
+.daily-prompt-text{flex:1;font-size:13px;color:#701a75;line-height:1.5;font-style:italic}
+.daily-prompt-refresh{background:none;border:none;cursor:pointer;font-size:15px;color:#a21caf;padding:4px;flex-shrink:0}
+.daily-prompt-refresh:hover{transform:rotate(60deg);transition:.2s}
+
+.companion-message-box{background:linear-gradient(135deg,#eef2ff,#e0e7ff);border-left:3px solid var(--primary);border-radius:var(--radius-sm);padding:12px 14px;margin-top:14px}
+.companion-msg-label{font-size:10px;font-weight:700;color:var(--primary-dark);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
+.companion-msg-text{font-size:13px;color:var(--text);line-height:1.6;font-style:italic;white-space:pre-wrap}
+
+/* ── Không gian theo cảm xúc: gợi ý nhạc theo mood đang chọn ── */
+.ambience-suggest-btn{border-color:var(--primary);color:var(--primary-dark);background:var(--primary-light)}
+
+/* ── Bản đồ thời tiết tâm hồn (Mood Calendar) ── */
+.mood-cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.mood-cal-month-label{font-size:14px;font-weight:700;color:var(--text);font-family:'Nunito',sans-serif}
+.mood-calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.mood-cal-dow{text-align:center;font-size:11px;font-weight:700;color:var(--text-muted);padding-bottom:4px}
+.mood-cal-day{aspect-ratio:1;border:1px solid var(--border);border-radius:var(--radius-sm);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:default}
+.mood-cal-day.empty{border-color:transparent;opacity:.4}
+.mood-cal-daynum{font-size:11px;font-weight:600;color:var(--text-muted)}
+.mood-cal-icon{font-size:16px;line-height:1}
+
+/* ── Hạt mầm tâm hồn (Soul Seed) ── */
+.soul-seed-card{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#f0fdf4,#ecfccb);border:1px solid #bbf7d0;border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:20px;transition:.3s}
+.soul-seed-icon{font-size:32px;line-height:1}
+.soul-seed-name{font-size:14px;font-weight:700;color:#15803d;font-family:'Nunito',sans-serif}
+.soul-seed-desc{font-size:12px;color:#3f6212;margin-top:2px}
+.soul-seed-card.withered{background:linear-gradient(135deg,#f5f5f4,#e7e5e4);border-color:var(--border);filter:grayscale(.3)}
+.soul-seed-card.withered .soul-seed-name{color:#78716c}
+.soul-seed-card.withered .soul-seed-desc{color:var(--text-muted)}
 .ai-emotion-suggestions li{margin-bottom:2px}
