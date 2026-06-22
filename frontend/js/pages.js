@@ -46,12 +46,17 @@ const PAGES = {
         <div class="grid-4" id="mental-health-cards"></div>
       </div>
 
-      <!-- Huy hiệu -->
-      <div class="section-label" id="badges-label" style="display:none">Huy hiệu của bạn</div>
-      <div id="badges-grid"></div>
-
-      <div class="section-label">Nhật ký gần đây</div>
-      <div id="dash-recent-entries"><div class="loading-text">Đang tải...</div></div>
+      <!-- Huy hiệu & Nhật ký gần đây -->
+      <div class="grid-2">
+        <div>
+          <div class="section-label" id="badges-label" style="display:none">Huy hiệu của bạn</div>
+          <div id="badges-grid"></div>
+        </div>
+        <div>
+          <div class="section-label">Nhật ký gần đây</div>
+          <div id="dash-recent-entries"><div class="loading-text">Đang tải...</div></div>
+        </div>
+      </div>
     </div>`,
 
   diary: () => `

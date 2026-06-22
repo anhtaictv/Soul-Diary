@@ -548,16 +548,14 @@ select.form-input{cursor:pointer}
 .trend-down{color:var(--rose);font-size:13px}
 .trend-same{color:var(--amber);font-size:13px}
 
-/* ── Badges (cuộn ngang) ── */
-.badge-grid{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:20px;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
-.badge-grid::-webkit-scrollbar{height:4px}
-.badge-grid::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-.badge-item{flex:0 0 auto;background:var(--bg);border:1.5px solid var(--border);border-radius:20px;padding:8px 14px;display:flex;align-items:center;gap:6px;transition:.15s;cursor:default}
+/* ── Badges (danh sách dọc, gọn) ── */
+#badges-grid{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.badge-item{background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;gap:10px;transition:.15s;cursor:default}
 .badge-item.earned{border-color:#fbbf24;background:linear-gradient(135deg,#fffbeb,#fef9e7)}
 .badge-item.earned:hover{transform:translateY(-1px);box-shadow:0 3px 10px rgba(251,191,36,.25)}
 .badge-item.locked{opacity:.45;filter:grayscale(1)}
 .badge-icon{font-size:18px;line-height:1}
-.badge-name{font-size:12px;font-weight:700;color:var(--text);white-space:nowrap}
+.badge-name{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap}
 
 /* Hộp yêu cầu quyền microphone */
 .mic-perm-box{display:flex;flex-direction:column;align-items:center;gap:10px;padding:24px 16px;text-align:center}
@@ -568,7 +566,7 @@ select.form-input{cursor:pointer}
   .diary-textarea{min-height:100px}
   .push-banner{flex-direction:column;align-items:flex-start;gap:10px}
   .push-banner button{width:100%}
-  .badge-grid{gap:6px}
+  #badges-grid{gap:6px}
 }
 
 /* ── AI Insight Card (trong weekly-recap) ── */
