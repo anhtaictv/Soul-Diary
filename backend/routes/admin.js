@@ -3,6 +3,7 @@ const express          = require('express');
 const { getPool, sql } = require('../db');
 const authMiddleware   = require('../middleware/auth');
 const adminMiddleware  = require('../middleware/admin');
+const { webpush }      = require('./push');
 
 const router = express.Router();
 router.use(authMiddleware, adminMiddleware);
@@ -49,7 +50,8 @@ router.get('/users', async (req, res) => {
     const result = await db.request().query(`
       SELECT u.id, u.username, u.email, u.full_name, u.role,
              u.streak, u.created_at,
-             COUNT(d.id) AS diary_count
+             COUNT(d.id) AS diary_count,
+             (SELECT TOP 1 mood_score FROM DiaryEntries WHERE user_id=u.id ORDER BY created_at DESC) AS last_mood
       FROM Users u
       LEFT JOIN DiaryEntries d ON d.user_id = u.id
       GROUP BY u.id, u.username, u.email, u.full_name, u.role, u.streak, u.created_at
@@ -79,6 +81,53 @@ router.patch('/users/:id/role', async (req, res) => {
       .query('UPDATE Users SET role=@role WHERE id=@id');
     res.json({ message: role === 'admin' ? 'Đã cấp quyền admin.' : 'Đã thu hồi quyền admin.' });
   } catch (err) {
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+// ── POST /api/admin/outreach — Gửi tin hỗ trợ đến user ──────────────────
+router.post('/outreach', async (req, res) => {
+  try {
+    const { to_user_id, type, content, meta } = req.body;
+    if (!to_user_id || !content?.trim()) {
+      return res.status(400).json({ message: 'Thiếu người nhận hoặc nội dung.' });
+    }
+    if (!['message','cheer','song','article'].includes(type)) {
+      return res.status(400).json({ message: 'Loại tin không hợp lệ.' });
+    }
+    const db = await getPool();
+    await db.request()
+      .input('from',    sql.Int,      req.user.id)
+      .input('to',      sql.Int,      to_user_id)
+      .input('type',    sql.NVarChar, type)
+      .input('content', sql.NVarChar, content.trim())
+      .input('meta',    sql.NVarChar, meta ? JSON.stringify(meta) : null)
+      .query(`INSERT INTO AdminMessages (from_user_id,to_user_id,type,content,meta_json)
+              VALUES (@from,@to,@type,@content,@meta)`);
+
+    // Push notification nếu user có subscription
+    if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+      const subs = await db.request()
+        .input('uid', sql.Int, to_user_id)
+        .query('SELECT endpoint,p256dh,auth FROM PushSubscriptions WHERE user_id=@uid');
+      const icons = { message:'💬', cheer:'✨', song:'🎵', article:'📖' };
+      for (const s of subs.recordset) {
+        try {
+          await webpush.sendNotification(
+            { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+            JSON.stringify({ title: `Soul Diary ${icons[type]}`, body: content.trim().slice(0, 80) }),
+          );
+        } catch (e) {
+          if (e.statusCode === 410 || e.statusCode === 404) {
+            await db.request().input('ep', sql.NVarChar, s.endpoint)
+              .query('DELETE FROM PushSubscriptions WHERE endpoint=@ep');
+          }
+        }
+      }
+    }
+    res.json({ message: 'Đã gửi tin!' });
+  } catch (err) {
+    console.error('Outreach error:', err);
     res.status(500).json({ message: 'Lỗi server.' });
   }
 });

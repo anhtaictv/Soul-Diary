@@ -2,9 +2,13 @@
 const Admin = (() => {
 
   let allArticles = [];
+  let allUsers    = [];
   let mdeInstance = null;
   let bound       = false;
-  let changelogExpanded = false;
+  let changelogExpanded  = false;
+  let outreachTargetId   = null;
+  let outreachType       = 'message';
+  let outreachMood       = 'chill';
 
   // ── Lịch sử phiên bản ────────────────────────────────────────────────
   const CHANGELOG = [
@@ -597,6 +601,7 @@ const Admin = (() => {
   async function loadUsers() {
     try {
       const data  = await API.getAdminUsers();
+      allUsers = data.users;
       const tbody = document.getElementById('adm-users-tbody');
       tbody.innerHTML = data.users.map(u => `
         <tr>
@@ -610,15 +615,66 @@ const Admin = (() => {
           <td>${u.role === 'admin'
             ? '<span class="badge badge-orange">👑 Admin</span>'
             : '<span class="badge badge-gray">User</span>'}</td>
+          <td>
+            ${u.last_mood !== null && u.last_mood !== undefined
+              ? `<span style="font-weight:700;color:${u.last_mood<=4?'#ef4444':u.last_mood<=6?'#f59e0b':'#22c55e'}">${u.last_mood}/10</span>`
+              : '<span style="color:var(--text-hint)">—</span>'}
+          </td>
           <td><span style="color:#f97316;font-weight:600">🔥 ${u.streak}</span></td>
           <td style="color:var(--text-muted)">${u.diary_count}</td>
           <td style="color:var(--text-hint);font-size:12px">${fmtDate(u.created_at)}</td>
-          <td>
+          <td style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm" style="background:var(--primary-light,#ede9fe);color:var(--primary);border:1px solid var(--primary)" title="Gửi tin hỗ trợ" onclick="Admin.openOutreachModal(${u.id})">💌</button>
             ${u.role !== 'admin'
               ? `<button class="btn btn-outline btn-sm" onclick="Admin.promoteUser(${u.id})">👑 Cấp Admin</button>`
               : `<button class="btn btn-sm" style="background:var(--rose-light);color:var(--rose);border:1px solid #fecdd3" onclick="Admin.demoteUser(${u.id})">Thu hồi</button>`}
           </td>
         </tr>`).join('');
+    } catch (err) { showToast('❌ ' + err.message); }
+  }
+
+  // ── Outreach (Gửi tin hỗ trợ đến user) ──────────────────────────────────
+  function openOutreachModal(userId) {
+    outreachTargetId = userId;
+    outreachType = 'message';
+    outreachMood = 'chill';
+    const u = allUsers.find(x => x.id === userId);
+    document.getElementById('outreach-target-name').textContent = u ? (u.full_name || u.username) : `#${userId}`;
+    document.getElementById('outreach-content').value = '';
+    document.getElementById('outreach-content').placeholder = 'Viết lời nhắn cá nhân...';
+    document.getElementById('outreach-song-section').style.display = 'none';
+    document.querySelectorAll('#outreach-type-btns .tag').forEach(b => b.classList.toggle('sel', b.dataset.type === 'message'));
+    document.querySelectorAll('#outreach-mood-btns .tag').forEach(b => b.classList.toggle('sel', b.dataset.mood === 'chill'));
+    document.getElementById('outreach-modal').classList.add('open');
+  }
+
+  function closeOutreachModal() {
+    document.getElementById('outreach-modal').classList.remove('open');
+  }
+
+  function selectOutreachType(type, btn) {
+    outreachType = type;
+    document.querySelectorAll('#outreach-type-btns .tag').forEach(b => b.classList.remove('sel'));
+    btn.classList.add('sel');
+    document.getElementById('outreach-song-section').style.display = type === 'song' ? '' : 'none';
+    const ph = { message:'Viết lời nhắn cá nhân...', cheer:'Một lời động viên ngắn gọn, ấm áp...', song:'Kèm lời nhắn cho bài nhạc này...', article:'Tiêu đề bài viết và lý do bạn gợi ý...' };
+    document.getElementById('outreach-content').placeholder = ph[type] || '';
+  }
+
+  function selectOutreachMood(mood, btn) {
+    outreachMood = mood;
+    document.querySelectorAll('#outreach-mood-btns .tag').forEach(b => b.classList.remove('sel'));
+    btn.classList.add('sel');
+  }
+
+  async function sendOutreach() {
+    const content = document.getElementById('outreach-content').value.trim();
+    if (!content) { showToast('⚠️ Vui lòng nhập nội dung.'); return; }
+    const meta = outreachType === 'song' ? { mood: outreachMood } : null;
+    try {
+      await API.sendOutreach(outreachTargetId, outreachType, content, meta);
+      showToast('✅ Đã gửi tin!');
+      closeOutreachModal();
     } catch (err) { showToast('❌ ' + err.message); }
   }
 
@@ -655,6 +711,7 @@ const Admin = (() => {
     selectEmoji, selectColor,
     togglePublish, deleteArticle,
     promoteUser, demoteUser,
+    openOutreachModal, closeOutreachModal, selectOutreachType, selectOutreachMood, sendOutreach,
     saveSOSSetting,
     toggleChangelog,
     showNewVersionForm, submitNewVersion,
