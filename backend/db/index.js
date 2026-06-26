@@ -454,6 +454,15 @@ async function initSchema() {
             'v1.6',N'Lan tỏa Tâm hồn',0,9)
   `);
 
+  // Seed feature flags v1.7 — Heatmap cảm xúc năm + Báo cáo Admin (disabled by default)
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='mood_heatmap')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('mood_heatmap',N'Heatmap Cảm xúc Năm',
+            N'Lưới 52 tuần kiểu GitHub-style — mỗi ô là 1 ngày, màu sắc theo điểm tâm trạng trung bình',
+            'v1.7',N'Phân tích Cảm xúc Nâng cao',0,11)
+  `);
+
   // Bảng AdminMessages — tin nhắn admin/counselor gửi đến user (hộp thư hỗ trợ)
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AdminMessages' AND xtype='U')

@@ -557,6 +557,33 @@ Viết đúng 2-3 câu tiếng Việt: nhận xét ngắn về tuần cảm xúc
   }
 });
 
+// ── GET /api/diary/heatmap?year=YYYY — Heatmap cảm xúc năm ─────────────
+router.get('/heatmap', async (req, res) => {
+  try {
+    const db   = await getPool();
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    const result = await db.request()
+      .input('uid',   sql.Int,  req.user.id)
+      .input('start', sql.Date, `${year}-01-01`)
+      .input('end',   sql.Date, `${year + 1}-01-01`)
+      .query(`
+        SELECT CAST(created_at AS DATE) AS entry_date,
+               AVG(CAST(mood_score AS FLOAT)) AS avg_mood,
+               COUNT(*) AS entry_count
+        FROM DiaryEntries
+        WHERE user_id = @uid
+          AND created_at >= @start
+          AND created_at < @end
+        GROUP BY CAST(created_at AS DATE)
+        ORDER BY entry_date
+      `);
+    res.json({ year, days: result.recordset });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
+});
+
 // ── POST /api/diary — tạo nhật ký mới ───────────────────────────────────
 router.post('/', async (req, res) => {
   try {

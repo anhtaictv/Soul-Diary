@@ -634,6 +634,30 @@ select.form-input{cursor:pointer}
 .mood-cal-daynum{font-size:11px;font-weight:600;color:var(--text-muted)}
 .mood-cal-icon{font-size:16px;line-height:1}
 
+/* ── Heatmap cảm xúc năm ── */
+.hm-wrap{overflow-x:auto;padding-bottom:6px}
+.hm-months{position:relative;height:18px;margin-bottom:4px;font-size:10px;color:var(--text-muted);margin-left:0}
+.hm-month-label{position:absolute;white-space:nowrap}
+.hm-grid{display:flex;align-items:flex-start;gap:4px}
+.hm-day-labels{display:flex;flex-direction:column;gap:2px;margin-right:2px;padding-top:0}
+.hm-day-labels span{height:12px;font-size:9px;color:var(--text-muted);line-height:12px;text-align:right;width:14px}
+.hm-cols{display:flex;gap:2px}
+.hm-col{display:flex;flex-direction:column;gap:2px}
+.hm-cell{width:12px;height:12px;border-radius:2px;display:inline-block;cursor:default;transition:opacity .15s}
+.hm-cell:hover{opacity:.7}
+.hm-empty{background:transparent}
+.hm-none{background:#e5e7eb}
+.hm-1-4{background:#fca5a5}
+.hm-5-6{background:#fcd34d}
+.hm-7-8{background:#86efac}
+.hm-9-10{background:#22c55e}
+.heatmap-legend{display:flex;align-items:center;gap:6px;margin-top:10px;justify-content:flex-end;flex-wrap:wrap}
+.dark-mode .hm-none{background:#374151}
+.dark-mode .hm-1-4{background:#b91c1c}
+.dark-mode .hm-5-6{background:#b45309}
+.dark-mode .hm-7-8{background:#15803d}
+.dark-mode .hm-9-10{background:#16a34a}
+
 /* ── Hạt mầm tâm hồn (Soul Seed) ── */
 .soul-seed-card{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#f0fdf4,#ecfccb);border:1px solid #bbf7d0;border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:20px;transition:.3s}
 .soul-seed-icon{font-size:32px;line-height:1}
