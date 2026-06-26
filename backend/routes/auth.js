@@ -152,7 +152,8 @@ router.get('/me', authMiddleware, async (req, res) => {
       .input('id', sql.Int, req.user.id)
       .query(`
         SELECT id, username, email, full_name, avatar_text, role,
-               streak, streak_freeze, max_streak, last_entry, created_at
+               streak, streak_freeze, max_streak, last_entry, created_at,
+               notif_hour, notif_days
         FROM Users WHERE id = @id
       `);
 
@@ -189,6 +190,26 @@ router.put('/profile', authMiddleware, async (req, res) => {
     res.json({ message: 'Cập nhật thành công.', avatar_text: avatarText, full_name });
   } catch (err) {
     console.error('Update profile error:', err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+// ── PUT /api/auth/notification-prefs — cài đặt nhắc nhở tùy chỉnh ─────
+router.put('/notification-prefs', authMiddleware, async (req, res) => {
+  try {
+    const { notif_hour, notif_days } = req.body;
+    const h = notif_hour !== null && notif_hour !== undefined ? parseInt(notif_hour) : null;
+    if (h !== null && (isNaN(h) || h < 0 || h > 23))
+      return res.status(400).json({ message: 'Giờ không hợp lệ (0–23).' });
+    const db = await getPool();
+    await db.request()
+      .input('uid',        sql.Int,      req.user.id)
+      .input('notif_hour', sql.Int,      h)
+      .input('notif_days', sql.NVarChar, notif_days || null)
+      .query('UPDATE Users SET notif_hour=@notif_hour, notif_days=@notif_days WHERE id=@uid');
+    res.json({ message: 'Đã lưu cài đặt nhắc nhở!' });
+  } catch (e) {
+    console.error(e);
     res.status(500).json({ message: 'Lỗi server.' });
   }
 });

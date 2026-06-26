@@ -73,8 +73,10 @@ app.use('/api/settings', apiLimiter,  require('./routes/settings'));
 app.use('/api/music',    apiLimiter,  require('./routes/music'));
 app.use('/api/push',     apiLimiter,  require('./routes/push').router);
 app.use('/api/features', apiLimiter,  require('./routes/features'));
-app.use('/api/check-in', apiLimiter,  require('./routes/checkin'));
-app.use('/api/inbox',   apiLimiter,  require('./routes/inbox'));
+app.use('/api/check-in',   apiLimiter, require('./routes/checkin'));
+app.use('/api/inbox',      apiLimiter, require('./routes/inbox'));
+app.use('/api/challenges', apiLimiter, require('./routes/challenges'));
+app.use('/api/community',  apiLimiter, require('./routes/community'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -104,14 +106,17 @@ cron.schedule('0 * * * *', async () => {
     // – Có subscription, chưa viết hôm nay, chưa nhận push trong 20h gần nhất, ≥3 bài
     const result = await db.request().query(`
       SELECT
-        u.id, u.streak, u.streak_freeze,
+        u.id, u.streak, u.streak_freeze, u.notif_days,
         ps.endpoint, ps.p256dh, ps.auth,
         (SELECT TOP 1 mood_score FROM DiaryEntries
          WHERE user_id = u.id ORDER BY created_at DESC) AS last_mood,
-        ISNULL(
-          (SELECT CAST(AVG(CAST(DATEPART(HOUR, DATEADD(HOUR,7,created_at)) AS FLOAT)) AS INT)
-           FROM (SELECT TOP 20 created_at FROM DiaryEntries WHERE user_id = u.id ORDER BY created_at DESC) r
-          ), 20
+        COALESCE(
+          u.notif_hour,
+          ISNULL(
+            (SELECT CAST(AVG(CAST(DATEPART(HOUR, DATEADD(HOUR,7,created_at)) AS FLOAT)) AS INT)
+             FROM (SELECT TOP 20 created_at FROM DiaryEntries WHERE user_id = u.id ORDER BY created_at DESC) r
+            ), 20
+          )
         ) AS preferred_hour
       FROM Users u
       INNER JOIN PushSubscriptions ps ON ps.user_id = u.id
@@ -121,8 +126,13 @@ cron.schedule('0 * * * *', async () => {
         AND (SELECT COUNT(*) FROM DiaryEntries WHERE user_id = u.id) >= 3
     `);
 
-    // Lọc thêm theo giờ ưa thích (±1h) — tránh gọi DB với tất cả trong 1 truy vấn phức tạp
-    const toNotify = result.recordset.filter(u => Math.abs(vnHour - (u.preferred_hour || 20)) <= 1);
+    // Lọc theo giờ ưa thích (±1h) và ngày trong tuần (nếu đã cài)
+    const vnDow = (new Date().getUTCDay()); // 0=CN, 1=T2, ..., 6=T7
+    const toNotify = result.recordset.filter(u => {
+      const hourOk = Math.abs(vnHour - (u.preferred_hour || 20)) <= 1;
+      const dayOk  = !u.notif_days || u.notif_days.split(',').map(Number).includes(vnDow);
+      return hourOk && dayOk;
+    });
 
     for (const u of toNotify) {
       let body;

@@ -634,6 +634,35 @@ select.form-input{cursor:pointer}
 .mood-cal-daynum{font-size:11px;font-weight:600;color:var(--text-muted)}
 .mood-cal-icon{font-size:16px;line-height:1}
 
+/* ── Thử thách Sức khỏe Tâm thần ── */
+.challenge-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;margin-bottom:14px;transition:.2s}
+.challenge-card.completed{opacity:.75}
+.challenge-card:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,0,0,.07)}
+.challenge-card-title{font-size:15px;font-weight:700;margin-bottom:4px}
+.challenge-card-desc{font-size:13px;color:var(--text-muted);line-height:1.5}
+.challenge-active-card{border-color:var(--primary)!important}
+.challenge-progress-wrap{height:8px;background:var(--bg-secondary);border-radius:99px;overflow:hidden}
+.challenge-progress-fill{height:100%;background:linear-gradient(90deg,#6366f1,#a78bfa);border-radius:99px;transition:width .5s ease}
+.challenge-task-box{background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;border-radius:var(--radius);padding:14px 16px;margin-top:14px}
+.challenge-task-label{font-size:11px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.challenge-task-text{font-size:14px;color:#0c4a6e;line-height:1.55}
+.dark-mode .challenge-task-box{background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.3)}
+.dark-mode .challenge-task-label{color:#a78bfa}
+.dark-mode .challenge-task-text{color:var(--text)}
+
+/* ── Tâm sự Ẩn danh ── */
+.community-post-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:12px;transition:.2s}
+.community-post-card:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.06)}
+.community-post-content{font-size:14px;color:var(--text);line-height:1.6;white-space:pre-wrap;margin-bottom:10px;word-break:break-word}
+.community-mood-tag{display:inline-block;font-size:11px;padding:3px 10px;background:var(--bg-secondary);border-radius:99px;color:var(--text-muted);margin-bottom:8px}
+.community-post-footer{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
+.community-post-time{font-size:11px;color:var(--text-muted)}
+.community-react-btn{background:none;border:1px solid var(--border);border-radius:99px;padding:4px 12px;font-size:13px;cursor:pointer;color:var(--text-muted);transition:.15s;display:flex;align-items:center;gap:4px}
+.community-react-btn:hover{border-color:#6366f1;color:#6366f1}
+.community-react-btn.reacted{background:#ede9fe;border-color:#a78bfa;color:#6366f1}
+.community-delete-btn{background:none;border:none;font-size:14px;color:var(--text-muted);cursor:pointer;padding:4px 6px;border-radius:4px}
+.community-delete-btn:hover{color:var(--rose);background:rgba(239,68,68,.08)}
+
 /* ── Heatmap cảm xúc năm ── */
 .hm-wrap{overflow-x:auto;padding-bottom:6px}
 .hm-months{position:relative;height:18px;margin-bottom:4px;font-size:10px;color:var(--text-muted);margin-left:0}

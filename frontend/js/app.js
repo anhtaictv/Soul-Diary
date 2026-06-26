@@ -25,8 +25,12 @@ const App = (() => {
   let diaryMode = 'free';   // 'free' hoặc 'cbt' — chỉ hiệu lực khi cbt_guided_writing được bật
   let checkinAnswers = [];  // mảng 31 phần tử của bài Check-in Sức khỏe Tinh thần đang làm dở
   let calendarMonth   = new Date(); // tháng đang xem ở Bản đồ thời tiết tâm hồn (mood_calendar)
-  let heatmapYear     = new Date().getFullYear(); // năm đang xem ở Heatmap cảm xúc
+  let heatmapYear      = new Date().getFullYear(); // năm đang xem ở Heatmap cảm xúc
   let pendingMusicMood = null;      // mood chờ tự phát khi chuyển sang trang Nhạc (mood_ambience)
+  let challengeList    = [];        // cache danh sách thử thách
+  let communityPage    = 1;         // trang hiện tại của góc tâm sự
+  let communityMoodTag = null;      // mood tag đang chọn khi đăng bài
+  let notifDays        = [];        // ngày trong tuần đang bật nhắc nhở
 
   // ── Navigation ──────────────────────────────────────────────────────
   function nav(page) {
@@ -56,10 +60,12 @@ const App = (() => {
       case 'library':   initLibrary(); break;
       case 'exercises': renderExercises();            break;
       case 'music':     initMusicPage();              break;
-      case 'checkin':   initCheckinPage();            break;
-      case 'inbox':     initInboxPage();               break;
-      case 'sos':       renderSOSContacts();          break;
-      case 'admin':     Admin.initPage();             break;
+      case 'checkin':    initCheckinPage();        break;
+      case 'inbox':      initInboxPage();          break;
+      case 'challenges': initChallengePage();      break;
+      case 'community':  initCommunityPage();      break;
+      case 'sos':        renderSOSContacts();      break;
+      case 'admin':      Admin.initPage();         break;
     }
   }
 
@@ -147,6 +153,7 @@ const App = (() => {
       if (window.FEATURES && window.FEATURES.soul_seed) renderSoulSeed(user);
       renderRecommendations(todayEntry ? todayEntry.mood_score : null);
       initPushOptIn();
+      if (window.FEATURES && window.FEATURES.custom_reminder) renderCustomReminderCard(user);
       renderWeeklyRecap(statsRes.stats || []);
       loadAndRenderSmartRecap();
       renderBadges(user, totalEntries, cachedEntries);
@@ -328,6 +335,19 @@ const App = (() => {
       if (promptCard) { promptCard.style.display = ''; loadDailyPrompt(); }
     }
     document.getElementById('companion-message-box').style.display = 'none';
+    // Xuất nhật ký (diary_export flag)
+    if (window.FEATURES && window.FEATURES.diary_export) {
+      const exportSec = document.getElementById('diary-export-section');
+      if (exportSec) {
+        exportSec.style.display = '';
+        const today = new Date().toISOString().split('T')[0];
+        const jan1  = `${new Date().getFullYear()}-01-01`;
+        const fromEl = document.getElementById('export-from');
+        const toEl   = document.getElementById('export-to');
+        if (fromEl && !fromEl.value) fromEl.value = jan1;
+        if (toEl   && !toEl.value)   toEl.value   = today;
+      }
+    }
     await loadDiaryEntries();
   }
 
@@ -971,6 +991,334 @@ const App = (() => {
     if (next > new Date().getFullYear()) return;
     heatmapYear = next;
     renderHeatmap();
+  }
+
+  // ── Xuất nhật ký ─────────────────────────────────────────────────────
+  async function exportDiaryCSV() {
+    const from = document.getElementById('export-from')?.value;
+    const to   = document.getElementById('export-to')?.value;
+    if (!from || !to) return showToast('Vui lòng chọn khoảng thời gian!');
+    if (from > to)    return showToast('Ngày bắt đầu phải trước ngày kết thúc!');
+    try {
+      showToast('Đang xuất dữ liệu...');
+      const token = Auth.getToken();
+      const resp  = await fetch(`${CONFIG.API_URL}/diary/export?format=csv&from=${from}&to=${to}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!resp.ok) throw new Error('Lỗi xuất dữ liệu');
+      const blob = await resp.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = `souldiary-${from}-den-${to}.csv`; a.click();
+      URL.revokeObjectURL(url);
+      showToast('✅ Đã xuất CSV!');
+    } catch (e) { showToast('❌ ' + e.message); }
+  }
+
+  async function printDiaryPDF() {
+    const from = document.getElementById('export-from')?.value;
+    const to   = document.getElementById('export-to')?.value;
+    if (!from || !to) return showToast('Vui lòng chọn khoảng thời gian!');
+    try {
+      showToast('Đang chuẩn bị...');
+      const token = Auth.getToken();
+      const resp  = await fetch(`${CONFIG.API_URL}/diary/export?format=json&from=${from}&to=${to}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data    = await resp.json();
+      const entries = data.entries || [];
+      const EMOJIS  = ['','😢','😟','😕','😞','😐','🙂','😊','😄','🌟','✨'];
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+        <title>Soul Diary — Nhật ký của tôi</title>
+        <style>
+          body{font-family:sans-serif;max-width:700px;margin:0 auto;padding:24px;color:#1f2937}
+          h1{text-align:center;color:#6366f1;margin-bottom:4px}
+          .sub{text-align:center;color:#6b7280;margin-bottom:24px;font-size:14px}
+          .entry{border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:14px;page-break-inside:avoid}
+          .eh{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+          .ed{font-weight:700;color:#6366f1}.em{font-size:22px}.et{color:#6b7280;font-size:13px;margin-left:4px}
+          .lbl{font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin:8px 0 3px}
+          .txt{color:#374151;line-height:1.6;white-space:pre-wrap;font-size:14px}
+          @media print{body{padding:0}h1{margin-top:0}}
+        </style></head><body>
+        <h1>📖 Nhật ký Soul Diary</h1>
+        <div class="sub">Từ ${from} đến ${to} — ${entries.length} nhật ký</div>
+        ${entries.map(e => `
+          <div class="entry">
+            <div class="eh"><span class="em">${EMOJIS[e.mood_score]||''}</span>
+              <div><span class="ed">${e.entry_date}</span><span class="et">${e.entry_time||''} — ${e.mood_score}/10</span></div></div>
+            ${e.event_text ? `<div class="lbl">Sự kiện / Cảm xúc</div><div class="txt">${e.event_text}</div>` : ''}
+            ${e.thoughts   ? `<div class="lbl">Suy nghĩ</div><div class="txt">${e.thoughts}</div>` : ''}
+            ${e.gratitude  ? `<div class="lbl">Lòng biết ơn</div><div class="txt">${e.gratitude}</div>` : ''}
+          </div>`).join('')}
+      </body></html>`;
+      const w = window.open('', '_blank');
+      w.document.write(html); w.document.close();
+      setTimeout(() => w.print(), 400);
+    } catch (e) { showToast('❌ ' + e.message); }
+  }
+
+  // ── Nhắc nhở tùy chỉnh ───────────────────────────────────────────────
+  function renderCustomReminderCard(user) {
+    const sec = document.getElementById('custom-reminder-section');
+    if (!sec) return;
+    notifDays = user.notif_days ? user.notif_days.split(',').map(Number) : [];
+    const DAYS = [
+      {d:1,l:'T2'},{d:2,l:'T3'},{d:3,l:'T4'},{d:4,l:'T5'},{d:5,l:'T6'},{d:6,l:'T7'},{d:0,l:'CN'},
+    ];
+    const hour = user.notif_hour !== null && user.notif_hour !== undefined ? user.notif_hour : '';
+    const options = Array.from({length:24}, (_,h) => `<option value="${h}" ${h==hour?'selected':''}>${String(h).padStart(2,'0')}:00</option>`).join('');
+    sec.innerHTML = `
+      <div class="card" style="margin-bottom:16px">
+        <div style="font-size:14px;font-weight:700;margin-bottom:10px">⏰ Tùy chỉnh giờ nhắc nhở</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Hệ thống sẽ gửi push notification vào giờ bạn chọn. Nếu không chọn, hệ thống tự tính theo thói quen viết nhật ký.</div>
+        <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px">Giờ nhắc nhở</div>
+            <select class="text-input" id="notif-hour-select" style="padding:8px 10px;font-size:13px;max-width:120px">
+              <option value="">Tự động</option>${options}
+            </select>
+          </div>
+          <div>
+            <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:6px">Ngày trong tuần (bỏ trống = tất cả ngày)</div>
+            <div id="notif-days-row" style="display:flex;gap:6px;flex-wrap:wrap">
+              ${DAYS.map(({d,l}) => `<button class="tag ${notifDays.includes(d)?'sel':''}" onclick="App.toggleNotifDay(this,${d})" data-day="${d}">${l}</button>`).join('')}
+            </div>
+          </div>
+        </div>
+        <button class="btn-primary" onclick="App.saveNotifPrefs()" style="margin-top:14px;max-width:180px;font-size:13px">💾 Lưu cài đặt</button>
+      </div>
+    `;
+  }
+
+  function toggleNotifDay(btn, day) {
+    day = parseInt(day);
+    btn.classList.toggle('sel');
+    if (notifDays.includes(day)) notifDays = notifDays.filter(d => d !== day);
+    else notifDays.push(day);
+  }
+
+  async function saveNotifPrefs() {
+    const hourEl = document.getElementById('notif-hour-select');
+    const hour   = hourEl && hourEl.value !== '' ? parseInt(hourEl.value) : null;
+    const days   = notifDays.length ? notifDays.join(',') : null;
+    try {
+      await API.updateNotifPrefs(hour, days);
+      showToast('✅ Đã lưu cài đặt nhắc nhở!');
+    } catch (e) { showToast('❌ ' + e.message); }
+  }
+
+  // ── Thử thách Sức khỏe Tâm thần ─────────────────────────────────────
+  async function initChallengePage() {
+    try {
+      const data = await API.getChallenges();
+      challengeList = data.challenges || [];
+      renderChallenges();
+    } catch (e) { showToast('❌ Lỗi tải thử thách: ' + e.message); }
+  }
+
+  function renderChallenges() {
+    const listEl   = document.getElementById('challenges-list');
+    const activeEl = document.getElementById('active-challenge-section');
+    if (!listEl) return;
+
+    const active    = challengeList.find(c => c.is_joined && !c.is_completed);
+    const today     = new Date().toDateString();
+
+    if (active && activeEl) {
+      const tasks    = JSON.parse(active.tasks_json || '[]');
+      const task     = tasks[active.current_day] || '🎉 Bạn đã hoàn thành!';
+      const pct      = Math.round(active.current_day / active.duration_days * 100);
+      const lastDate = active.last_checkin_at ? new Date(active.last_checkin_at).toDateString() : null;
+      const canCheckin = lastDate !== today;
+      activeEl.style.display = '';
+      activeEl.innerHTML = `
+        <div class="card challenge-active-card">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+            <span style="font-size:32px">${active.badge_emoji}</span>
+            <div>
+              <div style="font-size:15px;font-weight:700">${active.title}</div>
+              <div style="font-size:12px;color:var(--text-muted)">Ngày ${active.current_day}/${active.duration_days}</div>
+            </div>
+          </div>
+          <div class="challenge-progress-wrap"><div class="challenge-progress-fill" style="width:${pct}%"></div></div>
+          <div class="challenge-task-box">
+            <div class="challenge-task-label">📋 Nhiệm vụ hôm nay — Ngày ${active.current_day + 1}</div>
+            <div class="challenge-task-text">${task}</div>
+          </div>
+          ${canCheckin
+            ? `<button class="btn-primary" style="margin-top:14px;max-width:240px" onclick="App.doChallengeCheckin(${active.id})">✅ Đã làm xong hôm nay</button>`
+            : `<div style="color:#10b981;font-size:13px;margin-top:12px;font-weight:600">✅ Đã check-in hôm nay — quay lại ngày mai!</div>`}
+          <div><button onclick="App.quitChallenge(${active.id})" style="background:none;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;margin-top:10px;padding:0;text-decoration:underline">Bỏ thử thách này</button></div>
+        </div>
+      `;
+    } else if (activeEl) { activeEl.style.display = 'none'; }
+
+    listEl.innerHTML = challengeList.map(c => {
+      const isActive    = c.is_joined && !c.is_completed;
+      const isCompleted = c.is_joined &&  c.is_completed;
+      const pct = isActive ? Math.round(c.current_day / c.duration_days * 100) : 0;
+      return `
+        <div class="challenge-card${isCompleted ? ' completed' : ''}">
+          <div style="display:flex;align-items:flex-start;gap:14px">
+            <div style="font-size:36px;flex-shrink:0">${c.badge_emoji}</div>
+            <div style="flex:1">
+              <div class="challenge-card-title">${c.title}</div>
+              <div class="challenge-card-desc">${c.description}</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+                <span class="tag" style="background:var(--bg-secondary)">${c.duration_days} ngày</span>
+                ${isCompleted ? `<span class="tag" style="background:#d1fae5;color:#065f46">✅ Hoàn thành</span>` : ''}
+                ${isActive    ? `<span class="tag" style="background:#ede9fe;color:#5b21b6">🔄 ${c.current_day}/${c.duration_days} ngày</span>` : ''}
+              </div>
+              ${isActive ? `<div class="challenge-progress-wrap" style="margin-top:10px"><div class="challenge-progress-fill" style="width:${pct}%"></div></div>` : ''}
+            </div>
+          </div>
+          <div style="margin-top:12px">
+            ${isCompleted
+              ? `<button class="btn-outline" style="font-size:12px" onclick="App.joinChallenge(${c.id})">🔁 Làm lại</button>`
+              : isActive
+                ? `<button class="btn-outline" style="font-size:12px" onclick="document.getElementById('active-challenge-section').scrollIntoView({behavior:'smooth'})">Xem tiến độ ↑</button>`
+                : `<button class="btn-primary" style="font-size:12px;max-width:180px" onclick="App.joinChallenge(${c.id})">Bắt đầu thử thách</button>`}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function joinChallenge(id) {
+    try {
+      await API.joinChallenge(id);
+      const data = await API.getChallenges();
+      challengeList = data.challenges || [];
+      renderChallenges();
+      showToast('🎉 Đã tham gia thử thách!');
+    } catch (e) { showToast('❌ ' + e.message); }
+  }
+
+  async function doChallengeCheckin(id) {
+    try {
+      const res = await API.challengeCheckin(id);
+      showToast(res.message);
+      if (res.completed) setTimeout(() => showToast('🏆 Bạn đã hoàn thành thử thách — xuất sắc lắm!'), 1200);
+      const data = await API.getChallenges();
+      challengeList = data.challenges || [];
+      renderChallenges();
+    } catch (e) { showToast('❌ ' + e.message); }
+  }
+
+  async function quitChallenge(id) {
+    if (!confirm('Bạn có chắc muốn bỏ thử thách này không?')) return;
+    try {
+      await API.quitChallenge(id);
+      showToast('Đã rời khỏi thử thách.');
+      const data = await API.getChallenges();
+      challengeList = data.challenges || [];
+      renderChallenges();
+    } catch (e) { showToast('❌ ' + e.message); }
+  }
+
+  // ── Tâm sự Ẩn danh ───────────────────────────────────────────────────
+  const COMMUNITY_MOOD_TAGS = ['😔 Buồn bã','😰 Lo lắng','😤 Căng thẳng','🤯 Quá tải','😶 Cô đơn','🙂 Bình yên','💪 Muốn chia sẻ'];
+
+  async function initCommunityPage() {
+    communityPage = 1;
+    communityMoodTag = null;
+    const tagsEl = document.getElementById('community-mood-tags');
+    if (tagsEl) tagsEl.innerHTML = COMMUNITY_MOOD_TAGS.map(tag =>
+      `<button class="tag" onclick="App.selectCommunityTag(this,'${tag}')" data-tag="${tag}">${tag}</button>`
+    ).join('');
+    await loadCommunityPosts(true);
+  }
+
+  async function loadCommunityPosts(reset) {
+    if (reset) communityPage = 1;
+    const el = document.getElementById('community-posts');
+    if (!el) return;
+    if (reset) el.innerHTML = '<div class="loading-text">Đang tải...</div>';
+    try {
+      const data  = await API.getCommunityPosts(communityPage);
+      const posts = data.posts || [];
+      const html  = posts.map(renderCommunityPost).join('');
+      if (reset) {
+        el.innerHTML = html || '<div class="loading-text">Chưa có tâm sự nào — hãy là người đầu tiên chia sẻ! 💙</div>';
+      } else {
+        const btn = el.querySelector('.community-loadmore');
+        if (btn) btn.remove();
+        el.insertAdjacentHTML('beforeend', html);
+      }
+      if (posts.length === 20) {
+        el.insertAdjacentHTML('beforeend', `<div style="text-align:center;margin-top:16px" class="community-loadmore"><button class="btn-outline" onclick="App.loadMoreCommunityPosts()">Xem thêm</button></div>`);
+      }
+    } catch (e) {
+      el.innerHTML = `<div class="loading-text" style="color:var(--rose)">Lỗi: ${e.message}</div>`;
+    }
+  }
+
+  function renderCommunityPost(p) {
+    const time = fmtTimeAgo(new Date(p.created_at));
+    const esc  = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `
+      <div class="community-post-card" id="community-post-${p.id}">
+        <div class="community-post-content">${esc(p.content)}</div>
+        ${p.mood_tag ? `<span class="community-mood-tag">${p.mood_tag}</span>` : ''}
+        <div class="community-post-footer">
+          <span class="community-post-time">${time}</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="community-react-btn${p.has_reacted ? ' reacted' : ''}" onclick="App.reactPost(${p.id},this)">
+              💙 <span class="react-count">${p.sympathy_count}</span>
+            </button>
+            ${p.is_own ? `<button class="community-delete-btn" onclick="App.deletePost(${p.id})" title="Xóa">✕</button>` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function selectCommunityTag(btn, tag) {
+    document.querySelectorAll('#community-mood-tags .tag').forEach(b => b.classList.remove('sel'));
+    if (communityMoodTag === tag) { communityMoodTag = null; return; }
+    btn.classList.add('sel');
+    communityMoodTag = tag;
+  }
+
+  async function submitCommunityPost() {
+    const input = document.getElementById('community-post-input');
+    if (!input) return;
+    const content = input.value.trim();
+    if (!content) return showToast('Vui lòng nhập nội dung!');
+    try {
+      const res = await API.createCommunityPost(content, communityMoodTag);
+      input.value = '';
+      document.getElementById('community-char-count').textContent = '0';
+      communityMoodTag = null;
+      document.querySelectorAll('#community-mood-tags .tag').forEach(b => b.classList.remove('sel'));
+      showToast('💙 Đã chia sẻ!');
+      const postsEl = document.getElementById('community-posts');
+      if (postsEl) postsEl.insertAdjacentHTML('afterbegin', renderCommunityPost({ ...res.post, is_own: 1, has_reacted: 0 }));
+    } catch (e) { showToast('❌ ' + e.message); }
+  }
+
+  async function reactPost(id, btn) {
+    try {
+      const data     = await API.reactCommunityPost(id);
+      const countEl  = btn.querySelector('.react-count');
+      const count    = parseInt(countEl.textContent);
+      if (data.reacted) { btn.classList.add('reacted');    countEl.textContent = count + 1; }
+      else              { btn.classList.remove('reacted'); countEl.textContent = Math.max(0, count - 1); }
+    } catch (e) { showToast('❌ ' + e.message); }
+  }
+
+  async function deletePost(id) {
+    if (!confirm('Xóa bài tâm sự này?')) return;
+    try {
+      await API.deleteCommunityPost(id);
+      document.getElementById(`community-post-${id}`)?.remove();
+    } catch (e) { showToast('❌ ' + e.message); }
+  }
+
+  function loadMoreCommunityPosts() {
+    communityPage++;
+    loadCommunityPosts(false);
   }
 
   // ── Library (API-driven) ──────────────────────────────────────────────
@@ -1985,8 +2333,16 @@ const App = (() => {
       navCheckin.style.display = '';
       refreshCheckinBadge();
     }
+    if (window.FEATURES && window.FEATURES.challenge_system) {
+      const el = document.getElementById('nav-challenges');
+      if (el) el.style.display = '';
+    }
+    if (window.FEATURES && window.FEATURES.community_wall) {
+      const el = document.getElementById('nav-community');
+      if (el) el.style.display = '';
+    }
     nav('dashboard');
   }
 
-  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped};
+  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts};
 })();
