@@ -142,38 +142,53 @@ const App = (() => {
   // ── Dashboard ────────────────────────────────────────────────────────
   async function initDashboard() {
     buildMoodScale('quick-mood-scale', v => { selectedMood = v; });
-    try {
-      const [entriesRes, userRes, statsRes] = await Promise.all([API.getDiary(1,20), API.getMe(), API.getStats(14)]);
-      cachedEntries = entriesRes.entries || [];
-      const user = userRes.user;
+    // allSettled để 1 call thất bại không crash cả dashboard
+    const [entriesSettled, userSettled, statsSettled] = await Promise.allSettled([
+      API.getDiary(1,20), API.getMe(), API.getStats(14)
+    ]);
+
+    // ── User info (quan trọng nhất) ──
+    const user = userSettled.status === 'fulfilled' ? userSettled.value.user : Auth.getUser();
+    if (user) {
       Auth.updateSidebarUser(user);
       localStorage.setItem('nhk_user', JSON.stringify(user));
+    }
 
-      const recent7 = cachedEntries.slice(0,7);
-      const avg = recent7.length ? (recent7.reduce((a,e)=>a+e.mood_score,0)/recent7.length).toFixed(1) : '—';
-      const today = new Date().toDateString();
-      const todayEntry = cachedEntries.find(e => new Date(e.created_at).toDateString() === today);
+    // ── Entries ──
+    const entriesRes = entriesSettled.status === 'fulfilled' ? entriesSettled.value : null;
+    cachedEntries = entriesRes ? (entriesRes.entries || []) : [];
+    const totalEntries = entriesRes ? entriesRes.pagination.total : 0;
+    const recent7    = cachedEntries.slice(0,7);
+    const avg        = recent7.length ? (recent7.reduce((a,e)=>a+e.mood_score,0)/recent7.length).toFixed(1) : '—';
+    const today      = new Date().toDateString();
+    const todayEntry = cachedEntries.find(e => new Date(e.created_at).toDateString() === today);
 
-      const totalEntries = entriesRes.pagination.total;
-      document.getElementById('dash-entries').textContent = totalEntries;
-      document.getElementById('dash-avg').textContent     = avg;
-      document.getElementById('dash-streak').textContent  = user.streak || 0;
-      document.getElementById('dash-today').textContent   = todayEntry ? `${todayEntry.mood_score}/10` : '—';
+    const elEntries = document.getElementById('dash-entries');
+    const elAvg     = document.getElementById('dash-avg');
+    const elStreak  = document.getElementById('dash-streak');
+    const elToday   = document.getElementById('dash-today');
+    if (elEntries) elEntries.textContent = totalEntries || '—';
+    if (elAvg)     elAvg.textContent     = avg;
+    if (elStreak)  elStreak.textContent  = user ? (user.streak || 0) : '—';
+    if (elToday)   elToday.textContent   = todayEntry ? (todayEntry.mood_score + '/10') : '—';
 
-      renderStreakCalendar('streak-calendar-card');
-      renderLevelBar(totalEntries);
-      if (window.FEATURES && window.FEATURES.soul_seed) renderSoulSeed(user);
-      renderRecommendations(todayEntry ? todayEntry.mood_score : null);
-      initPushOptIn();
-      if (window.FEATURES && window.FEATURES.custom_reminder) renderCustomReminderCard(user);
-      renderWeeklyRecap(statsRes.stats || []);
-      loadAndRenderSmartRecap();
-      renderBadges(user, totalEntries, cachedEntries);
-      loadAndRenderMentalHealth();
-      renderRecentEntries('dash-recent-entries', cachedEntries.slice(0,3));
-      if (!todayEntry && (user.streak || 0) >= 3)
-        setTimeout(() => showToast(`⚠️ Chuỗi ${user.streak} ngày sắp hết! Đừng quên ghi nhật ký hôm nay.`), 1500);
-    } catch(err) { showToast('⚠️ Không thể tải dữ liệu: ' + err.message); }
+    renderStreakCalendar('streak-calendar-card');
+    if (totalEntries) renderLevelBar(totalEntries);
+    if (user && window.FEATURES && window.FEATURES.soul_seed) renderSoulSeed(user);
+    renderRecommendations(todayEntry ? todayEntry.mood_score : null);
+    initPushOptIn();
+    if (user && window.FEATURES && window.FEATURES.custom_reminder) renderCustomReminderCard(user);
+
+    // ── Stats (không bắt buộc) ──
+    const statsRes = statsSettled.status === 'fulfilled' ? statsSettled.value : null;
+    renderWeeklyRecap(statsRes ? (statsRes.stats || []) : []);
+    loadAndRenderSmartRecap();
+    if (user) renderBadges(user, totalEntries, cachedEntries);
+    loadAndRenderMentalHealth();
+    renderRecentEntries('dash-recent-entries', cachedEntries.slice(0,3));
+
+    if (user && !todayEntry && (user.streak || 0) >= 3)
+      setTimeout(() => showToast('⚠️ Chuỗi ' + user.streak + ' ngày sắp hết! Đừng quên ghi nhật ký hôm nay.'), 1500);
   }
 
   function renderRecommendations(mood) {
