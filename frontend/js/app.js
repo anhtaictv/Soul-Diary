@@ -483,7 +483,8 @@ const App = (() => {
         audioChunks = []; recordSeconds = 0; recordedAudioData = null;
         mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
         mediaRecorder.onstop = () => {
-          const blob = new Blob(audioChunks, {type:'audio/webm'});
+          const mimeType = mediaRecorder.mimeType || 'audio/webm';
+          const blob = new Blob(audioChunks, {type: mimeType});
           const url  = URL.createObjectURL(blob);
           const audio = document.getElementById('audio-playback');
           audio.src = url; audio.style.display = 'block';
