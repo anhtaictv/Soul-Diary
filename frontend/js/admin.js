@@ -22,6 +22,12 @@ const Admin = (() => {
         'Bảng Người dùng hiển thị tâm trạng gần nhất — màu đỏ (≤4) / vàng (5–6) / xanh (≥7) để admin nhận diện nhanh',
         'Push notification tức thì khi admin gửi tin, user nhận ngay trên điện thoại',
         'Hộp thư hỗ trợ (💌) cho user đọc và tương tác — chờ admin phát hành qua Feature Flags',
+        'Heatmap cảm xúc năm: lưới 52 tuần GitHub-style, mỗi ô 1 ngày, màu theo điểm tâm trạng — chờ bật flag mood_heatmap',
+        'Báo cáo tháng cho Admin: biểu đồ xu hướng mood 6 tháng + phân bố điểm 30 ngày — tab 📈 Báo cáo trong admin panel',
+        'Thử thách Sức khỏe Tâm thần 7/14/21 ngày: 3 gói (Biết Ơn, CBT, Chánh Niệm) với nhiệm vụ hàng ngày — chờ bật flag challenge_system',
+        'Xuất nhật ký CSV (Excel) hoặc In PDF — chờ bật flag diary_export',
+        'Nhắc nhở tùy chỉnh: user tự chọn giờ + ngày trong tuần nhận push — chờ bật flag custom_reminder',
+        'Tâm sự Ẩn danh: board chia sẻ cảm xúc ẩn danh, chỉ bấm 💙 Đồng cảm, admin kiểm duyệt — chờ bật flag community_wall',
       ],
     },
     {

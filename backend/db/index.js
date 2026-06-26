@@ -463,6 +463,173 @@ async function initSchema() {
             'v1.7',N'Phân tích Cảm xúc Nâng cao',0,11)
   `);
 
+  // Feature 6: Nhắc nhở tùy chỉnh — giờ + ngày trong tuần user muốn nhận push
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Users' AND COLUMN_NAME='notif_hour')
+    ALTER TABLE Users ADD notif_hour INT NULL
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Users' AND COLUMN_NAME='notif_days')
+    ALTER TABLE Users ADD notif_days NVARCHAR(20) NULL
+  `);
+
+  // Feature 3: Thử thách Sức khỏe Tâm thần
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Challenges' AND xtype='U')
+    CREATE TABLE Challenges (
+      id            INT           IDENTITY(1,1) PRIMARY KEY,
+      slug          NVARCHAR(50)  NOT NULL UNIQUE,
+      title         NVARCHAR(200) NOT NULL,
+      description   NVARCHAR(MAX) NOT NULL,
+      duration_days INT           NOT NULL,
+      category      NVARCHAR(50)  NOT NULL DEFAULT 'general',
+      tasks_json    NVARCHAR(MAX) NULL,
+      badge_emoji   NVARCHAR(10)  NULL,
+      is_active     BIT           NOT NULL DEFAULT 1,
+      sort_order    INT           NOT NULL DEFAULT 0
+    )
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='UserChallenges' AND xtype='U')
+    CREATE TABLE UserChallenges (
+      id              INT       IDENTITY(1,1) PRIMARY KEY,
+      user_id         INT       NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      challenge_id    INT       NOT NULL REFERENCES Challenges(id),
+      started_at      DATETIME2 DEFAULT GETDATE(),
+      last_checkin_at DATETIME2 NULL,
+      completed_at    DATETIME2 NULL,
+      current_day     INT       NOT NULL DEFAULT 0,
+      is_completed    BIT       NOT NULL DEFAULT 0,
+      CONSTRAINT UQ_UserChallenge UNIQUE(user_id, challenge_id)
+    )
+  `);
+
+  // Seed dữ liệu 3 thử thách
+  const GRATITUDE_TASKS = JSON.stringify([
+    'Viết 3 điều bạn biết ơn về gia đình hôm nay',
+    'Viết 3 điều bạn biết ơn về bản thân mình',
+    'Viết 3 điều bạn biết ơn về những người bạn xung quanh',
+    'Viết 3 điều nhỏ trong ngày khiến bạn mỉm cười',
+    'Viết 3 điều bạn biết ơn về sức khỏe và cơ thể',
+    'Viết 3 điều bạn biết ơn về cơ hội học tập của mình',
+    'Nhìn lại 6 ngày vừa rồi — điều lớn nhất bạn nhận ra về bản thân là gì?',
+  ]);
+  const CBT_TASKS = JSON.stringify([
+    'Ghi một tình huống căng thẳng hôm nay và cảm xúc bạn cảm thấy',
+    'Suy nghĩ tự động nào xuất hiện trong đầu bạn khi đó?',
+    'Suy nghĩ đó có hoàn toàn đúng không? Hãy tìm bằng chứng ủng hộ VÀ phản bác',
+    'Viết một suy nghĩ thay thế cân bằng và thực tế hơn',
+    'Nếu người bạn thân gặp tình huống tương tự, bạn sẽ nói gì với họ?',
+    'Hành động nhỏ nhất nào bạn có thể làm ngay hôm nay để cải thiện tình hình?',
+    'Ghi một lo lắng và thách thức nó: điều tệ nhất có thể xảy ra là gì và xác suất bao nhiêu?',
+    'Nhận diện 1 suy nghĩ quá tiêu cực và viết lại theo cách cân bằng hơn',
+    'Thực hành câu hỏi Socrates: "Suy nghĩ này có giúp ích gì cho mình không?"',
+    'Liệt kê 3 thành tích bạn đạt được trong tuần — dù rất nhỏ',
+    'Ghi một tình huống bạn phản ứng bằng cảm xúc và phân tích lại bằng lý trí',
+    'Viết một bức thư ngắn từ "phiên bản tương lai" của bạn gửi cho bạn hiện tại',
+    'Ôn lại 12 ngày — kiểu suy nghĩ tiêu cực nào hay lặp lại nhất ở bạn?',
+    'Cam kết: viết 1 hành động cụ thể bạn sẽ làm khác đi khi suy nghĩ đó xuất hiện',
+  ]);
+  const MINDFUL_TASKS = JSON.stringify([
+    'Dành 5 phút chú ý vào hơi thở. Đếm 10 nhịp thở chậm rồi ghi lại cảm giác',
+    'Quan sát 5 điều nhìn thấy, 4 âm thanh nghe thấy, 3 vật bạn chạm vào',
+    'Ăn một bữa chậm rãi — hoàn toàn tập trung vào hương vị và kết cấu thức ăn',
+    'Đi bộ 10 phút không nhìn điện thoại — chú ý đến môi trường xung quanh',
+    'Dành 5 phút không làm gì cả — không điện thoại, không nhạc, chỉ ngồi yên',
+    'Ghi nhật ký về khoảnh khắc hiện tại: bạn đang ở đâu, cảm thấy gì, nghe thấy gì',
+    'Thực hành quét cơ thể (body scan): từ đầu đến chân, chú ý từng vùng 30 giây',
+    'Khi lo lắng xuất hiện, dừng lại và hỏi: "Điều này có đang xảy ra ngay lúc này không?"',
+    'Cảm ơn 3 người trong ngày — bằng lời nói thật sự hoặc trong tâm trí',
+    'Dành 10 phút trong thiên nhiên (ban công, công viên, cây xanh) và quan sát',
+    'Nhận diện 3 cảm xúc bạn đã trải qua hôm nay mà không phán xét chúng',
+    'Thực hành khoảng dừng chánh niệm: 3 hơi thở sâu trước mỗi hoạt động lớn',
+    'Viết về điều bạn thường bỏ qua nhưng thực ra đang làm cuộc sống tốt hơn',
+    'Chú ý đến một việc thường ngày (đánh răng, rửa tay) và làm hoàn toàn có ý thức',
+    'Đọc lại nhật ký 2 tuần qua — sự thay đổi nào bạn nhận ra trong cảm xúc?',
+    'Thực hành thiền từ bi: nghĩ đến người yêu thương và gửi tâm tư tốt lành đến họ',
+    'Đặt điện thoại xuống 1 giờ và làm điều gì đó sáng tạo hoặc bạn yêu thích',
+    'Khi suy nghĩ khó chịu xuất hiện, hãy hình dung nó như đám mây trôi qua — rồi để nó đi',
+    'Ghi 5 điều làm bạn cảm thấy bình an hôm nay',
+    'Chia sẻ khoảnh khắc chánh niệm với ai đó — nói về điều bạn đang trải nghiệm',
+    'Nhìn lại 21 ngày — điều gì thay đổi trong cách bạn nhìn nhận khoảnh khắc hiện tại?',
+  ]);
+
+  await db.request().input('tasks', sql.NVarChar, GRATITUDE_TASKS).query(`
+    IF NOT EXISTS (SELECT * FROM Challenges WHERE slug='gratitude_7')
+    INSERT INTO Challenges (slug,title,description,duration_days,category,tasks_json,badge_emoji,sort_order)
+    VALUES ('gratitude_7',N'7 Ngày Biết Ơn',
+            N'Nuôi dưỡng lòng biết ơn mỗi ngày — thay đổi cách nhìn về cuộc sống chỉ trong 1 tuần',
+            7,'gratitude',@tasks,N'🙏',1)
+  `);
+  await db.request().input('tasks', sql.NVarChar, CBT_TASKS).query(`
+    IF NOT EXISTS (SELECT * FROM Challenges WHERE slug='cbt_14')
+    INSERT INTO Challenges (slug,title,description,duration_days,category,tasks_json,badge_emoji,sort_order)
+    VALUES ('cbt_14',N'14 Ngày Viết CBT',
+            N'Học cách nhận diện và thay đổi suy nghĩ tiêu cực qua kỹ thuật CBT mỗi ngày',
+            14,'cbt',@tasks,N'🧠',2)
+  `);
+  await db.request().input('tasks', sql.NVarChar, MINDFUL_TASKS).query(`
+    IF NOT EXISTS (SELECT * FROM Challenges WHERE slug='mindful_21')
+    INSERT INTO Challenges (slug,title,description,duration_days,category,tasks_json,badge_emoji,sort_order)
+    VALUES ('mindful_21',N'21 Ngày Chánh Niệm',
+            N'Xây dựng thói quen sống chánh niệm — chú ý vào hiện tại để giảm lo âu và stress',
+            21,'mindfulness',@tasks,N'🧘',3)
+  `);
+
+  // Feature 7: Tâm sự Ẩn danh
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AnonPosts' AND xtype='U')
+    CREATE TABLE AnonPosts (
+      id             INT           IDENTITY(1,1) PRIMARY KEY,
+      user_id        INT           NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      content        NVARCHAR(500) NOT NULL,
+      mood_tag       NVARCHAR(50)  NULL,
+      sympathy_count INT           NOT NULL DEFAULT 0,
+      is_hidden      BIT           NOT NULL DEFAULT 0,
+      created_at     DATETIME2     DEFAULT GETDATE()
+    )
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AnonReactions' AND xtype='U')
+    CREATE TABLE AnonReactions (
+      id         INT       IDENTITY(1,1) PRIMARY KEY,
+      post_id    INT       NOT NULL REFERENCES AnonPosts(id) ON DELETE CASCADE,
+      user_id    INT       NOT NULL REFERENCES Users(id),
+      created_at DATETIME2 DEFAULT GETDATE(),
+      CONSTRAINT UQ_AnonReact UNIQUE(post_id, user_id)
+    )
+  `);
+
+  // Seed feature flags v1.7 — 4 tính năng mới (disabled by default)
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='challenge_system')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('challenge_system',N'Thử thách Sức khỏe Tâm thần',
+            N'Gói thử thách có cấu trúc 7/14/21 ngày: biết ơn, CBT, chánh niệm — streak riêng, huy hiệu khi hoàn thành',
+            'v1.7',N'Thử thách & Cộng đồng',0,12)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='diary_export')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('diary_export',N'Xuất Nhật ký',
+            N'User export nhật ký ra CSV (Excel) hoặc in PDF — tiện chia sẻ với tâm lý học đường',
+            'v1.7',N'Thử thách & Cộng đồng',0,13)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='custom_reminder')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('custom_reminder',N'Nhắc nhở Tùy chỉnh',
+            N'User tự chọn giờ và ngày trong tuần nhận push notification thay vì hệ thống tự tính',
+            'v1.7',N'Thử thách & Cộng đồng',0,14)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='community_wall')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('community_wall',N'Tâm sự Ẩn danh',
+            N'Board chia sẻ cảm xúc ẩn danh — chỉ có thể bấm 💙 Đồng cảm, không comment tự do, admin moderation',
+            'v1.7',N'Thử thách & Cộng đồng',0,15)
+  `);
+
   // Bảng AdminMessages — tin nhắn admin/counselor gửi đến user (hộp thư hỗ trợ)
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AdminMessages' AND xtype='U')

@@ -557,6 +557,52 @@ Viết đúng 2-3 câu tiếng Việt: nhận xét ngắn về tuần cảm xúc
   }
 });
 
+// ── GET /api/diary/export — Xuất nhật ký ra CSV (hoặc JSON cho PDF) ────
+router.get('/export', async (req, res) => {
+  try {
+    const db   = await getPool();
+    const from = req.query.from || `${new Date().getFullYear()}-01-01`;
+    const to   = req.query.to   || new Date().toISOString().split('T')[0];
+    const fmt  = req.query.format || 'csv';
+    const result = await db.request()
+      .input('uid',  sql.Int,  req.user.id)
+      .input('from', sql.Date, from)
+      .input('to',   sql.Date, to)
+      .query(`
+        SELECT CONVERT(NVARCHAR(10), created_at, 23) AS entry_date,
+               FORMAT(created_at, 'HH:mm') AS entry_time,
+               mood_score,
+               ISNULL(event_text, '') AS event_text,
+               ISNULL(thoughts, '')   AS thoughts,
+               ISNULL(gratitude, '')  AS gratitude,
+               ISNULL(tags, '[]')     AS tags
+        FROM DiaryEntries
+        WHERE user_id = @uid
+          AND created_at >= @from
+          AND CAST(created_at AS DATE) <= @to
+        ORDER BY created_at DESC
+      `);
+    if (fmt === 'json') return res.json({ entries: result.recordset, from, to });
+
+    // CSV với BOM UTF-8 để Excel mở được
+    const BOM  = '﻿';
+    const CRLF = '\r\n';
+    const esc  = s => `"${String(s || '').replace(/"/g, '""')}"`;
+    const hdr  = ['Ngày','Giờ','Tâm trạng','Sự kiện / Cảm xúc','Suy nghĩ','Lòng biết ơn','Tags'].join(',');
+    const rows = result.recordset.map(r => {
+      let tags = '';
+      try { tags = JSON.parse(r.tags).join('; '); } catch(_) {}
+      return [r.entry_date, r.entry_time, r.mood_score, esc(r.event_text), esc(r.thoughts), esc(r.gratitude), esc(tags)].join(',');
+    });
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="souldiary-${from}-den-${to}.csv"`);
+    res.send(BOM + hdr + CRLF + rows.join(CRLF));
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: 'Lỗi xuất dữ liệu' });
+  }
+});
+
 // ── GET /api/diary/heatmap?year=YYYY — Heatmap cảm xúc năm ─────────────
 router.get('/heatmap', async (req, res) => {
   try {

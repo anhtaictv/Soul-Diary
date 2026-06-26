@@ -37,6 +37,9 @@ const PAGES = {
       <!-- Push notification opt-in -->
       <div id="push-optin-banner"></div>
 
+      <!-- Nhắc nhở tùy chỉnh (ẩn cho đến khi feature custom_reminder được bật) -->
+      <div id="custom-reminder-section" style="display:none"></div>
+
       <!-- Recap tuần này -->
       <div id="weekly-recap"></div>
 
@@ -155,6 +158,27 @@ const PAGES = {
         <div>
           <div class="section-label">Các nhật ký đã lưu</div>
           <div id="diary-entries-list"><div class="loading-text">Đang tải...</div></div>
+
+          <!-- Xuất nhật ký (ẩn cho đến khi feature diary_export được bật) -->
+          <div id="diary-export-section" style="display:none;margin-top:20px">
+            <div class="section-label">Xuất nhật ký 📥</div>
+            <div class="card" style="padding:16px">
+              <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+                <div class="form-group" style="margin:0;flex:1;min-width:130px">
+                  <label class="form-label" style="font-size:12px">Từ ngày</label>
+                  <input type="date" class="text-input" id="export-from" style="padding:8px 10px;font-size:13px" />
+                </div>
+                <div class="form-group" style="margin:0;flex:1;min-width:130px">
+                  <label class="form-label" style="font-size:12px">Đến ngày</label>
+                  <input type="date" class="text-input" id="export-to" style="padding:8px 10px;font-size:13px" />
+                </div>
+              </div>
+              <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <button class="btn-outline" onclick="App.exportDiaryCSV()" style="font-size:13px">📋 Xuất CSV (Excel)</button>
+                <button class="btn-outline" onclick="App.printDiaryPDF()" style="font-size:13px">🖨️ In PDF</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>`,
@@ -244,6 +268,37 @@ const PAGES = {
           </div>
         </div>
       </div>
+    </div>`,
+
+  challenges: () => `
+    <div class="page active" id="page-challenges">
+      <div class="page-header">
+        <div class="page-title">Thử thách Sức khỏe Tâm thần 🏆</div>
+        <div class="page-sub">7 – 21 ngày thay đổi thói quen — từng bước nhỏ, tác động lớn</div>
+      </div>
+      <div id="active-challenge-section" style="display:none"></div>
+      <div class="section-label" style="margin-top:8px">Tất cả thử thách</div>
+      <div id="challenges-list"><div class="loading-text">Đang tải...</div></div>
+    </div>`,
+
+  community: () => `
+    <div class="page active" id="page-community">
+      <div class="page-header">
+        <div class="page-title">Góc Tâm sự 💙</div>
+        <div class="page-sub">Chia sẻ ẩn danh — kết nối đồng cảm, không phán xét</div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="form-group">
+          <label class="form-label">Điều bạn muốn chia sẻ hôm nay...</label>
+          <textarea class="diary-textarea" id="community-post-input" maxlength="500"
+            placeholder="Viết tự do — không ai biết đây là bạn. Tối đa 500 ký tự."
+            style="min-height:90px" oninput="document.getElementById('community-char-count').textContent=this.value.length"></textarea>
+          <div style="text-align:right;font-size:11px;color:var(--text-muted);margin-top:4px"><span id="community-char-count">0</span>/500</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="community-mood-tags"></div>
+        <button class="btn-primary" onclick="App.submitCommunityPost()" style="max-width:200px">💙 Chia sẻ ẩn danh</button>
+      </div>
+      <div id="community-posts"><div class="loading-text">Đang tải...</div></div>
     </div>`,
 
   library: () => `

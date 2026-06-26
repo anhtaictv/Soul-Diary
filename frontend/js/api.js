@@ -106,5 +106,23 @@ const API = (() => {
 
     // Báo cáo hệ thống (admin)
     getAdminReport: () => request('/admin/report'),
+
+    // Nhắc nhở tùy chỉnh
+    updateNotifPrefs: (notif_hour, notif_days) =>
+      request('/auth/notification-prefs', { method: 'PUT', body: { notif_hour, notif_days } }),
+
+    // Thử thách Sức khỏe Tâm thần
+    getChallenges:    ()  => request('/challenges'),
+    joinChallenge:    (id) => request(`/challenges/${id}/join`,   { method: 'POST' }),
+    challengeCheckin: (id) => request(`/challenges/${id}/checkin`, { method: 'POST' }),
+    quitChallenge:    (id) => request(`/challenges/${id}/quit`,    { method: 'DELETE' }),
+
+    // Tâm sự Ẩn danh
+    getCommunityPosts:   (page = 1) => request(`/community?page=${page}`),
+    createCommunityPost: (content, mood_tag) => request('/community', { method: 'POST', body: { content, mood_tag } }),
+    reactCommunityPost:  (id) => request(`/community/${id}/react`, { method: 'POST' }),
+    deleteCommunityPost: (id) => request(`/community/${id}`,       { method: 'DELETE' }),
+    getCommunityAdmin:   ()   => request('/community/admin-list'),
+    hideCommunityPost:   (id) => request(`/community/${id}/hide`,  { method: 'PATCH' }),
   };
 })();
