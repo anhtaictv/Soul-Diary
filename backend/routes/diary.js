@@ -3,6 +3,7 @@ const express        = require('express');
 const { getPool, sql } = require('../db');
 const authMiddleware   = require('../middleware/auth');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { dataUriToBuffer, bufferToDataUri } = require('../utils/media');
 
 const genai = process.env.GEMINI_API_KEY
   ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
@@ -11,21 +12,12 @@ const genai = process.env.GEMINI_API_KEY
 const router = express.Router();
 router.use(authMiddleware);   // Tất cả diary routes đều cần auth
 
-// ── Helper: parse cột photos (JSON array data URI) — trả [] nếu null/lỗi ──
-function parsePhotos(raw) {
-  if (!raw) return [];
-  try {
-    const arr = JSON.parse(raw);
-    return Array.isArray(arr) ? arr : [];
-  } catch { return []; }
-}
-
 const MAX_PHOTOS = 4;
 const MAX_PHOTO_SIZE = 3_000_000; // ~2MB ảnh gốc sau khi base64 hóa
 
-// ── Helper: validate + serialize mảng ảnh đính kèm, trả {error} hoặc {photosJson} ──
-function buildPhotosJson(photos) {
-  if (photos === undefined || photos === null) return { photosJson: null };
+// ── Helper: validate mảng ảnh đính kèm, trả {error} hoặc {photos: [dataURI,...]} ──
+function validatePhotos(photos) {
+  if (photos === undefined || photos === null) return { photos: [] };
   if (!Array.isArray(photos)) return { error: 'Định dạng ảnh không hợp lệ.' };
 
   const validPhotos = photos.filter(Boolean);
@@ -40,7 +32,55 @@ function buildPhotosJson(photos) {
       return { error: 'Ảnh quá lớn (mỗi ảnh tối đa khoảng 2MB).' };
     }
   }
-  return { photosJson: validPhotos.length ? JSON.stringify(validPhotos) : null };
+  return { photos: validPhotos };
+}
+
+// ── Helper: ghi ảnh/audio (data URI) của 1 entry vào DiaryMedia dạng nhị phân ──
+async function saveMedia(db, entryId, photos, audioDataUri) {
+  for (let i = 0; i < photos.length; i++) {
+    const parsed = dataUriToBuffer(photos[i]);
+    if (!parsed) continue;
+    await db.request()
+      .input('entry_id',   sql.Int, entryId)
+      .input('kind',       sql.NVarChar, 'photo')
+      .input('mime',       sql.NVarChar, parsed.mime)
+      .input('data',       sql.VarBinary(sql.MAX), parsed.buffer)
+      .input('sort_order', sql.Int, i)
+      .query(`INSERT INTO DiaryMedia (entry_id, kind, mime_type, data, sort_order)
+              VALUES (@entry_id, @kind, @mime, @data, @sort_order)`);
+  }
+  if (audioDataUri) {
+    const parsed = dataUriToBuffer(audioDataUri);
+    if (parsed) {
+      await db.request()
+        .input('entry_id',   sql.Int, entryId)
+        .input('kind',       sql.NVarChar, 'audio')
+        .input('mime',       sql.NVarChar, parsed.mime)
+        .input('data',       sql.VarBinary(sql.MAX), parsed.buffer)
+        .input('sort_order', sql.Int, 0)
+        .query(`INSERT INTO DiaryMedia (entry_id, kind, mime_type, data, sort_order)
+                VALUES (@entry_id, @kind, @mime, @data, @sort_order)`);
+    }
+  }
+}
+
+// ── Helper: lấy ảnh/audio (DiaryMedia) cho nhiều entry, trả Map entry_id -> {photos, audio_data} ──
+async function loadMediaForEntries(db, entryIds) {
+  const map = new Map();
+  if (!entryIds.length) return map;
+  const result = await db.request().query(`
+    SELECT entry_id, kind, mime_type, data, sort_order
+    FROM DiaryMedia WHERE entry_id IN (${entryIds.join(',')})
+    ORDER BY entry_id, sort_order
+  `);
+  for (const row of result.recordset) {
+    if (!map.has(row.entry_id)) map.set(row.entry_id, { photos: [], audio_data: null });
+    const m = map.get(row.entry_id);
+    const uri = bufferToDataUri(row.mime_type, row.data);
+    if (row.kind === 'photo') m.photos.push(uri);
+    else if (row.kind === 'audio') m.audio_data = uri;
+  }
+  return map;
 }
 
 // ── Helper: phân tích cảm xúc dựa trên từ khóa (fallback khi không có Gemini) ──
@@ -204,7 +244,7 @@ router.get('/', async (req, res) => {
         .input('limit',   sql.Int, limit)
         .input('offset',  sql.Int, offset)
         .query(`
-          SELECT id, mood_score, event_text, thoughts, gratitude, tags, audio_data, ai_emotion, ai_companion_message, cbt_data, photos, created_at
+          SELECT id, mood_score, event_text, thoughts, gratitude, tags, ai_emotion, ai_companion_message, cbt_data, created_at
           FROM DiaryEntries
           WHERE user_id = @user_id
           ORDER BY created_at DESC
@@ -216,12 +256,14 @@ router.get('/', async (req, res) => {
     ]);
 
     const total = countResult.recordset[0].total;
+    const mediaMap = await loadMediaForEntries(db, dataResult.recordset.map(e => e.id));
 
     res.json({
       entries: dataResult.recordset.map(e => ({
         ...e,
         tags: e.tags ? e.tags.split('|') : [],
-        photos: parsePhotos(e.photos),
+        photos: mediaMap.get(e.id)?.photos || [],
+        audio_data: mediaMap.get(e.id)?.audio_data || null,
       })),
       pagination: {
         page, limit, total,
@@ -545,13 +587,13 @@ router.post('/', async (req, res) => {
     }
 
     // Ảnh đính kèm: tối đa MAX_PHOTOS ảnh dạng data URI base64
-    const { photosJson, error: photosError } = buildPhotosJson(photos);
+    const { photos: validPhotos, error: photosError } = validatePhotos(photos);
     if (photosError) return res.status(400).json({ message: photosError });
 
     const tagsStr = Array.isArray(tags) ? tags.join('|') : '';
     const db      = await getPool();
 
-    // Insert entry
+    // Insert entry (ảnh/audio lưu riêng ở DiaryMedia dạng nhị phân, không qua cột NVARCHAR)
     const result = await db.request()
       .input('user_id',    sql.Int,      req.user.id)
       .input('mood_score', sql.TinyInt,  mood_score)
@@ -559,17 +601,16 @@ router.post('/', async (req, res) => {
       .input('thoughts',   sql.NVarChar, thoughts    || '')
       .input('gratitude',  sql.NVarChar, gratitude   || '')
       .input('tags',       sql.NVarChar, tagsStr)
-      .input('audio_data', sql.NVarChar, audioData)
       .input('cbt_data',   sql.NVarChar, cbtJson)
-      .input('photos',     sql.NVarChar, photosJson)
       .query(`
-        INSERT INTO DiaryEntries (user_id, mood_score, event_text, thoughts, gratitude, tags, audio_data, cbt_data, photos)
+        INSERT INTO DiaryEntries (user_id, mood_score, event_text, thoughts, gratitude, tags, cbt_data)
         OUTPUT INSERTED.id, INSERTED.mood_score, INSERTED.event_text, INSERTED.thoughts,
-               INSERTED.gratitude, INSERTED.tags, INSERTED.audio_data, INSERTED.cbt_data, INSERTED.photos, INSERTED.created_at
-        VALUES (@user_id, @mood_score, @event_text, @thoughts, @gratitude, @tags, @audio_data, @cbt_data, @photos)
+               INSERTED.gratitude, INSERTED.tags, INSERTED.cbt_data, INSERTED.created_at
+        VALUES (@user_id, @mood_score, @event_text, @thoughts, @gratitude, @tags, @cbt_data)
       `);
 
     const entry = result.recordset[0];
+    await saveMedia(db, entry.id, validPhotos, audioData);
 
     // Cập nhật streak
     const streakResult = await db.request()
@@ -625,13 +666,27 @@ router.post('/', async (req, res) => {
         `);
     }
 
+    // Kiểm tra chuỗi 7 ngày tâm trạng tiêu cực (avg_mood ≤ 4 trên 7 ngày gần nhất có nhật ký)
+    const lowStreakRes = await db.request()
+      .input('uid_ls', sql.Int, req.user.id)
+      .query(`
+        SELECT COUNT(*) AS low_days FROM (
+          SELECT TOP 7 CAST(created_at AS DATE) AS d, AVG(CAST(mood_score AS FLOAT)) AS avg_m
+          FROM DiaryEntries WHERE user_id = @uid_ls
+          GROUP BY CAST(created_at AS DATE)
+          ORDER BY d DESC
+        ) t WHERE t.avg_m <= 4
+      `);
+    const lowStreak = lowStreakRes.recordset[0].low_days >= 7;
+
     res.status(201).json({
       message: 'Đã lưu nhật ký!',
-      entry: { ...entry, tags: entry.tags ? entry.tags.split('|') : [], photos: parsePhotos(entry.photos) },
+      entry: { ...entry, tags: entry.tags ? entry.tags.split('|') : [], photos: validPhotos, audio_data: audioData },
       streak:         newStreak,
       freeze_used:    freezeUsed,
       freeze_granted: freezeGrant,
       streak_freeze:  newFreezeCount,
+      low_streak:     lowStreak,
     });
   } catch (err) {
     console.error('Create diary error:', err);
@@ -660,7 +715,7 @@ router.put('/:id', async (req, res) => {
     if (cbt_data && typeof cbt_data === 'object') cbtJson = JSON.stringify(cbt_data);
 
     // Ảnh đính kèm: tối đa MAX_PHOTOS ảnh dạng data URI base64
-    const { photosJson, error: photosError } = buildPhotosJson(photos);
+    const { photos: validPhotos, error: photosError } = validatePhotos(photos);
     if (photosError) return res.status(400).json({ message: photosError });
 
     const db = await getPool();
@@ -673,16 +728,15 @@ router.put('/:id', async (req, res) => {
       .input('thoughts',   sql.NVarChar, thoughts   || '')
       .input('gratitude',  sql.NVarChar, gratitude  || '')
       .input('tags',       sql.NVarChar, tagsStr)
-      .input('audio_data', sql.NVarChar, audioData)
       .input('cbt_data',   sql.NVarChar, cbtJson)
-      .input('photos',     sql.NVarChar, photosJson)
       .query(`
         UPDATE DiaryEntries
         SET mood_score = @mood_score, event_text = @event_text,
             thoughts = @thoughts, gratitude = @gratitude,
-            tags = @tags, audio_data = @audio_data, cbt_data = @cbt_data, photos = @photos, updated_at = GETDATE()
+            tags = @tags, cbt_data = @cbt_data,
+            audio_data = NULL, photos = NULL, updated_at = GETDATE()
         OUTPUT INSERTED.id, INSERTED.mood_score, INSERTED.event_text, INSERTED.thoughts,
-               INSERTED.gratitude, INSERTED.tags, INSERTED.audio_data, INSERTED.cbt_data, INSERTED.photos, INSERTED.created_at
+               INSERTED.gratitude, INSERTED.tags, INSERTED.cbt_data, INSERTED.created_at
         WHERE id = @id AND user_id = @user_id
       `);
 
@@ -691,9 +745,15 @@ router.put('/:id', async (req, res) => {
     }
 
     const entry = result.recordset[0];
+
+    // Nhật ký sửa lại = thay toàn bộ ảnh/audio: xóa media cũ rồi ghi lại media mới
+    await db.request().input('id', sql.Int, entry.id)
+      .query('DELETE FROM DiaryMedia WHERE entry_id = @id');
+    await saveMedia(db, entry.id, validPhotos, audioData);
+
     res.json({
       message: 'Đã cập nhật nhật ký.',
-      entry: { ...entry, tags: entry.tags ? entry.tags.split('|') : [], photos: parsePhotos(entry.photos) },
+      entry: { ...entry, tags: entry.tags ? entry.tags.split('|') : [], photos: validPhotos, audio_data: audioData },
     });
   } catch (err) {
     console.error('Update diary error:', err);

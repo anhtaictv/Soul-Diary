@@ -208,6 +208,59 @@ cron.schedule('0 * * * *', async () => {
   }
 });
 
+// ── Cron: Cảnh báo chuỗi tâm trạng tiêu cực (8h sáng giờ VN = 1h UTC) ──────
+cron.schedule('0 1 * * *', async () => {
+  if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) return;
+  try {
+    const db = await getPool();
+    // Lấy user có 7 ngày nhật ký gần nhất đều avg_mood ≤ 4 + có push subscription + chưa nhận cảnh báo hôm nay
+    const result = await db.request().query(`
+      SELECT u.id, ps.endpoint, ps.p256dh, ps.auth
+      FROM Users u
+      INNER JOIN PushSubscriptions ps ON ps.user_id = u.id
+      WHERE (u.last_lowmood_notif_at IS NULL OR CAST(u.last_lowmood_notif_at AS DATE) < CAST(GETDATE() AS DATE))
+        AND u.id IN (
+          SELECT user_id FROM (
+            SELECT user_id, CAST(created_at AS DATE) AS d,
+                   AVG(CAST(mood_score AS FLOAT)) AS avg_m,
+                   ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY CAST(created_at AS DATE) DESC) AS rn
+            FROM DiaryEntries
+            GROUP BY user_id, CAST(created_at AS DATE)
+          ) daily
+          WHERE rn <= 7
+          GROUP BY user_id
+          HAVING COUNT(*) = 7 AND SUM(CASE WHEN avg_m <= 4 THEN 1 ELSE 0 END) = 7
+        )
+    `);
+    let sentCount = 0;
+    for (const u of result.recordset) {
+      try {
+        await webpush.sendNotification(
+          { endpoint: u.endpoint, keys: { p256dh: u.p256dh, auth: u.auth } },
+          JSON.stringify({
+            title: 'Soul Diary 💙',
+            body: 'Bạn đã có những ngày không dễ dàng. Bạn không cần đối mặt một mình — hãy xem đường dây hỗ trợ nhé.',
+            url: '/sos',
+          }),
+        );
+        await db.request()
+          .input('id', sql.Int, u.id)
+          .query('UPDATE Users SET last_lowmood_notif_at = GETDATE() WHERE id = @id');
+        sentCount++;
+      } catch (pushErr) {
+        if (pushErr.statusCode === 410 || pushErr.statusCode === 404) {
+          await db.request()
+            .input('ep', sql.NVarChar, u.endpoint)
+            .query('DELETE FROM PushSubscriptions WHERE endpoint = @ep');
+        }
+      }
+    }
+    if (sentCount > 0) console.log(`💙 Đã gửi cảnh báo tâm trạng tiêu cực cho ${sentCount} người dùng`);
+  } catch (err) {
+    console.error('Low mood cron error:', err.message);
+  }
+});
+
 // ── Cron: Tự động phát hành tính năng theo lịch hẹn (chạy lúc 00:05 giờ VN = 17:05 UTC) ──
 cron.schedule('5 17 * * *', async () => {
   try {

@@ -11,16 +11,31 @@ router.use(authMiddleware, adminMiddleware);
 router.get('/stats', async (req, res) => {
   try {
     const db = await getPool();
-    const [users, entries, articles] = await Promise.all([
+    const [users, entries, articles, atRisk] = await Promise.all([
       db.request().query('SELECT COUNT(*) AS total FROM Users WHERE role=\'user\''),
       db.request().query('SELECT COUNT(*) AS total FROM DiaryEntries'),
       db.request().query('SELECT COUNT(*) AS total, SUM(CAST(is_published AS INT)) AS published FROM Articles'),
+      db.request().query(`
+        SELECT COUNT(*) AS total FROM (
+          SELECT user_id FROM (
+            SELECT user_id, CAST(created_at AS DATE) AS d,
+                   AVG(CAST(mood_score AS FLOAT)) AS avg_m,
+                   ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY CAST(created_at AS DATE) DESC) AS rn
+            FROM DiaryEntries
+            GROUP BY user_id, CAST(created_at AS DATE)
+          ) daily
+          WHERE rn <= 7
+          GROUP BY user_id
+          HAVING COUNT(*) = 7 AND SUM(CASE WHEN avg_m <= 4 THEN 1 ELSE 0 END) = 7
+        ) x
+      `),
     ]);
     res.json({
       users:             users.recordset[0].total,
       diary_entries:     entries.recordset[0].total,
       articles_total:    articles.recordset[0].total,
       articles_published:articles.recordset[0].published || 0,
+      at_risk_users:     atRisk.recordset[0].total,
     });
   } catch (err) {
     res.status(500).json({ message: 'Lỗi server.' });

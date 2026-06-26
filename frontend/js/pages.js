@@ -307,11 +307,18 @@ const PAGES = {
 
       <!-- Dashboard panel -->
       <div class="panel active" id="adm-panel-dashboard">
-        <div class="grid-4" style="margin-bottom:20px">
+        <div class="grid-4" style="margin-bottom:12px">
           <div class="stat-card"><div class="stat-val" id="adm-stat-users">—</div><div class="stat-lbl">Người dùng</div></div>
           <div class="stat-card"><div class="stat-val" id="adm-stat-entries">—</div><div class="stat-lbl">Nhật ký đã ghi</div></div>
           <div class="stat-card"><div class="stat-val" id="adm-stat-articles">—</div><div class="stat-lbl">Tổng bài viết</div></div>
           <div class="stat-card"><div class="stat-val" id="adm-stat-published">—</div><div class="stat-lbl">Đã xuất bản</div></div>
+        </div>
+        <div class="stat-card" style="margin-bottom:20px;border-color:#f59e0b;display:flex;align-items:center;gap:14px;text-align:left;padding:14px 18px">
+          <div style="font-size:26px">⚠️</div>
+          <div>
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:2px">Tâm trạng tiêu cực 7+ ngày liên tiếp</div>
+            <div style="font-size:20px;font-weight:800;color:#d97706;font-family:'Nunito',sans-serif"><span id="adm-stat-at-risk">—</span> người dùng cần chú ý</div>
+          </div>
         </div>
         <div class="card">
           <div style="font-size:15px;font-weight:600;margin-bottom:6px">Thao tác nhanh</div>
