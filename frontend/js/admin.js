@@ -113,10 +113,12 @@ const Admin = (() => {
   async function loadDashboard() {
     try {
       const data = await API.getAdminStats();
-      document.getElementById('adm-stat-users').textContent     = data.users;
-      document.getElementById('adm-stat-entries').textContent   = data.diary_entries;
-      document.getElementById('adm-stat-articles').textContent  = data.articles_total;
-      document.getElementById('adm-stat-published').textContent = data.articles_published;
+      document.getElementById('adm-stat-users').textContent    = data.users;
+      document.getElementById('adm-stat-entries').textContent  = data.diary_entries;
+      document.getElementById('adm-stat-articles').textContent = data.articles_total;
+      document.getElementById('adm-stat-published').textContent= data.articles_published;
+      const atRiskEl = document.getElementById('adm-stat-at-risk');
+      if (atRiskEl) atRiskEl.textContent = data.at_risk_users ?? '—';
     } catch (e) {}
     await renderChangelog();
   }
@@ -266,12 +268,15 @@ const Admin = (() => {
               <span class="feat-version-name">${vData.title}</span>
               ${badge}
             </div>
-            ${!allOn ? `
+            ${allOn ? `
+            <div class="feat-version-actions">
+              <button class="adm-btn adm-btn-danger feat-btn-sm" onclick="Admin.revokeAll('${ver}')">↩️ Thu hồi cập nhật</button>
+            </div>` : `
             <div class="feat-version-actions">
               <input type="date" class="feat-date-inp" id="sched-${verId}" title="Ngày phát hành tự động">
               <button class="adm-btn adm-btn-outline feat-btn-sm" onclick="Admin.scheduleRelease('${ver}','${verId}')">🗓 Hẹn ngày</button>
               <button class="adm-btn adm-btn-primary feat-btn-sm" onclick="Admin.releaseAll('${ver}')">🚀 Phát hành</button>
-            </div>` : ''}
+            </div>`}
           </div>
 
           <div class="feat-flags-list">
@@ -388,6 +393,16 @@ const Admin = (() => {
     try {
       await API.releaseVersion({ version });
       showToast(`🚀 Đã phát hành ${version}`);
+      loadFeaturesPanel();
+      renderChangelog();
+    } catch (e) { showToast('❌ ' + e.message); }
+  }
+
+  async function revokeAll(version) {
+    if (!confirm(`Thu hồi cập nhật ${version}?\nTất cả tính năng trong phiên bản này sẽ tắt ngay, người dùng sẽ không còn thấy nữa. Bạn có thể phát hành lại bất cứ lúc nào.`)) return;
+    try {
+      await API.revokeVersion({ version });
+      showToast(`↩️ Đã thu hồi ${version}`);
       loadFeaturesPanel();
       renderChangelog();
     } catch (e) { showToast('❌ ' + e.message); }
@@ -631,6 +646,6 @@ const Admin = (() => {
     toggleChangelog,
     showNewVersionForm, submitNewVersion,
     showAddFlagForm, submitAddFlag,
-    toggleFlag, deleteFlag, releaseAll, scheduleRelease,
+    toggleFlag, deleteFlag, releaseAll, scheduleRelease, revokeAll,
   };
 })();

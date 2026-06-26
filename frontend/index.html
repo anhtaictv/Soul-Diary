@@ -147,6 +147,21 @@
     </div>
   </div>
 
+  <!-- Low Mood Streak Alert Modal -->
+  <div class="modal-overlay" id="lowmood-alert-modal">
+    <div class="modal" style="text-align:center;padding:28px 24px;max-width:340px">
+      <div style="font-size:52px;margin-bottom:12px">💙</div>
+      <div style="font-size:17px;font-weight:700;margin-bottom:10px;color:var(--text)">Chúng mình nhớ bạn</div>
+      <div style="font-size:13px;color:var(--text-muted);line-height:1.7;margin-bottom:22px">
+        Bạn vừa trải qua những ngày không dễ dàng liên tiếp. Điều đó hoàn toàn bình thường — nhưng bạn không cần đối mặt một mình.
+      </div>
+      <button class="btn-primary" style="margin-bottom:10px" onclick="App.navToSOS()">💙 Xem đường dây hỗ trợ</button>
+      <div>
+        <button style="background:none;border:none;color:var(--text-muted);font-size:13px;cursor:pointer;padding:6px 0" onclick="App.closeLowMoodAlert()">Tôi ổn, cảm ơn bạn đã hỏi</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Breathing Modal -->
   <div class="modal-overlay" id="breath-modal">
     <div class="modal">

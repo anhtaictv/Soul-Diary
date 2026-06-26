@@ -17,6 +17,7 @@ const App = (() => {
   let recordedAudioData = null;   // data URI base64 của bản ghi âm hiện tại — gửi kèm khi lưu nhật ký
   const MAX_RECORD_SECONDS = 30;  // giới hạn ghi âm cảm xúc tối đa 30 giây
   let uploadedPhotos= [];
+  let lastWeeklySummary = null; // { thisDays, thisAvg, diff, topTags } — dữ liệu tuần gần nhất, dùng để vẽ thẻ Mood Wrapped
   let musicTracks     = [];
   let nowPlaying      = null;   // { id, name, artist, image, audio, duration } | null — bài đang phát, theo dõi bằng id ổn định (không phải index, vì musicTracks bị nạp lại mỗi lần đổi mood)
   let currentMood     = 'chill';
@@ -417,10 +418,35 @@ const App = (() => {
   // Photo upload — tối đa MAX_PHOTOS ảnh, mỗi ảnh tối đa 2MB (giới hạn khớp với backend)
   const MAX_PHOTOS = 4;
   const MAX_PHOTO_FILE_SIZE = 2 * 1024 * 1024;
+  const PHOTO_MAX_DIM      = 1280; // resize cạnh dài nhất xuống tối đa 1280px trước khi gửi lên server
+  const PHOTO_JPEG_QUALITY = 0.72; // nén JPEG — giảm phần lớn dung lượng so với ảnh gốc từ camera điện thoại
+
+  // Resize + nén ảnh qua canvas trước khi lưu — giảm tải dung lượng DB (server lưu nguyên bản gửi lên)
+  function compressImage(file) {
+    return new Promise(resolve => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let { width, height } = img;
+        if (width > PHOTO_MAX_DIM || height > PHOTO_MAX_DIM) {
+          if (width > height) { height = Math.round(height * PHOTO_MAX_DIM / width); width = PHOTO_MAX_DIM; }
+          else { width = Math.round(width * PHOTO_MAX_DIM / height); height = PHOTO_MAX_DIM; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', PHOTO_JPEG_QUALITY));
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+      img.src = url;
+    });
+  }
+
   function handlePhotoUpload(event) {
     const files = Array.from(event.target.files);
     const row = document.getElementById('photo-preview-row');
-    files.forEach(file => {
+    files.forEach(async file => {
       if (!file.type.startsWith('image/')) return;
       if (uploadedPhotos.filter(Boolean).length >= MAX_PHOTOS) {
         showToast(`⚠️ Chỉ được đính kèm tối đa ${MAX_PHOTOS} ảnh.`);
@@ -430,16 +456,15 @@ const App = (() => {
         showToast(`⚠️ Ảnh "${file.name}" quá lớn (tối đa 2MB).`);
         return;
       }
-      const reader = new FileReader();
-      reader.onload = e => {
-        uploadedPhotos.push(e.target.result);
-        const img = document.createElement('div');
-        img.className = 'photo-thumb';
-        img.innerHTML = `<img src="${e.target.result}" /><button onclick="App.removePhoto(this,${uploadedPhotos.length-1})">✕</button>`;
-        row.appendChild(img);
-        document.getElementById('photo-upload-area').querySelector('.photo-upload-text').textContent = `${uploadedPhotos.filter(Boolean).length} ảnh đã chọn`;
-      };
-      reader.readAsDataURL(file);
+      const compressed = await compressImage(file);
+      if (!compressed) { showToast(`⚠️ Không thể xử lý ảnh "${file.name}".`); return; }
+      uploadedPhotos.push(compressed);
+      const idx = uploadedPhotos.length - 1;
+      const img = document.createElement('div');
+      img.className = 'photo-thumb';
+      img.innerHTML = `<img src="${compressed}" /><button onclick="App.removePhoto(this,${idx})">✕</button>`;
+      row.appendChild(img);
+      document.getElementById('photo-upload-area').querySelector('.photo-upload-text').textContent = `${uploadedPhotos.filter(Boolean).length} ảnh đã chọn`;
     });
     event.target.value = '';
   }
@@ -615,6 +640,7 @@ const App = (() => {
       if (window.FEATURES && window.FEATURES.soul_companion && res.entry?.id) {
         API.getEntryCompanion(res.entry.id).then(d => { if (d && d.message) showCompanionMessage(d.message); }).catch(() => {});
       }
+      if (res.low_streak) setTimeout(showLowMoodAlert, 800);
       await loadDiaryEntries();
       showToast('✅ Đã lưu nhật ký!');
     } catch(err) { showToast('❌ Lỗi lưu nhật ký: '+err.message); }
@@ -647,6 +673,10 @@ const App = (() => {
     document.getElementById('streak-modal').classList.add('open');
   }
   function closeStreakModal() { document.getElementById('streak-modal').classList.remove('open'); }
+
+  function showLowMoodAlert() { document.getElementById('lowmood-alert-modal').classList.add('open'); }
+  function closeLowMoodAlert() { document.getElementById('lowmood-alert-modal').classList.remove('open'); }
+  function navToSOS() { closeLowMoodAlert(); nav('sos'); }
 
   // ── Chart ────────────────────────────────────────────────────────────
   async function renderChart(days) {
@@ -1587,12 +1617,14 @@ const App = (() => {
     });
     const topTags = Object.entries(tagFreq).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([t])=>t);
     let trendHtml = '';
+    let diff = null;
     if (thisAvg !== null && lastAvg !== null) {
-      const diff = thisAvg - lastAvg;
+      diff = thisAvg - lastAvg;
       if (diff > 0.3)       trendHtml = `<span class="trend-up">↑ +${diff.toFixed(1)}</span>`;
       else if (diff < -0.3) trendHtml = `<span class="trend-down">↓ ${diff.toFixed(1)}</span>`;
       else                  trendHtml = `<span class="trend-same">→ ổn định</span>`;
     }
+    lastWeeklySummary = { thisDays, thisAvg, diff, topTags };
     el.innerHTML = `
       <div class="weekly-recap-card">
         <div class="recap-header">
@@ -1615,7 +1647,85 @@ const App = (() => {
         </div>
         ${thisDays === 0 ? '<div style="text-align:center;font-size:12px;color:#14532d;margin-top:8px;padding:8px;background:rgba(255,255,255,.5);border-radius:8px">Tuần này chưa có nhật ký nào — hãy bắt đầu hôm nay! 🌱</div>' : ''}
         <div id="ai-insight-box"></div>
+        ${window.FEATURES && window.FEATURES.mood_wrapped_card && thisDays > 0
+          ? '<button class="btn-outline" style="width:100%;margin-top:10px;font-size:13px" onclick="App.shareMoodWrapped()">📸 Tạo thẻ chia sẻ tâm trạng</button>'
+          : ''}
       </div>`;
+  }
+
+  // ── Mood Wrapped — thẻ ảnh tổng kết tâm trạng tuần, vẽ bằng canvas, chỉ lưu/chia sẻ ──
+  // máy người dùng, KHÔNG upload lên server (không tốn dung lượng DB).
+  function shareMoodWrapped() {
+    if (!lastWeeklySummary || !lastWeeklySummary.thisDays) {
+      showToast('Chưa có dữ liệu tuần này để tạo thẻ.');
+      return;
+    }
+    const { thisDays, thisAvg, diff, topTags } = lastWeeklySummary;
+    const user = Auth.getUser();
+    const moodRounded = thisAvg !== null ? Math.max(1, Math.min(10, Math.round(thisAvg))) : 5;
+    const mood = MOOD_DATA[moodRounded];
+
+    const W = 720, H = 960;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+
+    const grad = ctx.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, mood.color);
+    grad.addColorStop(1, '#1e1b4b');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.font = '600 22px system-ui, sans-serif';
+    ctx.fillText('SOUL DIARY · TỔNG KẾT TUẦN', W/2, 90);
+
+    ctx.font = '120px system-ui, sans-serif';
+    ctx.fillText(mood.emoji, W/2, 280);
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '700 56px system-ui, sans-serif';
+    ctx.fillText(thisAvg !== null ? thisAvg.toFixed(1) : '—', W/2, 380);
+    ctx.font = '400 20px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,.75)';
+    ctx.fillText('điểm tâm trạng trung bình', W/2, 415);
+
+    ctx.font = '600 24px system-ui, sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.fillText(`📅 ${thisDays}/7 ngày ghi nhật ký`, W/2, 480);
+
+    if (diff !== null) {
+      const trendTxt = diff > 0.3  ? `↑ Cải thiện +${diff.toFixed(1)} so với tuần trước`
+        :              diff < -0.3 ? `↓ Giảm ${diff.toFixed(1)} so với tuần trước`
+        :                            '→ Ổn định so với tuần trước';
+      ctx.font = '20px system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,.85)';
+      ctx.fillText(trendTxt, W/2, 525);
+    }
+
+    if (topTags.length) {
+      ctx.font = '22px system-ui, sans-serif';
+      ctx.fillStyle = '#fff';
+      ctx.fillText(`Cảm xúc nổi bật: ${topTags.join('  ')}`, W/2, 575);
+    }
+
+    ctx.font = '400 16px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,.6)';
+    ctx.fillText(`${user?.full_name || 'Một người viết nhật ký'} · ${new Date().toLocaleDateString('vi-VN')}`, W/2, H-50);
+
+    canvas.toBlob(blob => {
+      const file = new File([blob], 'soul-diary-tuan.png', { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: 'Soul Diary', text: 'Tổng kết tâm trạng tuần này của tôi 🌱' }).catch(() => {});
+      } else {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'soul-diary-tuan.png';
+        a.click();
+        showToast('📥 Đã lưu ảnh chia sẻ!');
+      }
+    }, 'image/png');
   }
 
   // ── Badges ───────────────────────────────────────────────────────────
@@ -1708,5 +1818,5 @@ const App = (() => {
     nav('dashboard');
   }
 
-  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,refreshDailyPrompt,suggestAmbienceMusic};
+  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped};
 })();

@@ -1,4 +1,5 @@
 const sql = require('mssql');
+const { dataUriToBuffer } = require('../utils/media');
 
 const config = {
   server:   'localhost',
@@ -45,6 +46,51 @@ async function getPool() {
     console.log('✅ Kết nối SQL Server thành công');
   }
   return pool;
+}
+
+// Chuyển dữ liệu ảnh/audio cũ (base64 trong NVARCHAR) sang bảng DiaryMedia (VARBINARY)
+async function migrateLegacyMedia() {
+  const db = await getPool();
+  const rows = await db.request().query(`
+    SELECT id, photos, audio_data FROM DiaryEntries
+    WHERE photos IS NOT NULL OR audio_data IS NOT NULL
+  `);
+  if (!rows.recordset.length) return;
+
+  for (const row of rows.recordset) {
+    if (row.photos) {
+      let arr = [];
+      try { arr = JSON.parse(row.photos); } catch {}
+      for (let i = 0; i < arr.length; i++) {
+        const parsed = dataUriToBuffer(arr[i]);
+        if (!parsed) continue;
+        await db.request()
+          .input('entry_id',   sql.Int, row.id)
+          .input('kind',       sql.NVarChar, 'photo')
+          .input('mime',       sql.NVarChar, parsed.mime)
+          .input('data',       sql.VarBinary(sql.MAX), parsed.buffer)
+          .input('sort_order', sql.Int, i)
+          .query(`INSERT INTO DiaryMedia (entry_id, kind, mime_type, data, sort_order)
+                  VALUES (@entry_id, @kind, @mime, @data, @sort_order)`);
+      }
+    }
+    if (row.audio_data) {
+      const parsed = dataUriToBuffer(row.audio_data);
+      if (parsed) {
+        await db.request()
+          .input('entry_id',   sql.Int, row.id)
+          .input('kind',       sql.NVarChar, 'audio')
+          .input('mime',       sql.NVarChar, parsed.mime)
+          .input('data',       sql.VarBinary(sql.MAX), parsed.buffer)
+          .input('sort_order', sql.Int, 0)
+          .query(`INSERT INTO DiaryMedia (entry_id, kind, mime_type, data, sort_order)
+                  VALUES (@entry_id, @kind, @mime, @data, @sort_order)`);
+      }
+    }
+    await db.request().input('id', sql.Int, row.id)
+      .query(`UPDATE DiaryEntries SET photos = NULL, audio_data = NULL WHERE id = @id`);
+  }
+  console.log(`✅ Đã chuyển ${rows.recordset.length} nhật ký sang lưu ảnh/audio dạng nhị phân (DiaryMedia)`);
 }
 
 async function initSchema() {
@@ -161,6 +207,15 @@ async function initSchema() {
     ALTER TABLE Users ADD last_checkin_notif_at DATETIME2 NULL
   `);
 
+  // Thời điểm gửi push cảnh báo chuỗi tâm trạng tiêu cực gần nhất — chống spam
+  await db.request().query(`
+    IF NOT EXISTS (
+      SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME='Users' AND COLUMN_NAME='last_lowmood_notif_at'
+    )
+    ALTER TABLE Users ADD last_lowmood_notif_at DATETIME2 NULL
+  `);
+
   // DiaryEntries table
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='DiaryEntries' AND xtype='U')
@@ -221,6 +276,30 @@ async function initSchema() {
     )
     ALTER TABLE DiaryEntries ADD ai_companion_message NVARCHAR(MAX) NULL
   `);
+
+  // Bảng DiaryMedia — ảnh/audio đính kèm nhật ký lưu dạng VARBINARY (nhị phân gốc),
+  // thay cho cột photos/audio_data NVARCHAR(MAX) base64 cũ (base64 + UTF-16 tốn ~2.7x dung lượng thật)
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='DiaryMedia' AND xtype='U')
+    CREATE TABLE DiaryMedia (
+      id         INT            IDENTITY(1,1) PRIMARY KEY,
+      entry_id   INT            NOT NULL REFERENCES DiaryEntries(id) ON DELETE CASCADE,
+      kind       NVARCHAR(10)   NOT NULL,
+      mime_type  NVARCHAR(50)   NOT NULL,
+      data       VARBINARY(MAX) NOT NULL,
+      sort_order INT            NOT NULL DEFAULT 0,
+      created_at DATETIME2      DEFAULT GETDATE()
+    )
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_DiaryMedia_entry')
+    CREATE INDEX IX_DiaryMedia_entry ON DiaryMedia(entry_id)
+  `);
+
+  // Migration 1 lần: chuyển ảnh/audio cũ (base64 NVARCHAR) sang DiaryMedia rồi xóa dữ liệu cột cũ.
+  // Idempotent: chỉ những entry còn photos/audio_data NOT NULL mới được xử lý; sau khi xong
+  // cột cũ được set NULL nên lần khởi động sau sẽ không còn gì để xử lý.
+  await migrateLegacyMedia();
 
   // Articles table
   await db.request().query(`
@@ -355,6 +434,15 @@ async function initSchema() {
     VALUES ('soul_seed',N'Hạt mầm tâm hồn',
             N'Cây ảo trên dashboard lớn dần theo chuỗi ngày viết, héo nếu bỏ bê',
             'v1.5',N'Nuôi dưỡng Tâm hồn',0,8)
+  `);
+
+  // Seed feature flag v1.6 — Lan tỏa Tâm hồn (disabled by default, chờ admin bật)
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='mood_wrapped_card')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('mood_wrapped_card',N'Thẻ Cảm xúc Chia sẻ (Mood Wrapped)',
+            N'Tạo ảnh tổng kết tâm trạng tuần dạng thẻ đẹp để lưu/chia sẻ, không upload lên server',
+            'v1.6',N'Lan tỏa Tâm hồn',0,9)
   `);
 
   // Index
