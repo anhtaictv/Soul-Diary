@@ -64,9 +64,14 @@ const App = (() => {
       case 'inbox':      initInboxPage();          break;
       case 'challenges': initChallengePage();      break;
       case 'community':  initCommunityPage();      break;
-      case 'settings':   initSettingsPage();       break;
-      case 'sos':        renderSOSContacts();      break;
-      case 'admin':      Admin.initPage();         break;
+      case 'settings':    initSettingsPage();       break;
+      case 'sos':         renderSOSContacts();      break;
+      case 'admin':       Admin.initPage();         break;
+      case 'chat':        initChatPage();           break;
+      case 'study':       initStudyPage();          break;
+      case 'courses':     initCoursesPage();        break;
+      case 'goals':       initGoalsPage();          break;
+      case 'year-review': initYearReviewPage();     break;
     }
   }
 
@@ -2432,6 +2437,405 @@ const App = (() => {
     setTimeout(() => { if (el) el.style.display = 'none'; }, 4000);
   }
 
+  // ── Soul Chat (v1.8) ────────────────────────────────────────────────
+  async function initChatPage() {
+    const msgsEl = document.getElementById('chat-messages');
+    const remEl  = document.getElementById('chat-remaining');
+    try {
+      const { messages, remaining } = await API.getChatHistory();
+      if (messages && messages.length) {
+        msgsEl.innerHTML = messages.map(m => `
+          <div class="chat-bubble ${m.role}">
+            <div class="chat-content">${escapeHtml(m.content)}</div>
+          </div>`).join('');
+      }
+      if (remEl) remEl.textContent = remaining !== undefined ? `Còn ${remaining}/20 tin nhắn hôm nay` : '';
+      msgsEl.scrollTop = msgsEl.scrollHeight;
+    } catch(e) {}
+    const input = document.getElementById('chat-input');
+    if (input) input.addEventListener('input', () => {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+    });
+  }
+
+  async function sendChat() {
+    const input = document.getElementById('chat-input');
+    const msgsEl = document.getElementById('chat-messages');
+    const remEl  = document.getElementById('chat-remaining');
+    const sendBtn= document.getElementById('chat-send-btn');
+    const text = (input?.value || '').trim();
+    if (!text) return;
+    input.value = '';
+    input.style.height = 'auto';
+    sendBtn.disabled = true;
+
+    msgsEl.innerHTML += `<div class="chat-bubble user"><div class="chat-content">${escapeHtml(text)}</div></div>`;
+    msgsEl.innerHTML += `<div class="chat-bubble assistant typing" id="chat-typing"><div class="chat-content">...</div></div>`;
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+
+    try {
+      const { reply, remaining, crisis } = await API.sendChatMessage(text);
+      document.getElementById('chat-typing')?.remove();
+      msgsEl.innerHTML += `<div class="chat-bubble assistant"><div class="chat-content">${escapeHtml(reply)}</div></div>`;
+      if (remEl) remEl.textContent = `Còn ${remaining}/20 tin nhắn hôm nay`;
+      if (crisis) {
+        msgsEl.innerHTML += `<div class="chat-crisis-banner">🆘 Nếu bạn đang trong tình trạng nguy hiểm, hãy gọi ngay <strong>1800 599 920</strong> hoặc đến <a href="#" onclick="App.nav('sos');return false">trang SOS</a>.</div>`;
+      }
+    } catch(e) {
+      document.getElementById('chat-typing')?.remove();
+      msgsEl.innerHTML += `<div class="chat-bubble assistant"><div class="chat-content" style="color:#dc2626">Xin lỗi, có lỗi xảy ra. Vui lòng thử lại.</div></div>`;
+    }
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+    sendBtn.disabled = false;
+    input.focus();
+  }
+
+  function chatKeydown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  }
+
+  async function clearChat() {
+    if (!confirm('Xóa toàn bộ lịch sử trò chuyện?')) return;
+    try {
+      await API.clearChat();
+      const msgsEl = document.getElementById('chat-messages');
+      if (msgsEl) msgsEl.innerHTML = `<div class="chat-bubble assistant"><div class="chat-content">Xin chào! Mình là Soul 🌱 Bạn đang cảm thấy thế nào hôm nay?</div></div>`;
+      const remEl = document.getElementById('chat-remaining');
+      if (remEl) remEl.textContent = 'Còn 20/20 tin nhắn hôm nay';
+      showToast('Đã xóa lịch sử trò chuyện.');
+    } catch(e) { showToast('Lỗi: ' + e.message); }
+  }
+
+  // ── Lịch Học tập (v1.8) ───────────────────────────────────────────────
+  const STUDY_TYPE_LABEL = { exam:'🔴 Thi/Kiểm tra', deadline:'🟠 Deadline', assignment:'🟡 Bài tập', other:'🔵 Khác' };
+
+  async function initStudyPage() {
+    const today = new Date().toISOString().split('T')[0];
+    const todayInput = document.getElementById('study-date');
+    if (todayInput) todayInput.value = today;
+    await loadStudyEvents();
+  }
+
+  async function loadStudyEvents() {
+    const listEl = document.getElementById('study-events-list');
+    if (!listEl) return;
+    try {
+      const { events } = await API.getStudyEvents();
+      if (!events || !events.length) {
+        listEl.innerHTML = '<div style="text-align:center;color:var(--text-hint);padding:30px 0;font-size:13px">Chưa có sự kiện nào. Thêm lịch thi, deadline ngay nào! 📅</div>';
+        return;
+      }
+      const now = new Date(); now.setHours(0,0,0,0);
+      listEl.innerHTML = events.map(ev => {
+        const d = new Date(ev.event_date);
+        const diff = Math.round((d - now) / 86400000);
+        const past = diff < 0;
+        const urgent = !past && diff <= 3;
+        const urgentCls = urgent ? 'study-event-urgent' : past ? 'study-event-past' : '';
+        const dayLabel = past ? `${Math.abs(diff)} ngày trước` : diff === 0 ? 'Hôm nay' : `Còn ${diff} ngày`;
+        return `<div class="study-event-card ${urgentCls} ${ev.is_done ? 'study-event-done' : ''}">
+          <div class="study-event-left">
+            <div class="study-event-type">${STUDY_TYPE_LABEL[ev.event_type] || ev.event_type}</div>
+            <div class="study-event-title">${escapeHtml(ev.title)}</div>
+            ${ev.notes ? `<div class="study-event-notes">${escapeHtml(ev.notes)}</div>` : ''}
+          </div>
+          <div class="study-event-right">
+            <div class="study-event-date">${d.toLocaleDateString('vi-VN')}</div>
+            <div class="study-event-days ${urgent?'urgent':''}">${dayLabel}</div>
+            <div style="display:flex;gap:6px;margin-top:6px">
+              ${!ev.is_done ? `<button class="btn-outline" style="padding:3px 8px;font-size:11px" onclick="App.doneStudy(${ev.id})">✅ Xong</button>` : '<span style="font-size:11px;color:#059669">✅ Hoàn thành</span>'}
+              <button class="btn-outline" style="padding:3px 8px;font-size:11px;color:#dc2626;border-color:#dc2626" onclick="App.removeStudy(${ev.id})">🗑</button>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    } catch(e) { if (listEl) listEl.innerHTML = '<div class="loading-text">Không thể tải dữ liệu.</div>'; }
+  }
+
+  async function createStudyEvent() {
+    const title = document.getElementById('study-title')?.value.trim();
+    const date  = document.getElementById('study-date')?.value;
+    const type  = document.getElementById('study-type')?.value;
+    const notes = document.getElementById('study-notes')?.value.trim();
+    const msgEl = document.getElementById('study-form-msg');
+    if (!title || !date) { showSettingsMsg(msgEl, '⚠️ Vui lòng nhập tên và ngày sự kiện.', false); return; }
+    try {
+      await API.createStudyEvent({ title, event_date: date, event_type: type, notes });
+      document.getElementById('study-title').value = '';
+      document.getElementById('study-notes').value = '';
+      showSettingsMsg(msgEl, '✅ Đã thêm sự kiện!', true);
+      await loadStudyEvents();
+    } catch(e) { showSettingsMsg(msgEl, '❌ ' + e.message, false); }
+  }
+
+  async function doneStudy(id) {
+    try { await API.doneStudyEvent(id); await loadStudyEvents(); } catch(e) { showToast('Lỗi: ' + e.message); }
+  }
+
+  async function removeStudy(id) {
+    if (!confirm('Xóa sự kiện này?')) return;
+    try { await API.deleteStudyEvent(id); await loadStudyEvents(); } catch(e) { showToast('Lỗi: ' + e.message); }
+  }
+
+  // ── Mini Courses (v1.8) ───────────────────────────────────────────────
+  let courseData = [];    // cache danh sách courses
+  let lessonState = { courseId: null, lessonIdx: 0 };  // trạng thái lesson đang xem
+
+  async function initCoursesPage() {
+    const listEl = document.getElementById('courses-list');
+    try {
+      const { courses } = await API.getCourses();
+      courseData = courses || [];
+      if (!courseData.length) { listEl.innerHTML = '<div class="loading-text">Chưa có khóa học nào.</div>'; return; }
+      listEl.innerHTML = courseData.map(c => {
+        const pct = c.lessons ? Math.round((c.current_lesson / c.lessons.length) * 100) : 0;
+        return `<div class="course-card card" onclick="App.openCourseLesson(${c.id}, ${c.current_lesson})">
+          <div class="course-header">
+            <div class="course-icon">${c.icon || '📘'}</div>
+            <div class="course-info">
+              <div class="course-title">${escapeHtml(c.title)}</div>
+              <div class="course-desc">${escapeHtml(c.description || '')}</div>
+            </div>
+            ${c.completed ? '<div class="course-done-badge">✅ Hoàn thành</div>' : ''}
+          </div>
+          <div class="course-progress-row">
+            <div class="course-progress-bar"><div class="course-progress-fill" style="width:${pct}%"></div></div>
+            <span class="course-progress-label">${c.current_lesson}/${c.lessons ? c.lessons.length : 0} bài</span>
+          </div>
+        </div>`;
+      }).join('');
+    } catch(e) { if (listEl) listEl.innerHTML = '<div class="loading-text">Không thể tải khóa học.</div>'; }
+  }
+
+  function openCourseLesson(courseId, lessonIdx) {
+    const course = courseData.find(c => c.id === courseId);
+    if (!course || !course.lessons || !course.lessons.length) return;
+    lessonState = { courseId, lessonIdx: Math.min(lessonIdx, course.lessons.length - 1) };
+    renderLessonModal();
+    document.getElementById('lesson-modal').style.display = 'flex';
+  }
+
+  function renderLessonModal() {
+    const course = courseData.find(c => c.id === lessonState.courseId);
+    if (!course || !course.lessons) return;
+    const lesson = course.lessons[lessonState.lessonIdx];
+    const total  = course.lessons.length;
+    const isLast = lessonState.lessonIdx >= total - 1;
+    document.getElementById('lesson-modal-content').innerHTML = `
+      <div style="font-size:11px;color:var(--text-hint);margin-bottom:6px">${escapeHtml(course.title)} · Bài ${lessonState.lessonIdx + 1}/${total}</div>
+      <div style="font-weight:700;font-size:16px;margin-bottom:12px">${escapeHtml(lesson.title)}</div>
+      <div style="white-space:pre-wrap;font-size:13px;line-height:1.7;color:var(--text)">${escapeHtml(lesson.content)}</div>`;
+    const prevBtn = document.getElementById('lesson-prev-btn');
+    const nextBtn = document.getElementById('lesson-next-btn');
+    prevBtn.style.display = lessonState.lessonIdx > 0 ? '' : 'none';
+    nextBtn.textContent   = isLast ? '✅ Hoàn thành khóa học' : 'Tiếp theo →';
+  }
+
+  async function lessonNav(dir) {
+    const course = courseData.find(c => c.id === lessonState.courseId);
+    if (!course) return;
+    const newIdx = lessonState.lessonIdx + dir;
+    if (newIdx < 0) return;
+    if (newIdx >= course.lessons.length) {
+      // Đánh dấu hoàn thành
+      try {
+        await API.saveCourseProgress(course.id, lessonState.lessonIdx);
+        showToast('🎉 Bạn đã hoàn thành khóa học này!');
+        closeLessonModal();
+        initCoursesPage();
+      } catch(e) { showToast('Lỗi: ' + e.message); }
+      return;
+    }
+    // Lưu tiến độ bài hiện tại khi next
+    if (dir > 0) {
+      try { await API.saveCourseProgress(course.id, newIdx); } catch(_) {}
+    }
+    lessonState.lessonIdx = newIdx;
+    renderLessonModal();
+  }
+
+  function closeLessonModal() {
+    document.getElementById('lesson-modal').style.display = 'none';
+  }
+
+  // ── Mục tiêu Cá nhân (v1.8) ──────────────────────────────────────────
+  function onGoalTypeChange() {
+    const type = document.getElementById('goal-type')?.value;
+    const targetLabel = document.getElementById('goal-target-label');
+    const periodWrap  = document.getElementById('goal-period-wrap');
+    const targetInput = document.getElementById('goal-target');
+    if (!targetLabel) return;
+    if (type === 'mood_avg') {
+      targetLabel.textContent = 'Mood trung bình ≥ (1-10)';
+      targetInput.placeholder = '7';
+      targetInput.max = '10';
+      if (periodWrap) periodWrap.style.display = '';
+    } else if (type === 'streak') {
+      targetLabel.textContent = 'Số ngày liên tiếp';
+      targetInput.placeholder = '7';
+      targetInput.max = '365';
+      if (periodWrap) periodWrap.style.display = 'none';
+    } else {
+      targetLabel.textContent = 'Số nhật ký cần viết';
+      targetInput.placeholder = '10';
+      targetInput.max = '999';
+      if (periodWrap) periodWrap.style.display = '';
+    }
+  }
+
+  async function initGoalsPage() {
+    onGoalTypeChange();
+    await loadGoals();
+  }
+
+  async function loadGoals() {
+    const listEl = document.getElementById('goals-list');
+    if (!listEl) return;
+    try {
+      const { goals } = await API.getGoals();
+      if (!goals || !goals.length) {
+        listEl.innerHTML = '<div style="text-align:center;color:var(--text-hint);padding:30px 0;font-size:13px">Chưa có mục tiêu nào. Đặt mục tiêu đầu tiên đi! 🎯</div>';
+        return;
+      }
+      listEl.innerHTML = goals.map(g => {
+        const pct = Math.min(100, Math.round((g.progress / g.target_value) * 100));
+        const done = pct >= 100;
+        return `<div class="goal-card card ${done ? 'goal-done' : ''}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+            <div>
+              <div class="goal-title">${escapeHtml(g.title)}</div>
+              <div class="goal-type-label">${goalTypeLabel(g.goal_type, g.target_value, g.period_days)}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              ${done ? '<span class="goal-done-badge">✅ Đạt rồi!</span>' : ''}
+              <button onclick="App.removeGoal(${g.id})" style="background:none;border:none;cursor:pointer;color:var(--text-hint);font-size:15px">🗑</button>
+            </div>
+          </div>
+          <div class="goal-progress-row">
+            <div class="goal-progress-bar"><div class="goal-progress-fill" style="width:${pct}%;${done?'background:#059669':''}"></div></div>
+            <span class="goal-progress-label">${g.progress}/${g.target_value}</span>
+          </div>
+        </div>`;
+      }).join('');
+    } catch(e) { if (listEl) listEl.innerHTML = '<div class="loading-text">Không thể tải dữ liệu.</div>'; }
+  }
+
+  function goalTypeLabel(type, target, period) {
+    if (type === 'mood_avg') return `📊 Mood trung bình ≥ ${target}/10 trong ${period} ngày`;
+    if (type === 'streak')   return `🔥 Chuỗi ${target} ngày`;
+    return `📖 Viết ${target} nhật ký trong ${period} ngày`;
+  }
+
+  async function createGoal() {
+    const title  = document.getElementById('goal-title')?.value.trim();
+    const type   = document.getElementById('goal-type')?.value;
+    const target = parseInt(document.getElementById('goal-target')?.value);
+    const period = parseInt(document.getElementById('goal-period')?.value || 30);
+    const msgEl  = document.getElementById('goal-form-msg');
+    if (!title) { showSettingsMsg(msgEl, '⚠️ Vui lòng nhập tên mục tiêu.', false); return; }
+    if (!target || target < 1) { showSettingsMsg(msgEl, '⚠️ Vui lòng nhập giá trị mục tiêu hợp lệ.', false); return; }
+    if (type === 'mood_avg' && target > 10) { showSettingsMsg(msgEl, '⚠️ Mood không thể vượt quá 10.', false); return; }
+    try {
+      await API.createGoal({ title, goal_type: type, target_value: target, period_days: period });
+      document.getElementById('goal-title').value = '';
+      document.getElementById('goal-target').value = '';
+      showSettingsMsg(msgEl, '✅ Đã tạo mục tiêu!', true);
+      await loadGoals();
+    } catch(e) { showSettingsMsg(msgEl, '❌ ' + e.message, false); }
+  }
+
+  async function removeGoal(id) {
+    if (!confirm('Xóa mục tiêu này?')) return;
+    try { await API.deleteGoal(id); await loadGoals(); } catch(e) { showToast('Lỗi: ' + e.message); }
+  }
+
+  // ── Tổng kết Năm (v1.8) ───────────────────────────────────────────────
+  let yearReviewYear = new Date().getFullYear();
+
+  async function initYearReviewPage() {
+    yearReviewYear = new Date().getFullYear();
+    const yearEl = document.getElementById('year-review-year');
+    if (yearEl) yearEl.textContent = yearReviewYear;
+    await loadYearReview();
+  }
+
+  function yearReviewNav(dir) {
+    yearReviewYear += dir;
+    const yearEl = document.getElementById('year-review-year');
+    if (yearEl) yearEl.textContent = yearReviewYear;
+    loadYearReview();
+  }
+
+  async function loadYearReview() {
+    const el = document.getElementById('year-review-content');
+    if (!el) return;
+    el.innerHTML = '<div class="loading-text">Đang tải...</div>';
+    try {
+      const data = await API.getYearReview(yearReviewYear);
+      renderYearReview(data, yearReviewYear);
+    } catch(e) { el.innerHTML = '<div class="loading-text">Không thể tải dữ liệu.</div>'; }
+  }
+
+  function renderYearReview(data, year) {
+    const el = document.getElementById('year-review-content');
+    if (!el) return;
+    const { summary, monthly, topTags, sleepCorrelation, bestMonth, worstMonth } = data;
+    if (!summary || !summary.total_entries) {
+      el.innerHTML = `<div style="text-align:center;color:var(--text-hint);padding:60px 0">Không có dữ liệu nhật ký cho năm ${year}.</div>`;
+      return;
+    }
+
+    const monthNames = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
+    const maxEntries = Math.max(...monthly.map(m => m.entries || 0), 1);
+
+    const monthBars = monthly.map((m, i) => {
+      const h = m.entries ? Math.round((m.entries / maxEntries) * 60) : 0;
+      const isB = bestMonth  && m.month === bestMonth.month;
+      const isW = worstMonth && m.month === worstMonth.month;
+      return `<div class="yr-month-col" title="${monthNames[i]}: ${m.entries || 0} nhật ký, mood TB ${m.avg_mood ? m.avg_mood.toFixed(1) : '—'}">
+        <div class="yr-month-bar" style="height:${h}px;background:${isB?'#059669':isW?'#dc2626':'var(--primary)'}"></div>
+        <div class="yr-month-lbl">${monthNames[i]}</div>
+      </div>`;
+    }).join('');
+
+    const tagsHtml = topTags && topTags.length
+      ? topTags.map(t => `<span class="entry-tag">${escapeHtml(t.tag)} <strong>${t.count}</strong></span>`).join('')
+      : '<span style="color:var(--text-hint)">Chưa có tag</span>';
+
+    const sleepHtml = sleepCorrelation && sleepCorrelation.length
+      ? `<div class="card" style="margin-bottom:16px">
+          <div class="settings-section-title" style="margin-bottom:10px">😴 Giấc ngủ & Tâm trạng</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${sleepCorrelation.map(s => `<div class="stat-card" style="min-width:100px">
+            <div class="stat-val" style="font-size:16px">${parseFloat(s.avg_mood).toFixed(1)}</div>
+            <div class="stat-lbl">${s.sleep_band} giờ ngủ</div>
+          </div>`).join('')}
+          </div>
+        </div>` : '';
+
+    el.innerHTML = `
+      <div class="grid-stats" style="margin-bottom:16px">
+        <div class="stat-card"><div class="stat-val">${summary.total_entries}</div><div class="stat-lbl">Nhật ký đã viết</div></div>
+        <div class="stat-card"><div class="stat-val">${summary.avg_mood ? parseFloat(summary.avg_mood).toFixed(1) : '—'}</div><div class="stat-lbl">Mood trung bình</div></div>
+        <div class="stat-card"><div class="stat-val">${summary.max_streak || 0}</div><div class="stat-lbl">Chuỗi dài nhất</div></div>
+        <div class="stat-card"><div class="stat-val">${summary.active_months || 0}</div><div class="stat-lbl">Tháng có nhật ký</div></div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="settings-section-title" style="margin-bottom:12px">📊 Nhật ký mỗi tháng</div>
+        <div class="yr-month-chart">${monthBars}</div>
+        <div style="display:flex;gap:16px;margin-top:10px;font-size:12px;color:var(--text-hint)">
+          ${bestMonth  ? `<span>🌟 Tháng tốt nhất: T${bestMonth.month}  (${bestMonth.entries} nhật ký, mood ${parseFloat(bestMonth.avg_mood).toFixed(1)})</span>` : ''}
+          ${worstMonth ? `<span>😔 Cần cải thiện: T${worstMonth.month} (${worstMonth.entries} nhật ký, mood ${parseFloat(worstMonth.avg_mood).toFixed(1)})</span>` : ''}
+        </div>
+      </div>
+      ${sleepHtml}
+      <div class="card">
+        <div class="settings-section-title" style="margin-bottom:10px">🏷️ Tags phổ biến nhất</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${tagsHtml}</div>
+      </div>`;
+  }
+
   // ── Init ─────────────────────────────────────────────────────────────
   async function init() {
     document.querySelectorAll('.nav-item').forEach(btn=>btn.addEventListener('click',()=>nav(btn.dataset.page)));
@@ -2471,8 +2875,17 @@ const App = (() => {
       const el = document.getElementById('nav-community');
       if (el) el.style.display = '';
     }
+    // v1.8 feature-gated nav items
+    const v18 = { soul_chat:'nav-chat', sleep_tracking:null, study_calendar:'nav-study', mini_courses:'nav-courses', personal_goals:'nav-goals', year_review:'nav-year-review' };
+    Object.entries(v18).forEach(([flag, navId]) => {
+      if (!navId) return;
+      if (window.FEATURES && window.FEATURES[flag]) {
+        const el = document.getElementById(navId);
+        if (el) el.style.display = '';
+      }
+    });
     nav('dashboard');
   }
 
-  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings};
+  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav};
 })();

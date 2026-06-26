@@ -134,5 +134,30 @@ const API = (() => {
     deleteCommunityPost: (id) => request(`/community/${id}`,       { method: 'DELETE' }),
     getCommunityAdmin:   ()   => request('/community/admin-list'),
     hideCommunityPost:   (id) => request(`/community/${id}/hide`,  { method: 'PATCH' }),
+
+    // v1.8 — Soul Chat AI
+    getChatHistory:  ()        => request('/chat/history'),
+    sendChatMessage: (content) => request('/chat/message', { method: 'POST', body: { content } }),
+    clearChat:       ()        => request('/chat/clear',   { method: 'DELETE' }),
+
+    // v1.8 — Lịch Học tập
+    getStudyEvents:   (from, to) => request(`/study${from ? `?from=${from}&to=${to}` : ''}`),
+    getUpcomingStudy: ()         => request('/study/upcoming'),
+    createStudyEvent: (body)     => request('/study',            { method: 'POST',   body }),
+    doneStudyEvent:   (id)       => request(`/study/${id}/done`, { method: 'PATCH' }),
+    deleteStudyEvent: (id)       => request(`/study/${id}`,      { method: 'DELETE' }),
+
+    // v1.8 — Mini Courses
+    getCourses:         ()         => request('/courses'),
+    saveCourseProgress: (id, idx)  => request(`/courses/${id}/progress`, { method: 'POST', body: { lesson_index: idx } }),
+
+    // v1.8 — Mục tiêu Cá nhân
+    getGoals:    ()     => request('/goals'),
+    createGoal:  (body) => request('/goals',      { method: 'POST',   body }),
+    deleteGoal:  (id)   => request(`/goals/${id}`, { method: 'DELETE' }),
+
+    // v1.8 — Tổng kết Năm & Giấc ngủ
+    getYearReview: (year) => request(`/diary/year-review?year=${year || new Date().getFullYear()}`),
+    getSleepStats: ()     => request('/diary/sleep-stats'),
   };
 })();
