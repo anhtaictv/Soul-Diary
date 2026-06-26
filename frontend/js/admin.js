@@ -9,10 +9,23 @@ const Admin = (() => {
   // ── Lịch sử phiên bản ────────────────────────────────────────────────
   const CHANGELOG = [
     {
+      version: 'v1.4',
+      date: '14/06/2026',
+      title: 'Check-in Tâm lý',
+      latest: true,
+      items: [
+        'Check-in Sức khỏe Tinh thần hàng tuần: bộ 31 câu hỏi PHQ-9 / GAD-7 / PSS-10 / WHO-5 đánh giá trầm cảm, lo âu, căng thẳng và sức khỏe tổng thể',
+        'AI phân tích kết quả check-in: nhận xét cá nhân hóa và gợi ý hành động từ Gemini, fallback rule-based khi quota hết',
+        'Lịch sử các lần check-in: xem lại điểm số và xu hướng qua các tuần',
+        'Web Push nhắc nhở mỗi sáng Thứ 7 — chỉ gửi nếu chưa check-in tuần này',
+        'Nav item Check-in ẩn cho đến khi admin bật feature flag weekly_checkin',
+      ],
+    },
+    {
       version: 'v1.3',
       date: '09/06/2026',
       title: 'AI Thấu hiểu cảm xúc',
-      latest: true,
+      latest: false,
       items: [
         'AI Phân tích cảm xúc tự động: phân tích từng nhật ký (cảm xúc %, chủ đề, gợi ý) ngay sau khi lưu',
         'Dashboard sức khỏe tâm thần nâng cao: 4 chỉ số mới (cảm xúc chủ đạo, ngày căng thẳng nhất, chủ đề áp lực, xu hướng tháng)',
