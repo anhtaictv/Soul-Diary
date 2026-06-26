@@ -54,6 +54,9 @@
           </div>
         </div>
         <button class="btn-auth" id="btn-login" onclick="Auth.login()"><span>Đăng nhập</span></button>
+        <div style="text-align:center;margin-top:12px">
+          <button type="button" class="auth-text-btn" onclick="Auth.showForgot()">Quên mật khẩu?</button>
+        </div>
       </div>
 
       <!-- REGISTER -->
@@ -85,6 +88,43 @@
         </div>
         <button class="btn-auth" id="btn-register" onclick="Auth.register()"><span>Tạo tài khoản</span></button>
       </div>
+      <!-- QUÊN MẬT KHẨU -->
+      <div id="form-forgot-password" style="display:none">
+        <div style="text-align:center;margin-bottom:16px">
+          <div style="font-size:32px;margin-bottom:8px">🔐</div>
+          <p style="color:var(--text-muted);font-size:14px;margin:0">Nhập email đăng ký để nhận link đặt lại mật khẩu</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input class="text-input" type="email" id="forgot-email" placeholder="abc@email.com" autocomplete="email" />
+        </div>
+        <button class="btn-auth" id="btn-forgot" onclick="Auth.forgotPassword()"><span>Gửi link đặt lại</span></button>
+        <div style="text-align:center;margin-top:12px">
+          <button type="button" class="auth-text-btn" onclick="Auth.showTab('login')">← Quay lại đăng nhập</button>
+        </div>
+      </div>
+
+      <!-- ĐẶT LẠI MẬT KHẨU (khi có ?reset=TOKEN trong URL) -->
+      <div id="form-reset-password" style="display:none">
+        <div style="text-align:center;margin-bottom:16px">
+          <div style="font-size:32px;margin-bottom:8px">🔑</div>
+          <p style="color:var(--text-muted);font-size:14px;margin:0">Tạo mật khẩu mới cho tài khoản của bạn</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mật khẩu mới</label>
+          <div class="input-wrap">
+            <input class="text-input" type="password" id="reset-password-input" placeholder="Ít nhất 6 ký tự" autocomplete="new-password" />
+            <button class="eye-btn" onclick="Auth.togglePwd('reset-password-input',this)">👁</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Xác nhận mật khẩu mới</label>
+          <input class="text-input" type="password" id="reset-confirm-input" placeholder="Nhập lại mật khẩu mới" autocomplete="new-password" />
+        </div>
+        <input type="hidden" id="reset-token-value" />
+        <button class="btn-auth" id="btn-reset" onclick="Auth.resetPassword()"><span>Đặt lại mật khẩu</span></button>
+      </div>
+
       <div class="auth-disclaimer">⚠️ Ứng dụng không thay thế liệu pháp tâm lý chuyên môn</div>
     </div>
   </div>
@@ -114,6 +154,7 @@
           <button class="nav-item" data-page="inbox" id="nav-inbox" style="display:none"><span class="nav-icon">💌</span> Hộp thư<span id="inbox-badge" class="nav-badge-dot" style="display:none"></span></button>
           <button class="nav-item" data-page="challenges" id="nav-challenges" style="display:none"><span class="nav-icon">🏆</span> Thử thách</button>
           <button class="nav-item" data-page="community"  id="nav-community"  style="display:none"><span class="nav-icon">💙</span> Góc tâm sự</button>
+          <button class="nav-item" data-page="settings"><span class="nav-icon">⚙️</span> Cài đặt</button>
           <button class="nav-item" data-page="sos">            <span class="nav-icon">📞</span> Đường dây hỗ trợ</button>
           <button class="nav-item" data-page="admin" id="nav-admin" style="display:none"><span class="nav-icon">🛠️</span> Quản trị</button>
         </nav>

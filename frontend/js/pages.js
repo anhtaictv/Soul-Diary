@@ -498,4 +498,107 @@ const PAGES = {
         </div>
       </div>
     </div>`,
+
+  settings: () => `
+    <div class="page active" id="page-settings">
+      <div class="page-header">
+        <div class="page-title">⚙️ Cài đặt</div>
+        <div class="page-sub">Quản lý thông tin và tài khoản của bạn</div>
+      </div>
+
+      <div class="settings-tabs">
+        <button class="settings-tab active" onclick="App.switchSettingsTab('profile',this)">👤 Hồ sơ</button>
+        <button class="settings-tab" onclick="App.switchSettingsTab('security',this)">🔐 Bảo mật</button>
+        <button class="settings-tab" onclick="App.switchSettingsTab('notifications',this)">🔔 Thông báo</button>
+        <button class="settings-tab" onclick="App.switchSettingsTab('account',this)">⚠️ Tài khoản</button>
+      </div>
+
+      <!-- Hồ sơ -->
+      <div id="settings-panel-profile" class="settings-panel card">
+        <div class="settings-section-title">Thông tin cá nhân</div>
+        <div class="form-group">
+          <label class="form-label">Tên đăng nhập</label>
+          <input class="text-input" id="set-username" disabled style="opacity:.6;cursor:not-allowed" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input class="text-input" id="set-email" disabled style="opacity:.6;cursor:not-allowed" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tên hiển thị</label>
+          <input class="text-input" id="set-fullname" placeholder="Tên hiển thị của bạn" />
+        </div>
+        <button class="btn-primary" style="max-width:200px" onclick="App.saveProfileSettings()">💾 Lưu thay đổi</button>
+        <div id="set-profile-msg" class="settings-msg" style="display:none"></div>
+      </div>
+
+      <!-- Bảo mật -->
+      <div id="settings-panel-security" class="settings-panel card" style="display:none">
+        <div class="settings-section-title">Đổi mật khẩu</div>
+        <div class="form-group">
+          <label class="form-label">Mật khẩu hiện tại</label>
+          <div class="input-wrap">
+            <input class="text-input" type="password" id="set-current-pw" placeholder="Nhập mật khẩu hiện tại" autocomplete="current-password" />
+            <button class="eye-btn" onclick="Auth.togglePwd('set-current-pw',this)">👁</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mật khẩu mới (ít nhất 6 ký tự)</label>
+          <div class="input-wrap">
+            <input class="text-input" type="password" id="set-new-pw" placeholder="Mật khẩu mới" autocomplete="new-password" />
+            <button class="eye-btn" onclick="Auth.togglePwd('set-new-pw',this)">👁</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Xác nhận mật khẩu mới</label>
+          <input class="text-input" type="password" id="set-confirm-pw" placeholder="Nhập lại mật khẩu mới" autocomplete="new-password" />
+        </div>
+        <button class="btn-primary" style="max-width:220px" onclick="App.changePasswordSettings()">🔐 Đổi mật khẩu</button>
+        <div id="set-security-msg" class="settings-msg" style="display:none"></div>
+      </div>
+
+      <!-- Thông báo -->
+      <div id="settings-panel-notifications" class="settings-panel card" style="display:none">
+        <div class="settings-section-title">Push Notification</div>
+        <div id="set-push-section"></div>
+        <hr style="border:none;border-top:1px solid var(--border);margin:20px 0"/>
+        <div class="settings-section-title">Nhắc nhở tùy chỉnh</div>
+        <p style="color:var(--text-muted);font-size:13px;margin-bottom:12px">Chọn giờ và ngày bạn muốn nhận nhắc nhở viết nhật ký.</p>
+        <div class="form-group">
+          <label class="form-label">Giờ nhắc nhở</label>
+          <select class="text-input" id="set-notif-hour" style="max-width:180px">
+            <option value="">Tự động (hệ thống tính)</option>
+            ${Array.from({length:24},(_,i)=>`<option value="${i}">${String(i).padStart(2,'0')}:00</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Ngày trong tuần</label>
+          <div class="notif-day-row" id="set-notif-days">
+            ${['CN','T2','T3','T4','T5','T6','T7'].map((d,i)=>`<button class="notif-day-btn" data-day="${i}" onclick="App.toggleNotifDaySetting(this,${i})">${d}</button>`).join('')}
+          </div>
+          <div style="font-size:12px;color:var(--text-hint);margin-top:6px">Không chọn = nhắc tất cả các ngày</div>
+        </div>
+        <button class="btn-primary" style="max-width:200px" onclick="App.saveNotifSettings()">💾 Lưu cài đặt</button>
+        <div id="set-notif-msg" class="settings-msg" style="display:none"></div>
+      </div>
+
+      <!-- Tài khoản -->
+      <div id="settings-panel-account" class="settings-panel card" style="display:none">
+        <div class="settings-section-title">Thông tin tài khoản</div>
+        <div id="set-account-info" style="color:var(--text-muted);font-size:14px;margin-bottom:20px"></div>
+        <hr style="border:none;border-top:1px solid var(--border);margin:20px 0"/>
+        <div class="danger-zone">
+          <div class="danger-zone-title">⚠️ Vùng nguy hiểm</div>
+          <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px">
+            Sau khi xóa, toàn bộ nhật ký, dữ liệu và tài khoản của bạn sẽ bị xóa vĩnh viễn và không thể khôi phục.
+          </p>
+          <div class="form-group">
+            <label class="form-label">Nhập mật khẩu để xác nhận xóa tài khoản</label>
+            <input class="text-input" type="password" id="set-delete-pw" placeholder="Mật khẩu của bạn" style="max-width:300px" />
+          </div>
+          <button class="btn-danger" onclick="App.deleteAccountSettings()">🗑️ Xóa tài khoản vĩnh viễn</button>
+          <div id="set-account-msg" class="settings-msg" style="display:none"></div>
+        </div>
+      </div>
+    </div>`,
 };
