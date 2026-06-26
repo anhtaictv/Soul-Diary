@@ -13,10 +13,22 @@ const Admin = (() => {
   // ── Lịch sử phiên bản ────────────────────────────────────────────────
   const CHANGELOG = [
     {
+      version: 'v1.7',
+      date: '26/06/2026',
+      title: 'Admin Tiếp Cận Người Dùng',
+      latest: true,
+      items: [
+        'Admin/counselor gửi tin hỗ trợ trực tiếp đến từng user: tin nhắn cá nhân, lời động viên, gợi ý nhạc theo mood, gợi ý bài viết tâm lý',
+        'Bảng Người dùng hiển thị tâm trạng gần nhất — màu đỏ (≤4) / vàng (5–6) / xanh (≥7) để admin nhận diện nhanh',
+        'Push notification tức thì khi admin gửi tin, user nhận ngay trên điện thoại',
+        'Hộp thư hỗ trợ (💌) cho user đọc và tương tác — chờ admin phát hành qua Feature Flags',
+      ],
+    },
+    {
       version: 'v1.4',
       date: '14/06/2026',
       title: 'Check-in Tâm lý',
-      latest: true,
+      latest: false,
       items: [
         'Check-in Sức khỏe Tinh thần hàng tuần: bộ 31 câu hỏi PHQ-9 / GAD-7 / PSS-10 / WHO-5 đánh giá trầm cảm, lo âu, căng thẳng và sức khỏe tổng thể',
         'AI phân tích kết quả check-in: nhận xét cá nhân hóa và gợi ý hành động từ Gemini, fallback rule-based khi quota hết',

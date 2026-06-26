@@ -436,6 +436,15 @@ async function initSchema() {
             'v1.5',N'Nuôi dưỡng Tâm hồn',0,8)
   `);
 
+  // Seed feature flag v1.7 — Hộp thư hỗ trợ (disabled by default, chờ admin phát hành)
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='inbox_support')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('inbox_support',N'Hộp thư hỗ trợ',
+            N'User nhận tin nhắn/động viên/gợi ý nhạc-bài viết từ admin/counselor, hiển thị nav Hộp thư với badge chưa đọc',
+            'v1.7',N'Admin Tiếp Cận Người Dùng',0,10)
+  `);
+
   // Seed feature flag v1.6 — Lan tỏa Tâm hồn (disabled by default, chờ admin bật)
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='mood_wrapped_card')
