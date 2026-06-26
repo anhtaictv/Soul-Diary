@@ -36,7 +36,13 @@ const App = (() => {
   function nav(page) {
     // Lưu ý: KHÔNG dừng nhạc ở đây — thẻ <audio id="music-audio"> nằm ngoài #main-content
     // (xem index.html) nên nó không bị huỷ khi đổi trang, nhạc tiếp tục phát xuyên suốt SPA.
-    document.getElementById('main-content').innerHTML = PAGES[page]();
+    if (!PAGES[page]) { console.error('Trang không tồn tại:', page); return; }
+    try {
+      document.getElementById('main-content').innerHTML = PAGES[page]();
+    } catch(e) {
+      console.error('Lỗi render trang', page, e);
+      return;
+    }
     document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === page));
     switch (page) {
       case 'dashboard': initDashboard();              break;
