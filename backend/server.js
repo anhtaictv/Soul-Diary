@@ -77,6 +77,10 @@ app.use('/api/check-in',   apiLimiter, require('./routes/checkin'));
 app.use('/api/inbox',      apiLimiter, require('./routes/inbox'));
 app.use('/api/challenges', apiLimiter, require('./routes/challenges'));
 app.use('/api/community',  apiLimiter, require('./routes/community'));
+app.use('/api/chat',       apiLimiter, require('./routes/chat'));
+app.use('/api/study',      apiLimiter, require('./routes/study'));
+app.use('/api/courses',    apiLimiter, require('./routes/courses'));
+app.use('/api/goals',      apiLimiter, require('./routes/goals'));
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -24,6 +24,9 @@ const VERSION_LADDER = [
   { version:'v1.3',  title:'AI Thấu hiểu cảm xúc',             flags:['ai_emotion_analysis','enhanced_mental_dashboard','cbt_guided_writing'] },
   { version:'v1.4',  title:'Check-in Tâm lý',                  flags:['weekly_checkin'] },
   { version:'v1.5',  title:'Nuôi dưỡng Tâm hồn',               flags:['mood_calendar','soul_companion','mood_ambience','soul_seed'] },
+  { version:'v1.6',  title:'Lan tỏa Tâm hồn',                  flags:['mood_wrapped_card'] },
+  { version:'v1.7',  title:'Thử thách & Cộng đồng',             flags:['challenge_system','diary_export','custom_reminder','community_wall'] },
+  { version:'v1.8',  title:'Soul Chat & Học liệu Toàn diện',    flags:['soul_chat','sleep_tracking','study_calendar','mini_courses','year_review','personal_goals'] },
 ];
 
 const ARTICLES = [
@@ -122,4 +125,5 @@ const EXERCISES = [
   { icon:'🧘', bg:'#fdf4ff', title:'Chánh niệm 5-4-3-2-1',         duration:'5 phút',     desc:'Kỹ thuật grounding giúp đưa ý thức về hiện tại, hiệu quả khi lo âu hoặc hoảng loạn.',      steps:['Nhìn 5 vật thể xung quanh','Chạm vào 4 vật thể khác nhau','Lắng nghe 3 âm thanh','Ngửi 2 mùi hương','Nếm 1 hương vị'], action:'grounding' },
   { icon:'📝', bg:'#fffbeb', title:'Viết không cấu trúc',           duration:'10–15 phút', desc:'Free writing — viết liên tục 10 phút không dừng lại, giải phóng những suy nghĩ bị chôn vùi.', steps:['Chuẩn bị giấy hoặc ứng dụng ghi chú','Đặt hẹn giờ 10 phút','Bắt đầu viết không được xóa','Không lo ngữ pháp hay ý nghĩa','Đọc lại và nhận ra pattern tâm lý'], action:'freewrite' },
   { icon:'🚶', bg:'#f0fdf4', title:'Đi bộ chánh niệm',             duration:'10–30 phút', desc:'Kết hợp vận động nhẹ với chánh niệm — nghiên cứu Harvard giảm 20% triệu chứng lo âu.',     steps:['Chọn tuyến đường quen thuộc','Tắt điện thoại hoặc để im lặng','Chú ý từng bước chân chạm đất','Quan sát xung quanh bằng con mắt mới','Hít thở sâu đều đặn theo nhịp bước'], action:'walk' },
+  { icon:'🌊', bg:'#f0f9ff', title:'Quét Cơ thể (Body Scan)',      duration:'10–15 phút', desc:'Thiền định dựa trên MBSR của Jon Kabat-Zinn — đưa sự chú ý lần lượt qua từng vùng cơ thể để giải phóng căng thẳng tích lũy mà bạn không nhận ra.',    steps:['Nằm xuống hoặc ngồi thoải mái, nhắm mắt','Bắt đầu từ ngón chân — chú ý mọi cảm giác: ấm, lạnh, tê, căng','Di chuyển chậm lên bàn chân, mắt cá, bắp chân','Tiếp tục lên đầu gối, đùi, hông — thở sâu khi gặp vùng căng','Lên bụng, ngực, vai, tay, cổ, mặt — dừng 30 giây mỗi vùng'], action:'bodyscan' },
 ];

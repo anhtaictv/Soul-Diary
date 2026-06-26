@@ -630,6 +630,185 @@ async function initSchema() {
             'v1.7',N'Thử thách & Cộng đồng',0,15)
   `);
 
+  // ── v1.8: Soul Chat AI ────────────────────────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='SoulChatMessages' AND xtype='U')
+    CREATE TABLE SoulChatMessages (
+      id         INT           IDENTITY(1,1) PRIMARY KEY,
+      user_id    INT           NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      role       NVARCHAR(10)  NOT NULL,
+      content    NVARCHAR(MAX) NOT NULL,
+      created_at DATETIME2     DEFAULT GETDATE()
+    )
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_SoulChat_user_created')
+    CREATE INDEX IX_SoulChat_user_created ON SoulChatMessages(user_id, created_at DESC)
+  `);
+
+  // ── v1.8: Theo dõi Giấc ngủ — thêm cột vào DiaryEntries ──────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='DiaryEntries' AND COLUMN_NAME='sleep_hours')
+    ALTER TABLE DiaryEntries ADD sleep_hours FLOAT NULL
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='DiaryEntries' AND COLUMN_NAME='sleep_quality')
+    ALTER TABLE DiaryEntries ADD sleep_quality INT NULL
+  `);
+
+  // ── v1.8: Lịch Học tập ────────────────────────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='StudyEvents' AND xtype='U')
+    CREATE TABLE StudyEvents (
+      id          INT           IDENTITY(1,1) PRIMARY KEY,
+      user_id     INT           NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      title       NVARCHAR(200) NOT NULL,
+      event_type  NVARCHAR(20)  NOT NULL DEFAULT 'other',
+      event_date  DATE          NOT NULL,
+      notes       NVARCHAR(500) NULL,
+      is_done     BIT           NOT NULL DEFAULT 0,
+      created_at  DATETIME2     DEFAULT GETDATE()
+    )
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_StudyEvents_user_date')
+    CREATE INDEX IX_StudyEvents_user_date ON StudyEvents(user_id, event_date ASC)
+  `);
+
+  // ── v1.8: Mini Courses ────────────────────────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='MiniCourses' AND xtype='U')
+    CREATE TABLE MiniCourses (
+      id           INT           IDENTITY(1,1) PRIMARY KEY,
+      slug         NVARCHAR(50)  NOT NULL UNIQUE,
+      title        NVARCHAR(200) NOT NULL,
+      description  NVARCHAR(MAX) NOT NULL,
+      lessons_json NVARCHAR(MAX) NOT NULL,
+      badge_emoji  NVARCHAR(10)  NULL,
+      category     NVARCHAR(50)  NOT NULL DEFAULT 'general',
+      duration_min INT           NOT NULL DEFAULT 30,
+      is_active    BIT           NOT NULL DEFAULT 1,
+      sort_order   INT           NOT NULL DEFAULT 0
+    )
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='UserCourseProgress' AND xtype='U')
+    CREATE TABLE UserCourseProgress (
+      id           INT       IDENTITY(1,1) PRIMARY KEY,
+      user_id      INT       NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      course_id    INT       NOT NULL REFERENCES MiniCourses(id),
+      lesson_index INT       NOT NULL DEFAULT 0,
+      completed_at DATETIME2 NULL,
+      updated_at   DATETIME2 DEFAULT GETDATE(),
+      CONSTRAINT UQ_UserCourse UNIQUE(user_id, course_id)
+    )
+  `);
+
+  // Seed 3 mini-courses
+  const COURSE1_LESSONS = JSON.stringify([
+    { title:'Lo âu là gì?', body:'Lo âu là phản ứng tự nhiên của não bộ trước nguy hiểm. Hệ thần kinh giao cảm (fight-or-flight) kích hoạt tim đập nhanh, thở gấp, cơ căng — để chuẩn bị cho bạn đối phó. Vấn đề là khi não nhầm lẫn, xem kỳ thi hay buổi thuyết trình là "mối đe dọa sinh tử". Bài học đầu tiên: lo âu không nguy hiểm, nó chỉ là tín hiệu. Hãy đặt tay lên ngực và cảm nhận nhịp tim — bạn ổn.', duration_min:5 },
+    { title:'Thở để bình tĩnh', body:'Khi lo âu, hơi thở là công cụ mạnh nhất bạn có. Thở ra dài hơn thở vào kích hoạt hệ thần kinh phó giao cảm — đưa cơ thể về trạng thái bình tĩnh trong vòng 90 giây. Thử ngay: hít vào 4 giây, thở ra 6 giây, lặp lại 5 lần. Bài tập 4-7-8 trong phần Bài tập cũng rất hiệu quả. Thực hành mỗi sáng 2 phút — não bộ sẽ học được cách bình tĩnh nhanh hơn.', duration_min:8 },
+    { title:'Thách thức suy nghĩ lo lắng', body:'CBT (Liệu pháp Nhận thức Hành vi) dạy chúng ta: cảm xúc đến từ suy nghĩ, không phải từ sự kiện. Khi lo lắng "Mình sẽ thi trượt", não bộ không phân biệt đây là sự thật hay chỉ là nỗi sợ. Hãy hỏi: "Bằng chứng nào cho thấy điều này sẽ xảy ra?" và "Điều tệ nhất thực sự là gì và mình có thể đối phó không?". Ghi lại câu trả lời — ngôn ngữ viết tắt hoạt động hợp lý hơn ngôn ngữ nói.', duration_min:10 },
+    { title:'Tiếp xúc dần dần', body:'Lo âu giảm đi khi bạn đối mặt — không phải né tránh. Graduated Exposure (tiếp xúc dần dần) là kỹ thuật được chứng minh nhất để vượt qua lo âu. Tạo "thang nỗi sợ" từ 0-10: bắt đầu từ tình huống lo lắng nhất ít nhất (mức 2-3), ở lại với cảm giác đó cho đến khi giảm xuống còn một nửa, rồi tiến lên bậc tiếp theo. Não bộ học được: "Lo âu không kéo dài mãi và mình an toàn".', duration_min:12 },
+    { title:'Kế hoạch phòng ngừa', body:'Bây giờ bạn đã có hộp công cụ: thở có kiểm soát, thách thức suy nghĩ, tiếp xúc dần dần. Bước cuối cùng: tạo kế hoạch cá nhân. Xác định 3 trigger lo âu chính của bạn. Với mỗi trigger, chọn 1 kỹ thuật sẽ dùng. Luyện tập KHI KHÔNG lo lắng — như tập thể dục khi khỏe, không phải khi ốm. Chia sẻ kế hoạch với một người bạn tin tưởng để có thêm trách nhiệm giải trình.', duration_min:8 },
+  ]);
+  const COURSE2_LESSONS = JSON.stringify([
+    { title:'Khoa học Hạnh phúc', body:'Martin Seligman (cha đẻ Tâm lý học Tích cực) phát hiện hạnh phúc gồm 5 thành phần: Positive emotions (cảm xúc tích cực), Engagement (đắm chìm), Relationships (mối quan hệ), Meaning (ý nghĩa), Achievement (thành tựu) — mô hình PERMA. Tin tốt: hạnh phúc 40% phụ thuộc vào hành động của bạn, 50% di truyền, 10% hoàn cảnh. 40% đó là vùng bạn có thể thay đổi ngay hôm nay.', duration_min:6 },
+    { title:'Sức mạnh Biết ơn', body:'Nghiên cứu Emmons & McCullough: viết nhật ký biết ơn 3 lần/tuần tăng hạnh phúc 25% sau 6 tuần. Lý do: não bộ có xu hướng chú ý đến tiêu cực (negativity bias) — biết ơn là cách chủ động cân bằng lại. Bài tập "3 điều tốt": mỗi tối viết 3 điều tốt đã xảy ra và LÝ DO tại sao. Phần lý do quan trọng hơn — nó buộc não xử lý sâu hơn, không chỉ liệt kê.', duration_min:8 },
+    { title:'Mục tiêu có ý nghĩa', body:'Nghiên cứu của Deci & Ryan: có 3 nhu cầu tâm lý cơ bản: Autonomy (tự chủ), Competence (năng lực), Relatedness (kết nối). Mục tiêu nào thỏa mãn cả 3 sẽ bền vững và mang lại hạnh phúc thật sự. Hỏi bản thân: "Mục tiêu này có phải của mình hay của người khác?" (Autonomy). "Mình có khả năng đạt được không?" (Competence). "Nó kết nối mình với điều gì lớn hơn?" (Relatedness). Đặt mục tiêu phần Mục tiêu trong app để theo dõi.', duration_min:10 },
+    { title:'Nuôi dưỡng Kết nối', body:'Robert Waldinger (Harvard Study of Adult Development — nghiên cứu 80 năm): yếu tố quyết định nhất sức khỏe và hạnh phúc lâu dài là CHẤT LƯỢNG mối quan hệ. Không phải số lượng bạn bè, không phải tiền bạc. Kết nối sâu giải phóng oxytocin — hormone chống stress tự nhiên. Hành động nhỏ hàng ngày: nhắn tin hỏi thăm một người, ăn cơm không nhìn điện thoại, lắng nghe để hiểu chứ không phải để trả lời.', duration_min:7 },
+    { title:'Tìm kiếm Ý nghĩa', body:'Viktor Frankl (nhà tâm lý học sống sót qua Holocaust): con người có thể chịu đựng bất kỳ HOW nếu có WHY. Ý nghĩa không phải tìm được — nó được TẠO RA. 3 nguồn ý nghĩa: Tạo ra (công việc, sáng tạo), Trải nghiệm (tình yêu, cái đẹp, sự thật), Thái độ (cách bạn đối mặt với đau khổ không thể tránh). Bài tập: viết câu trả lời cho "Nếu mình chỉ còn 1 năm sống, mình sẽ làm gì?" — câu trả lời đó thường chỉ ra điều thực sự có ý nghĩa.', duration_min:9 },
+  ]);
+  const COURSE3_LESSONS = JSON.stringify([
+    { title:'Hiểu stress học đường', body:'Stress học đường không xấu — nó cho thấy bạn quan tâm. Vấn đề là khi stress kéo dài và vượt quá khả năng đối phó. Mô hình Yerkes-Dodson: hiệu suất đạt đỉnh ở mức stress VỪA PHẢI — quá ít thì buồn ngủ, quá nhiều thì tê liệt. Nhận biết "stress tốt" (eustress) và "stress độc" (distress). Stress tốt: deadline thúc đẩy bạn làm việc. Stress độc: mất ngủ, không tập trung, cảm thấy tuyệt vọng. Viết nhật ký mood mỗi ngày để theo dõi pattern.', duration_min:7 },
+    { title:'Quản lý thời gian', body:'Ma trận Eisenhower: phân loại công việc theo Khẩn cấp × Quan trọng. Quan trọng + Khẩn cấp → làm ngay. Quan trọng + Không khẩn cấp → lên kế hoạch (đây là vùng phát triển thật sự). Khẩn cấp + Không quan trọng → giao người khác hoặc làm nhanh. Không quan trọng + Không khẩn cấp → loại bỏ. Sinh viên thường bị mắc kẹt ở ô "Khẩn cấp + Quan trọng" vì bỏ qua ô "Quan trọng + Chưa khẩn cấp". Lịch học tập trong app giúp bạn lập kế hoạch trước.', duration_min:9 },
+    { title:'Học tập hiệu quả', body:'Spaced Repetition (Lặp lại cách quãng): ôn lại sau 1 ngày → 3 ngày → 1 tuần → 2 tuần. Hiệu quả hơn 300% so với nhồi nhét. Active Recall: tự kiểm tra thay vì đọc lại — đóng sách, viết lại những gì nhớ được. Pomodoro: 25 phút tập trung + 5 phút nghỉ (sau 4 pomodoro nghỉ dài 15-30 phút). Ngủ đủ 7-8 tiếng: trong giấc ngủ não củng cố ký ức — thiếu ngủ xóa bỏ đi những gì vừa học. Theo dõi giấc ngủ trong phần Nhật ký.', duration_min:10 },
+    { title:'Xử lý áp lực thi cử', body:'Test anxiety (lo âu thi cử) ảnh hưởng 25-40% sinh viên và thực sự làm giảm điểm. Chiến lược trước kỳ thi: ôn tập "cách khoảng" 2-3 tuần trước, không nhồi nhét đêm trước. Đêm trước thi: ngủ đủ giấc (quan trọng hơn ôn thêm 2 tiếng). Sáng thi: ăn sáng protein + carb phức hợp, thở sâu 5 phút. Trong phòng thi: đọc toàn bộ đề trước, làm câu dễ trước. Sau khi kết thúc câu khó: thở 3 hơi sâu rồi tiếp tục.', duration_min:8 },
+    { title:'Cân bằng học và sống', body:'"Cân bằng" không có nghĩa là dành thời gian bằng nhau cho mọi thứ — mà là đầu tư thời gian đúng chỗ vào đúng lúc. Wheel of Life: vẽ bánh xe với 8 lĩnh vực (học tập, sức khỏe, gia đình, bạn bè, sở thích, tài chính, tâm linh, phát triển cá nhân), chấm điểm 0-10 mỗi ô. Lĩnh vực nào thấp nhất? Đó là ưu tiên tiếp theo. Nghỉ ngơi không phải là lãng phí thời gian — nó là đầu tư cho hiệu suất dài hạn. Lên lịch nghỉ ngơi như lên lịch học.', duration_min:9 },
+  ]);
+
+  await db.request().input('lessons', sql.NVarChar, COURSE1_LESSONS).query(`
+    IF NOT EXISTS (SELECT * FROM MiniCourses WHERE slug='anxiety_management')
+    INSERT INTO MiniCourses (slug,title,description,lessons_json,badge_emoji,category,duration_min,sort_order)
+    VALUES ('anxiety_management',N'Quản lý Lo âu',
+            N'5 bài học dựa trên CBT và khoa học thần kinh để hiểu và kiểm soát lo âu hiệu quả',
+            @lessons,N'🧠','anxiety',43,1)
+  `);
+  await db.request().input('lessons', sql.NVarChar, COURSE2_LESSONS).query(`
+    IF NOT EXISTS (SELECT * FROM MiniCourses WHERE slug='happiness_science')
+    INSERT INTO MiniCourses (slug,title,description,lessons_json,badge_emoji,category,duration_min,sort_order)
+    VALUES ('happiness_science',N'Khoa học Hạnh phúc',
+            N'5 bài học từ Tâm lý học Tích cực về hạnh phúc thật sự — không phải hạnh phúc thoáng qua',
+            @lessons,N'✨','positive',40,2)
+  `);
+  await db.request().input('lessons', sql.NVarChar, COURSE3_LESSONS).query(`
+    IF NOT EXISTS (SELECT * FROM MiniCourses WHERE slug='study_stress')
+    INSERT INTO MiniCourses (slug,title,description,lessons_json,badge_emoji,category,duration_min,sort_order)
+    VALUES ('study_stress',N'Vượt qua Áp lực Học tập',
+            N'5 bài học thực tiễn về quản lý stress học đường, kỹ thuật học tập và cân bằng cuộc sống',
+            @lessons,N'📚','study',43,3)
+  `);
+
+  // ── v1.8: Mục tiêu Cá nhân ───────────────────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='PersonalGoals' AND xtype='U')
+    CREATE TABLE PersonalGoals (
+      id           INT           IDENTITY(1,1) PRIMARY KEY,
+      user_id      INT           NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      title        NVARCHAR(200) NOT NULL,
+      goal_type    NVARCHAR(20)  NOT NULL,
+      target_value FLOAT         NOT NULL,
+      period_days  INT           NOT NULL DEFAULT 30,
+      is_active    BIT           NOT NULL DEFAULT 1,
+      achieved_at  DATETIME2     NULL,
+      created_at   DATETIME2     DEFAULT GETDATE()
+    )
+  `);
+
+  // ── v1.8: Feature flags ───────────────────────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='soul_chat')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('soul_chat',N'Soul Chat — Trò chuyện AI',
+            N'Chatbot tâm lý AI (Gemini), lắng nghe và phản hồi ấm áp, nhận diện khủng hoảng, giới hạn 20 tin/ngày',
+            'v1.8',N'Soul Chat & Theo dõi Toàn diện',0,16)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='sleep_tracking')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('sleep_tracking',N'Theo dõi Giấc ngủ',
+            N'Ghi giờ ngủ và chất lượng giấc ngủ kèm nhật ký, biểu đồ tương quan mood-giấc ngủ',
+            'v1.8',N'Soul Chat & Theo dõi Toàn diện',0,17)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='study_calendar')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('study_calendar',N'Lịch Học tập',
+            N'Ghi lịch thi/deadline/bài tập, nhắc nhở trước 1 ngày qua push notification',
+            'v1.8',N'Soul Chat & Theo dõi Toàn diện',0,18)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='mini_courses')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('mini_courses',N'Khóa học Tâm lý Ngắn',
+            N'3 khóa học 5 bài theo chủ đề: Quản lý Lo âu, Khoa học Hạnh phúc, Vượt qua Áp lực Học tập',
+            'v1.8',N'Học liệu & Mục tiêu',0,19)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='year_review')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('year_review',N'Tổng kết Năm',
+            N'Trang nhìn lại cả năm: tổng nhật ký, mood trung bình, tháng tốt nhất, chuỗi dài nhất, tag hay dùng nhất',
+            'v1.8',N'Học liệu & Mục tiêu',0,20)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='personal_goals')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('personal_goals',N'Mục tiêu Cá nhân',
+            N'Đặt và theo dõi mục tiêu tâm lý: mood trung bình, chuỗi ngày, số nhật ký trong khoảng thời gian',
+            'v1.8',N'Học liệu & Mục tiêu',0,21)
+  `);
+
   // Bảng PasswordResets — token đặt lại mật khẩu (hết hạn sau 1 giờ)
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='PasswordResets' AND xtype='U')

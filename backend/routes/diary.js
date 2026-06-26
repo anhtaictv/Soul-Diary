@@ -917,4 +917,82 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// ── GET /api/diary/year-review?year=YYYY — Tổng kết Năm (v1.8) ───────────
+router.get('/year-review', authMiddleware, async (req, res) => {
+  try {
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    const db   = await getPool();
+
+    const [summary, monthly, tags, sleepCorr] = await Promise.all([
+      db.request().input('uid', sql.Int, req.user.id).input('year', sql.Int, year).query(`
+        SELECT COUNT(*) AS total_entries,
+          AVG(CAST(mood_score AS FLOAT)) AS avg_mood,
+          COUNT(DISTINCT CAST(created_at AS DATE)) AS days_written
+        FROM DiaryEntries WHERE user_id=@uid AND YEAR(created_at)=@year
+      `),
+      db.request().input('uid', sql.Int, req.user.id).input('year', sql.Int, year).query(`
+        SELECT MONTH(created_at) AS month, COUNT(*) AS entries,
+          AVG(CAST(mood_score AS FLOAT)) AS avg_mood
+        FROM DiaryEntries WHERE user_id=@uid AND YEAR(created_at)=@year
+        GROUP BY MONTH(created_at) ORDER BY month ASC
+      `),
+      db.request().input('uid', sql.Int, req.user.id).input('year', sql.Int, year).query(`
+        SELECT TOP 5 tag, COUNT(*) AS cnt
+        FROM (SELECT TRIM(value) AS tag FROM DiaryEntries
+              CROSS APPLY STRING_SPLIT(tags, ',')
+              WHERE user_id=@uid AND YEAR(created_at)=@year AND tags IS NOT NULL AND tags != '') t
+        GROUP BY tag ORDER BY cnt DESC
+      `),
+      db.request().input('uid', sql.Int, req.user.id).input('year', sql.Int, year).query(`
+        SELECT CASE WHEN sleep_hours < 6 THEN N'Thiếu ngủ (<6h)'
+                    WHEN sleep_hours <= 8 THEN N'Đủ giấc (6-8h)'
+                    ELSE N'Ngủ nhiều (>8h)' END AS sleep_band,
+               AVG(CAST(mood_score AS FLOAT)) AS avg_mood, COUNT(*) AS cnt
+        FROM DiaryEntries
+        WHERE user_id=@uid AND YEAR(created_at)=@year AND sleep_hours IS NOT NULL
+        GROUP BY CASE WHEN sleep_hours < 6 THEN N'Thiếu ngủ (<6h)'
+                      WHEN sleep_hours <= 8 THEN N'Đủ giấc (6-8h)'
+                      ELSE N'Ngủ nhiều (>8h)' END
+      `),
+    ]);
+
+    const s = summary.recordset[0] || {};
+    const months = Array.from({ length: 12 }, (_, i) => {
+      const m = monthly.recordset.find(r => r.month === i + 1);
+      return { month: i + 1, entries: m ? m.entries : 0, avg_mood: m ? Math.round(m.avg_mood * 10) / 10 : null };
+    });
+    const withMood   = months.filter(m => m.avg_mood !== null);
+    const bestMonth  = withMood.length ? withMood.reduce((a, b) => b.avg_mood > a.avg_mood ? b : a) : null;
+    const worstMonth = withMood.length ? withMood.reduce((a, b) => b.avg_mood < a.avg_mood ? b : a) : null;
+
+    res.json({
+      year, monthly: months,
+      total_entries: s.total_entries || 0,
+      avg_mood:      s.avg_mood ? Math.round(s.avg_mood * 10) / 10 : null,
+      days_written:  s.days_written || 0,
+      best_month:    bestMonth,
+      worst_month:   worstMonth,
+      top_tags:      tags.recordset,
+      sleep_corr:    sleepCorr.recordset,
+    });
+  } catch (err) {
+    console.error('Year review error:', err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+// ── GET /api/diary/sleep-stats — tương quan mood-giấc ngủ ────────────────
+router.get('/sleep-stats', authMiddleware, async (req, res) => {
+  try {
+    const db = await getPool();
+    const result = await db.request().input('uid', sql.Int, req.user.id).query(`
+      SELECT TOP 30 CAST(created_at AS DATE) AS entry_date, mood_score, sleep_hours, sleep_quality
+      FROM DiaryEntries WHERE user_id=@uid AND sleep_hours IS NOT NULL ORDER BY created_at DESC
+    `);
+    res.json({ data: result.recordset.reverse() });
+  } catch (err) {
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
 module.exports = router;

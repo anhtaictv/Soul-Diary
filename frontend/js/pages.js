@@ -499,6 +499,135 @@ const PAGES = {
       </div>
     </div>`,
 
+  chat: () => `
+    <div class="page active" id="page-chat">
+      <div class="page-header">
+        <div class="page-title">💬 Soul Chat</div>
+        <div class="page-sub">Người bạn đồng hành tâm lý — lắng nghe không phán xét</div>
+      </div>
+      <div class="chat-disclaimer card" style="padding:10px 14px;margin-bottom:12px;border-left:3px solid var(--primary)">
+        <span style="font-size:12px;color:var(--text-muted)">⚠️ Soul Chat là AI hỗ trợ cảm xúc, không thay thế chuyên gia tâm lý. Khi cần giúp đỡ khẩn cấp, hãy gọi <strong>1800 599 920</strong>.</span>
+      </div>
+      <div class="chat-wrap card" style="padding:0;overflow:hidden">
+        <div class="chat-messages" id="chat-messages">
+          <div class="chat-bubble assistant">
+            <div class="chat-content">Xin chào! Mình là Soul 🌱 Bạn đang cảm thấy thế nào hôm nay? Cứ chia sẻ thoải mái nhé — mình ở đây lắng nghe.</div>
+          </div>
+        </div>
+        <div class="chat-input-row">
+          <textarea class="chat-input" id="chat-input" placeholder="Nhập tin nhắn..." rows="1" maxlength="1000" onkeydown="App.chatKeydown(event)"></textarea>
+          <button class="chat-send-btn" onclick="App.sendChat()" id="chat-send-btn">➤</button>
+        </div>
+        <div class="chat-footer-info">
+          <span id="chat-remaining" style="font-size:11px;color:var(--text-hint)"></span>
+          <button class="auth-text-btn" style="font-size:11px" onclick="App.clearChat()">Xóa lịch sử</button>
+        </div>
+      </div>
+    </div>`,
+
+  study: () => `
+    <div class="page active" id="page-study">
+      <div class="page-header">
+        <div class="page-title">📅 Lịch Học tập</div>
+        <div class="page-sub">Ghi lịch thi, deadline, bài tập — không bao giờ quên nữa</div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="settings-section-title" style="margin-bottom:12px">Thêm sự kiện mới</div>
+        <div class="grid-2" style="gap:10px;margin-bottom:10px">
+          <div class="form-group" style="margin:0">
+            <input class="text-input" id="study-title" placeholder="Tên sự kiện (VD: Thi Toán giải tích)" maxlength="200" />
+          </div>
+          <div class="form-group" style="margin:0">
+            <input class="text-input" type="date" id="study-date" />
+          </div>
+        </div>
+        <div class="grid-2" style="gap:10px;margin-bottom:12px">
+          <select class="text-input" id="study-type">
+            <option value="exam">🔴 Thi / Kiểm tra</option>
+            <option value="deadline">🟠 Deadline / Nộp bài</option>
+            <option value="assignment">🟡 Bài tập / Thực hành</option>
+            <option value="other">🔵 Khác</option>
+          </select>
+          <input class="text-input" id="study-notes" placeholder="Ghi chú (không bắt buộc)" maxlength="200" />
+        </div>
+        <button class="btn-primary" style="max-width:180px" onclick="App.createStudyEvent()">➕ Thêm sự kiện</button>
+        <div id="study-form-msg" class="settings-msg" style="display:none;margin-top:8px"></div>
+      </div>
+      <div class="section-label">Sự kiện sắp tới</div>
+      <div id="study-events-list"><div class="loading-text">Đang tải...</div></div>
+    </div>`,
+
+  courses: () => `
+    <div class="page active" id="page-courses">
+      <div class="page-header">
+        <div class="page-title">🎓 Khóa học Tâm lý</div>
+        <div class="page-sub">Học về tâm lý và cảm xúc qua những bài học ngắn, thực tiễn</div>
+      </div>
+      <div id="courses-list"><div class="loading-text">Đang tải...</div></div>
+      <!-- Lesson viewer overlay -->
+      <div class="modal-overlay" id="lesson-modal" style="display:none;align-items:flex-start;overflow-y:auto">
+        <div class="modal" style="max-width:600px;width:95%;margin:40px auto">
+          <div id="lesson-modal-content"></div>
+          <div style="display:flex;gap:10px;margin-top:20px">
+            <button class="btn-outline" id="lesson-prev-btn" onclick="App.lessonNav(-1)" style="display:none">← Trước</button>
+            <button class="btn-primary" id="lesson-next-btn" onclick="App.lessonNav(1)">Tiếp theo →</button>
+            <button class="btn-outline" style="margin-left:auto" onclick="App.closeLessonModal()">Đóng</button>
+          </div>
+        </div>
+      </div>
+    </div>`,
+
+  goals: () => `
+    <div class="page active" id="page-goals">
+      <div class="page-header">
+        <div class="page-title">🎯 Mục tiêu Cá nhân</div>
+        <div class="page-sub">Đặt mục tiêu tâm lý và theo dõi tiến độ từng ngày</div>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="settings-section-title" style="margin-bottom:12px">Tạo mục tiêu mới</div>
+        <div class="form-group">
+          <label class="form-label">Tên mục tiêu</label>
+          <input class="text-input" id="goal-title" placeholder="VD: Duy trì mood ≥ 7 trong 30 ngày" maxlength="200" />
+        </div>
+        <div class="grid-2" style="gap:10px">
+          <div class="form-group">
+            <label class="form-label">Loại mục tiêu</label>
+            <select class="text-input" id="goal-type" onchange="App.onGoalTypeChange()">
+              <option value="mood_avg">📊 Mood trung bình ≥ X/10</option>
+              <option value="streak">🔥 Duy trì chuỗi N ngày</option>
+              <option value="entries">📖 Viết N nhật ký trong M ngày</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" id="goal-target-label">Mục tiêu</label>
+            <input class="text-input" type="number" id="goal-target" placeholder="7" min="1" />
+          </div>
+        </div>
+        <div class="form-group" id="goal-period-wrap">
+          <label class="form-label">Trong vòng (ngày)</label>
+          <input class="text-input" type="number" id="goal-period" placeholder="30" min="1" max="365" value="30" style="max-width:120px" />
+        </div>
+        <button class="btn-primary" style="max-width:180px" onclick="App.createGoal()">➕ Tạo mục tiêu</button>
+        <div id="goal-form-msg" class="settings-msg" style="display:none;margin-top:8px"></div>
+      </div>
+      <div class="section-label">Mục tiêu đang theo dõi</div>
+      <div id="goals-list"><div class="loading-text">Đang tải...</div></div>
+    </div>`,
+
+  'year-review': () => `
+    <div class="page active" id="page-year-review">
+      <div class="page-header">
+        <div class="page-title">📆 Tổng kết Năm</div>
+        <div class="page-sub">Nhìn lại hành trình cảm xúc của bạn</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+        <button class="btn-outline" style="padding:6px 12px" onclick="App.yearReviewNav(-1)">←</button>
+        <span id="year-review-year" style="font-size:18px;font-weight:700"></span>
+        <button class="btn-outline" style="padding:6px 12px" onclick="App.yearReviewNav(1)">→</button>
+      </div>
+      <div id="year-review-content"><div class="loading-text">Đang tải...</div></div>
+    </div>`,
+
   settings: () => `
     <div class="page active" id="page-settings">
       <div class="page-header">

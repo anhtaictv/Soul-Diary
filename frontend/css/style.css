@@ -718,3 +718,76 @@ select.form-input{cursor:pointer}
 .dark-mode .danger-zone{background:#2d1515;border-color:#7f1d1d}
 .dark-mode .settings-msg.success{background:#052e16;border-color:#166534}
 .dark-mode .settings-msg.error{background:#2d0a0a;border-color:#7f1d1d}
+
+/* ══════════════════════════════════════════════════════════════
+   v1.8 — Soul Chat
+══════════════════════════════════════════════════════════════ */
+.chat-wrap { display:flex; flex-direction:column; height:calc(100vh - 280px); min-height:360px; }
+.chat-messages { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px; }
+.chat-bubble { display:flex; max-width:82%; }
+.chat-bubble.user { align-self:flex-end; }
+.chat-bubble.assistant { align-self:flex-start; }
+.chat-content { padding:10px 14px; border-radius:16px; font-size:13px; line-height:1.6; white-space:pre-wrap; }
+.chat-bubble.user    .chat-content { background:var(--primary); color:#fff; border-bottom-right-radius:4px; }
+.chat-bubble.assistant .chat-content { background:var(--card-bg); border:1px solid var(--border); color:var(--text); border-bottom-left-radius:4px; }
+.chat-bubble.typing .chat-content { opacity:.6; font-style:italic; }
+.chat-input-row { display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--border); }
+.chat-input { flex:1; resize:none; border:1px solid var(--border); border-radius:12px; padding:8px 12px; font-size:13px; background:var(--bg); color:var(--text); font-family:inherit; max-height:120px; }
+.chat-input:focus { outline:none; border-color:var(--primary); }
+.chat-send-btn { width:38px; height:38px; border-radius:50%; background:var(--primary); color:#fff; border:none; cursor:pointer; font-size:16px; flex-shrink:0; }
+.chat-send-btn:disabled { opacity:.5; cursor:not-allowed; }
+.chat-footer-info { display:flex; justify-content:space-between; align-items:center; padding:4px 12px 8px; }
+.chat-crisis-banner { background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:10px 14px; font-size:12px; color:#991b1b; margin:4px 0; }
+
+/* ══════════════════════════════════════════════════════════════
+   v1.8 — Lịch Học tập
+══════════════════════════════════════════════════════════════ */
+.study-event-card { display:flex; justify-content:space-between; align-items:flex-start; background:var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:10px; gap:10px; }
+.study-event-card.study-event-urgent { border-color:#f97316; background:#fff7ed; }
+.study-event-card.study-event-past  { opacity:.6; }
+.study-event-card.study-event-done  { opacity:.5; }
+.dark .study-event-card.study-event-urgent { background:#431407; }
+.study-event-type  { font-size:11px; font-weight:700; color:var(--text-hint); margin-bottom:2px; }
+.study-event-title { font-size:14px; font-weight:600; color:var(--text); }
+.study-event-notes { font-size:12px; color:var(--text-hint); margin-top:3px; }
+.study-event-right { text-align:right; flex-shrink:0; }
+.study-event-date  { font-size:12px; color:var(--text-hint); }
+.study-event-days  { font-size:12px; font-weight:600; color:var(--text); }
+.study-event-days.urgent { color:#ea580c; }
+
+/* ══════════════════════════════════════════════════════════════
+   v1.8 — Mini Courses
+══════════════════════════════════════════════════════════════ */
+.course-card { margin-bottom:14px; cursor:pointer; transition:transform .15s; }
+.course-card:hover { transform:translateY(-2px); }
+.course-header { display:flex; gap:12px; align-items:flex-start; margin-bottom:12px; }
+.course-icon { font-size:32px; flex-shrink:0; }
+.course-info { flex:1; }
+.course-title { font-size:15px; font-weight:700; color:var(--text); }
+.course-desc  { font-size:12px; color:var(--text-hint); margin-top:3px; }
+.course-done-badge { font-size:11px; font-weight:700; color:#059669; background:#ecfdf5; padding:3px 8px; border-radius:20px; flex-shrink:0; }
+.course-progress-row { display:flex; align-items:center; gap:10px; }
+.course-progress-bar  { flex:1; height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
+.course-progress-fill { height:100%; background:var(--primary); border-radius:3px; transition:width .3s; }
+.course-progress-label { font-size:11px; color:var(--text-hint); flex-shrink:0; }
+
+/* ══════════════════════════════════════════════════════════════
+   v1.8 — Mục tiêu Cá nhân
+══════════════════════════════════════════════════════════════ */
+.goal-card { margin-bottom:12px; }
+.goal-card.goal-done { border-color:#059669; }
+.goal-title      { font-size:14px; font-weight:700; color:var(--text); }
+.goal-type-label { font-size:12px; color:var(--text-hint); margin-top:3px; }
+.goal-done-badge { font-size:11px; font-weight:700; color:#059669; background:#ecfdf5; padding:3px 8px; border-radius:20px; }
+.goal-progress-row   { display:flex; align-items:center; gap:10px; margin-top:8px; }
+.goal-progress-bar   { flex:1; height:8px; background:var(--border); border-radius:4px; overflow:hidden; }
+.goal-progress-fill  { height:100%; background:var(--primary); border-radius:4px; transition:width .3s; }
+.goal-progress-label { font-size:12px; color:var(--text-hint); flex-shrink:0; }
+
+/* ══════════════════════════════════════════════════════════════
+   v1.8 — Tổng kết Năm
+══════════════════════════════════════════════════════════════ */
+.yr-month-chart { display:flex; align-items:flex-end; gap:4px; height:80px; padding:0 4px; }
+.yr-month-col   { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; }
+.yr-month-bar   { width:100%; border-radius:3px 3px 0 0; min-height:2px; transition:height .3s; }
+.yr-month-lbl   { font-size:9px; color:var(--text-hint); }

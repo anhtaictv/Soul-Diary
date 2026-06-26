@@ -69,6 +69,23 @@ router.post('/admin-list/schedule', auth, admin, async (req, res) => {
   }
 });
 
+// POST /api/features/admin-list/revoke — thu hồi (tắt) toàn bộ version đã phát hành
+router.post('/admin-list/revoke', auth, admin, async (req, res) => {
+  const { version } = req.body;
+  if (!version) return res.status(400).json({ message: 'Thiếu version' });
+  try {
+    const db = await getPool();
+    await db.request()
+      .input('v', sql.NVarChar, version)
+      .query(`UPDATE FeatureFlags
+              SET enabled=0, released_at=NULL, release_date=NULL
+              WHERE version=@v`);
+    res.json({ message: `Đã thu hồi ${version}` });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
 // POST /api/features/admin-list — tạo flag mới
 router.post('/admin-list', auth, admin, async (req, res) => {
   const { key, label, description, version, version_title } = req.body;
