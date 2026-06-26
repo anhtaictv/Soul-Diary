@@ -2,10 +2,32 @@
 const Auth = (() => {
 
   function showTab(tab) {
-    document.getElementById('form-login').style.display    = tab === 'login'    ? 'block' : 'none';
-    document.getElementById('form-register').style.display = tab === 'register' ? 'block' : 'none';
+    document.getElementById('form-login').style.display           = tab === 'login'    ? 'block' : 'none';
+    document.getElementById('form-register').style.display        = tab === 'register' ? 'block' : 'none';
+    document.getElementById('form-forgot-password').style.display = 'none';
+    document.getElementById('form-reset-password').style.display  = 'none';
+    document.querySelector('.auth-tabs').style.display = '';
     document.getElementById('tab-login').classList.toggle('active',    tab === 'login');
     document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+    clearAlert();
+  }
+
+  function showForgot() {
+    document.getElementById('form-login').style.display           = 'none';
+    document.getElementById('form-register').style.display        = 'none';
+    document.getElementById('form-forgot-password').style.display = 'block';
+    document.getElementById('form-reset-password').style.display  = 'none';
+    document.querySelector('.auth-tabs').style.display = 'none';
+    clearAlert();
+  }
+
+  function showReset(token) {
+    document.getElementById('form-login').style.display           = 'none';
+    document.getElementById('form-register').style.display        = 'none';
+    document.getElementById('form-forgot-password').style.display = 'none';
+    document.getElementById('form-reset-password').style.display  = 'block';
+    document.querySelector('.auth-tabs').style.display = 'none';
+    document.getElementById('reset-token-value').value = token;
     clearAlert();
   }
 
@@ -127,6 +149,51 @@ const Auth = (() => {
     showTab('login');
   }
 
+  async function forgotPassword() {
+    clearAlert();
+    const email = document.getElementById('forgot-email').value.trim();
+    if (!email) { showAlert('Vui lòng nhập email.'); return; }
+    const btn = document.getElementById('btn-forgot');
+    btn.disabled = true;
+    btn.querySelector('span').textContent = 'Đang gửi...';
+    try {
+      const data = await API.forgotPassword(email);
+      showAlert(data.message || 'Đã gửi!', 'success');
+    } catch (err) {
+      showAlert(err.message || 'Lỗi server.');
+    } finally {
+      btn.disabled = false;
+      btn.querySelector('span').textContent = 'Gửi link đặt lại';
+    }
+  }
+
+  async function resetPassword() {
+    clearAlert();
+    const token    = document.getElementById('reset-token-value').value;
+    const newPass  = document.getElementById('reset-password-input').value;
+    const confirm  = document.getElementById('reset-confirm-input').value;
+    if (!newPass || !confirm) { showAlert('Vui lòng điền đầy đủ thông tin.'); return; }
+    if (newPass !== confirm)  { showAlert('Mật khẩu xác nhận không khớp.'); return; }
+    if (newPass.length < 6)   { showAlert('Mật khẩu phải ít nhất 6 ký tự.'); return; }
+    const btn = document.getElementById('btn-reset');
+    btn.disabled = true;
+    btn.querySelector('span').textContent = 'Đang cập nhật...';
+    try {
+      const data = await API.resetPassword(token, newPass);
+      showAlert(data.message || 'Thành công!', 'success');
+      setTimeout(() => {
+        // Xóa token khỏi URL và hiển thị form đăng nhập
+        history.replaceState(null, '', window.location.pathname);
+        showTab('login');
+      }, 2000);
+    } catch (err) {
+      showAlert(err.message || 'Link không hợp lệ hoặc đã hết hạn.');
+    } finally {
+      btn.disabled = false;
+      btn.querySelector('span').textContent = 'Đặt lại mật khẩu';
+    }
+  }
+
   function togglePwd(inputId, btn) {
     const input = document.getElementById(inputId);
     if (input.type === 'password') { input.type = 'text';     btn.textContent = '🙈'; }
@@ -135,6 +202,14 @@ const Auth = (() => {
 
   // ── Auto-login nếu đã có token ─────────────────────────────────────────
   async function bootstrap() {
+    // Kiểm tra URL có token đặt lại mật khẩu không
+    const urlParams  = new URLSearchParams(window.location.search);
+    const resetToken = urlParams.get('reset');
+    if (resetToken) {
+      showReset(resetToken);
+      return;
+    }
+
     if (!isLoggedIn()) return; // Hiển thị auth screen (mặc định)
 
     // Xác thực token với server
@@ -149,7 +224,7 @@ const Auth = (() => {
     }
   }
 
-  return { showTab, login, register, logout, togglePwd, updateSidebarUser, getUser, bootstrap };
+  return { showTab, showForgot, showReset, forgotPassword, resetPassword, login, register, logout, togglePwd, updateSidebarUser, getUser, bootstrap };
 })();
 
 document.addEventListener('DOMContentLoaded', () => {

@@ -64,6 +64,7 @@ const App = (() => {
       case 'inbox':      initInboxPage();          break;
       case 'challenges': initChallengePage();      break;
       case 'community':  initCommunityPage();      break;
+      case 'settings':   initSettingsPage();       break;
       case 'sos':        renderSOSContacts();      break;
       case 'admin':      Admin.initPage();         break;
     }
@@ -2302,6 +2303,135 @@ const App = (() => {
     return current;
   }
 
+  // ── Settings Page ────────────────────────────────────────────────────
+  let settingsNotifDays = [];
+
+  function switchSettingsTab(tab, btn) {
+    document.querySelectorAll('.settings-panel').forEach(p => p.style.display = 'none');
+    document.querySelectorAll('.settings-tab').forEach(b => b.classList.remove('active'));
+    const panel = document.getElementById(`settings-panel-${tab}`);
+    if (panel) panel.style.display = '';
+    if (btn) btn.classList.add('active');
+    if (tab === 'notifications') renderSettingsNotif();
+  }
+
+  async function initSettingsPage() {
+    const user = Auth.getUser();
+    if (!user) return;
+    // Điền thông tin vào form
+    const un = document.getElementById('set-username');
+    const em = document.getElementById('set-email');
+    const fn = document.getElementById('set-fullname');
+    if (un) un.value = user.username || '';
+    if (em) em.value = user.email    || '';
+    if (fn) fn.value = user.full_name || '';
+    // Tài khoản info
+    const ai = document.getElementById('set-account-info');
+    if (ai) {
+      const joined = user.created_at ? new Date(user.created_at).toLocaleDateString('vi-VN') : '—';
+      ai.innerHTML = `<div>Tên đăng nhập: <strong>${user.username}</strong></div>
+        <div>Email: <strong>${user.email}</strong></div>
+        <div>Ngày tham gia: <strong>${joined}</strong></div>
+        <div>Tổng nhật ký: <strong>${user.totalEntries || '—'}</strong></div>`;
+    }
+    // Đồng bộ notif prefs từ DB
+    try {
+      const fresh = await API.getMe();
+      settingsNotifDays = fresh.user.notif_days ? fresh.user.notif_days.split(',').map(Number) : [];
+      const hourSel = document.getElementById('set-notif-hour');
+      if (hourSel) hourSel.value = fresh.user.notif_hour !== null && fresh.user.notif_hour !== undefined ? fresh.user.notif_hour : '';
+    } catch {}
+  }
+
+  function renderSettingsNotif() {
+    // Push opt-in section
+    const pushSection = document.getElementById('set-push-section');
+    if (pushSection) {
+      const existing = document.getElementById('push-optin-banner');
+      if (existing && existing.innerHTML) {
+        pushSection.innerHTML = existing.innerHTML;
+      } else {
+        pushSection.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Bật push notification để nhận nhắc nhở viết nhật ký hàng ngày.</p>' +
+          '<button class="btn-outline" onclick="App.enablePush()">🔔 Bật thông báo</button>';
+      }
+    }
+    // Đánh dấu ngày đã chọn
+    document.querySelectorAll('#set-notif-days .notif-day-btn').forEach(btn => {
+      const day = parseInt(btn.dataset.day);
+      btn.classList.toggle('sel', settingsNotifDays.includes(day));
+    });
+  }
+
+  function toggleNotifDaySetting(btn, day) {
+    const idx = settingsNotifDays.indexOf(day);
+    if (idx >= 0) settingsNotifDays.splice(idx, 1);
+    else settingsNotifDays.push(day);
+    btn.classList.toggle('sel', settingsNotifDays.includes(day));
+  }
+
+  async function saveProfileSettings() {
+    const fullName = (document.getElementById('set-fullname').value || '').trim();
+    const msgEl    = document.getElementById('set-profile-msg');
+    if (!fullName) { showSettingsMsg(msgEl, 'Tên không được để trống.', false); return; }
+    try {
+      const d = await API.updateProfile({ full_name: fullName });
+      const user = Auth.getUser();
+      if (user) { user.full_name = fullName; user.avatar_text = d.avatar_text; localStorage.setItem('nhk_user', JSON.stringify(user)); }
+      Auth.updateSidebarUser(user);
+      showSettingsMsg(msgEl, '✅ Đã cập nhật tên hiển thị!', true);
+    } catch (err) { showSettingsMsg(msgEl, '❌ ' + err.message, false); }
+  }
+
+  async function changePasswordSettings() {
+    const curPw  = document.getElementById('set-current-pw').value;
+    const newPw  = document.getElementById('set-new-pw').value;
+    const conPw  = document.getElementById('set-confirm-pw').value;
+    const msgEl  = document.getElementById('set-security-msg');
+    if (!curPw || !newPw || !conPw) { showSettingsMsg(msgEl, 'Vui lòng điền đầy đủ thông tin.', false); return; }
+    if (newPw !== conPw)            { showSettingsMsg(msgEl, 'Mật khẩu xác nhận không khớp.', false); return; }
+    if (newPw.length < 6)          { showSettingsMsg(msgEl, 'Mật khẩu mới phải ít nhất 6 ký tự.', false); return; }
+    try {
+      const d = await API.changePassword(curPw, newPw);
+      showSettingsMsg(msgEl, '✅ ' + (d.message || 'Đổi mật khẩu thành công!'), true);
+      document.getElementById('set-current-pw').value = '';
+      document.getElementById('set-new-pw').value     = '';
+      document.getElementById('set-confirm-pw').value = '';
+    } catch (err) { showSettingsMsg(msgEl, '❌ ' + err.message, false); }
+  }
+
+  async function saveNotifSettings() {
+    const hourEl = document.getElementById('set-notif-hour');
+    const msgEl  = document.getElementById('set-notif-msg');
+    const h      = hourEl.value !== '' ? parseInt(hourEl.value) : null;
+    const days   = settingsNotifDays.length > 0 ? settingsNotifDays.join(',') : null;
+    try {
+      const d = await API.updateNotifPrefs(h, days);
+      showSettingsMsg(msgEl, '✅ ' + (d.message || 'Đã lưu!'), true);
+    } catch (err) { showSettingsMsg(msgEl, '❌ ' + err.message, false); }
+  }
+
+  async function deleteAccountSettings() {
+    const pw    = document.getElementById('set-delete-pw').value;
+    const msgEl = document.getElementById('set-account-msg');
+    if (!pw) { showSettingsMsg(msgEl, 'Vui lòng nhập mật khẩu để xác nhận.', false); return; }
+    if (!confirm('Bạn có chắc muốn xóa toàn bộ tài khoản và dữ liệu? Hành động này KHÔNG THỂ hoàn tác!')) return;
+    try {
+      await API.deleteAccount(pw);
+      localStorage.removeItem('nhk_token');
+      localStorage.removeItem('nhk_user');
+      alert('Tài khoản đã được xóa. Tạm biệt!');
+      window.location.reload();
+    } catch (err) { showSettingsMsg(msgEl, '❌ ' + err.message, false); }
+  }
+
+  function showSettingsMsg(el, msg, success) {
+    if (!el) return;
+    el.textContent = msg;
+    el.className   = `settings-msg ${success ? 'success' : 'error'}`;
+    el.style.display = '';
+    setTimeout(() => { if (el) el.style.display = 'none'; }, 4000);
+  }
+
   // ── Init ─────────────────────────────────────────────────────────────
   async function init() {
     document.querySelectorAll('.nav-item').forEach(btn=>btn.addEventListener('click',()=>nav(btn.dataset.page)));
@@ -2344,5 +2474,5 @@ const App = (() => {
     nav('dashboard');
   }
 
-  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts};
+  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings};
 })();

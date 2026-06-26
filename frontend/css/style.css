@@ -696,3 +696,25 @@ select.form-input{cursor:pointer}
 .soul-seed-card.withered .soul-seed-name{color:#78716c}
 .soul-seed-card.withered .soul-seed-desc{color:var(--text-muted)}
 .ai-emotion-suggestions li{margin-bottom:2px}
+
+/* ── Settings Page ── */
+.settings-tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.settings-tab{padding:8px 16px;border-radius:var(--radius);border:1.5px solid var(--border);background:var(--card-bg);color:var(--text-muted);font-size:13px;font-weight:600;cursor:pointer;transition:.2s}
+.settings-tab:hover{border-color:var(--primary);color:var(--primary)}
+.settings-tab.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.settings-panel{padding:24px}
+.settings-section-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:16px;padding-bottom:10px;border-bottom:1.5px solid var(--border)}
+.settings-msg{margin-top:12px;font-size:13px;font-weight:600;padding:8px 12px;border-radius:var(--radius)}
+.settings-msg.success{color:#15803d;background:#f0fdf4;border:1px solid #bbf7d0}
+.settings-msg.error{color:#dc2626;background:#fef2f2;border:1px solid #fecaca}
+.danger-zone{border:1.5px solid #fca5a5;border-radius:var(--radius-lg);padding:20px;background:#fff5f5}
+.danger-zone-title{font-size:14px;font-weight:700;color:#dc2626;margin-bottom:10px}
+.btn-danger{background:#dc2626;color:#fff;border:none;border-radius:var(--radius);padding:10px 20px;font-size:14px;font-weight:600;cursor:pointer;transition:.2s}
+.btn-danger:hover{background:#b91c1c}
+.auth-text-btn{background:none;border:none;color:var(--primary);font-size:13px;font-weight:600;cursor:pointer;text-decoration:underline;padding:4px 0}
+.notif-day-btn{padding:6px 10px;border-radius:var(--radius);border:1.5px solid var(--border);background:var(--card-bg);color:var(--text-muted);font-size:12px;font-weight:700;cursor:pointer;transition:.2s}
+.notif-day-btn.sel{background:var(--primary);color:#fff;border-color:var(--primary)}
+.notif-day-row{display:flex;gap:6px;flex-wrap:wrap}
+.dark-mode .danger-zone{background:#2d1515;border-color:#7f1d1d}
+.dark-mode .settings-msg.success{background:#052e16;border-color:#166534}
+.dark-mode .settings-msg.error{background:#2d0a0a;border-color:#7f1d1d}

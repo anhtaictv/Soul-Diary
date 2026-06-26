@@ -630,6 +630,19 @@ async function initSchema() {
             'v1.7',N'Thử thách & Cộng đồng',0,15)
   `);
 
+  // Bảng PasswordResets — token đặt lại mật khẩu (hết hạn sau 1 giờ)
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='PasswordResets' AND xtype='U')
+    CREATE TABLE PasswordResets (
+      id         INT           IDENTITY(1,1) PRIMARY KEY,
+      user_id    INT           NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      token_hash NVARCHAR(100) NOT NULL UNIQUE,
+      expires_at DATETIME2     NOT NULL,
+      used_at    DATETIME2     NULL,
+      created_at DATETIME2     DEFAULT GETDATE()
+    )
+  `);
+
   // Bảng AdminMessages — tin nhắn admin/counselor gửi đến user (hộp thư hỗ trợ)
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AdminMessages' AND xtype='U')

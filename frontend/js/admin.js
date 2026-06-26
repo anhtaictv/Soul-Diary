@@ -642,8 +642,9 @@ const Admin = (() => {
           <td><span style="color:#f97316;font-weight:600">🔥 ${u.streak}</span></td>
           <td style="color:var(--text-muted)">${u.diary_count}</td>
           <td style="color:var(--text-hint);font-size:12px">${fmtDate(u.created_at)}</td>
-          <td style="display:flex;gap:6px;align-items:center">
+          <td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
             <button class="btn btn-sm" style="background:var(--primary-light,#ede9fe);color:var(--primary);border:1px solid var(--primary)" title="Gửi tin hỗ trợ" onclick="Admin.openOutreachModal(${u.id})">💌</button>
+            <button class="btn btn-sm" style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d" title="Đặt lại mật khẩu" onclick="Admin.resetUserPassword(${u.id})">🔑</button>
             ${u.role !== 'admin'
               ? `<button class="btn btn-outline btn-sm" onclick="Admin.promoteUser(${u.id})">👑 Cấp Admin</button>`
               : `<button class="btn btn-sm" style="background:var(--rose-light);color:var(--rose);border:1px solid #fecdd3" onclick="Admin.demoteUser(${u.id})">Thu hồi</button>`}
@@ -694,6 +695,17 @@ const Admin = (() => {
       await API.sendOutreach(outreachTargetId, outreachType, content, meta);
       showToast('✅ Đã gửi tin!');
       closeOutreachModal();
+    } catch (err) { showToast('❌ ' + err.message); }
+  }
+
+  async function resetUserPassword(id) {
+    const u    = allUsers.find(x => x.id === id);
+    const name = u ? (u.full_name || u.username) : `#${id}`;
+    if (!confirm(`Đặt mật khẩu tạm thời cho "${name}"?\nMật khẩu hiện tại sẽ bị thay thế.`)) return;
+    try {
+      const d = await API.adminResetUserPassword(id);
+      alert(`Mật khẩu tạm thời của ${name}:\n\n🔑 ${d.tempPassword}\n\nVui lòng thông báo cho người dùng đổi mật khẩu ngay sau khi đăng nhập.`);
+      showToast('✅ Đã đặt lại mật khẩu');
     } catch (err) { showToast('❌ ' + err.message); }
   }
 
@@ -815,7 +827,7 @@ const Admin = (() => {
     openEditor, editArticle, closeEditor, saveArticle,
     selectEmoji, selectColor,
     togglePublish, deleteArticle,
-    promoteUser, demoteUser,
+    promoteUser, demoteUser, resetUserPassword,
     openOutreachModal, closeOutreachModal, selectOutreachType, selectOutreachMood, sendOutreach,
     saveSOSSetting,
     loadReport,

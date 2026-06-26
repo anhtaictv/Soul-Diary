@@ -1,5 +1,7 @@
 // routes/admin.js — Quản lý hệ thống (chỉ admin)
 const express          = require('express');
+const bcrypt           = require('bcryptjs');
+const crypto           = require('crypto');
 const { getPool, sql } = require('../db');
 const authMiddleware   = require('../middleware/auth');
 const adminMiddleware  = require('../middleware/admin');
@@ -160,6 +162,32 @@ router.get('/report', async (req, res) => {
     res.json({ monthly: monthly.recordset, moodDist: moodDist.recordset });
   } catch (err) {
     console.error('Admin report error:', err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+// ── POST /api/admin/users/:id/reset-password — admin đặt lại mật khẩu tạm ──
+router.post('/users/:id/reset-password', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const db = await getPool();
+    const check = await db.request().input('id', sql.Int, userId)
+      .query('SELECT id, role FROM Users WHERE id=@id');
+    if (!check.recordset.length)
+      return res.status(404).json({ message: 'Người dùng không tồn tại.' });
+    if (check.recordset[0].role === 'admin' && userId !== req.user.id)
+      return res.status(403).json({ message: 'Không thể reset mật khẩu tài khoản admin khác.' });
+
+    const tempPassword = crypto.randomBytes(5).toString('hex'); // 10 ký tự hex
+    const hashed = await bcrypt.hash(tempPassword, 12);
+    await db.request()
+      .input('id', sql.Int, userId)
+      .input('pw', sql.NVarChar, hashed)
+      .query('UPDATE Users SET password=@pw, updated_at=GETDATE() WHERE id=@id');
+
+    res.json({ message: 'Đã đặt lại mật khẩu tạm thời.', tempPassword });
+  } catch (err) {
+    console.error('Admin reset password error:', err);
     res.status(500).json({ message: 'Lỗi server.' });
   }
 });

@@ -37,7 +37,7 @@ process.on('unhandledRejection', (err) => {
 app.use(helmet());
 
 app.use(cors({
-  origin: '*',
+  origin: process.env.CORS_ORIGIN || '*',
   credentials: false,
   methods: ['GET', 'POST','PATCH', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

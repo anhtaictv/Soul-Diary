@@ -111,6 +111,16 @@ const API = (() => {
     updateNotifPrefs: (notif_hour, notif_days) =>
       request('/auth/notification-prefs', { method: 'PUT', body: { notif_hour, notif_days } }),
 
+    // Cài đặt tài khoản
+    changePassword:  (currentPassword, newPassword) =>
+      request('/auth/change-password', { method: 'PUT', body: { currentPassword, newPassword } }),
+    forgotPassword:  (email)              => request('/auth/forgot-password',  { method: 'POST', body: { email } }),
+    resetPassword:   (token, newPassword) => request('/auth/reset-password',   { method: 'POST', body: { token, newPassword } }),
+    deleteAccount:   (password)           => request('/auth/account',           { method: 'DELETE', body: { password } }),
+
+    // Admin reset mật khẩu user
+    adminResetUserPassword: (id) => request(`/admin/users/${id}/reset-password`, { method: 'POST' }),
+
     // Thử thách Sức khỏe Tâm thần
     getChallenges:    ()  => request('/challenges'),
     joinChallenge:    (id) => request(`/challenges/${id}/join`,   { method: 'POST' }),
