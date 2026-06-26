@@ -66,6 +66,7 @@ const API = (() => {
     getDiary:         (page = 1, limit = 20) => request(`/diary?page=${page}&limit=${limit}`),
     getStats:         (days = 14)            => request(`/diary/stats?days=${days}`),
     getMoodCalendar:  (month)                => request(`/diary/calendar${month ? '?month='+month : ''}`),
+    getHeatmap:       (year)                 => request(`/diary/heatmap?year=${year || new Date().getFullYear()}`),
     getDailyPrompt:   (refresh)              => request(`/diary/daily-prompt${refresh ? '?refresh=1' : ''}`),
     getEntryCompanion:(id)                   => request(`/diary/${id}/companion`),
     getSmartRecap:    ()                     => request('/diary/smart-recap'),
@@ -102,5 +103,8 @@ const API = (() => {
     markInboxRead:  (id)        => request(`/inbox/${id}/read`, { method: 'PATCH' }),
     sendOutreach:   (to_user_id, type, content, meta) =>
       request('/admin/outreach', { method: 'POST', body: { to_user_id, type, content, meta } }),
+
+    // Báo cáo hệ thống (admin)
+    getAdminReport: () => request('/admin/report'),
   };
 })();

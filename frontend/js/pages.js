@@ -169,10 +169,11 @@ const PAGES = {
       <!-- Streak calendar full -->
       <div class="streak-calendar-card" id="chart-streak-calendar" style="margin-bottom:16px"></div>
 
-      <!-- Toggle biểu đồ / lịch tâm trạng (ẩn cho đến khi feature mood_calendar được bật) -->
+      <!-- Toggle biểu đồ / lịch tâm trạng / heatmap -->
       <div id="chart-view-toggle" style="display:none;margin-bottom:16px">
         <button class="tag sel" id="chart-view-btn-chart"    onclick="App.switchChartView('chart',this)">📈 Biểu đồ</button>
-        <button class="tag"     id="chart-view-btn-calendar" onclick="App.switchChartView('calendar',this)">📅 Lịch tâm trạng</button>
+        <button class="tag"     id="chart-view-btn-calendar" onclick="App.switchChartView('calendar',this)" style="display:none">📅 Lịch tâm trạng</button>
+        <button class="tag"     id="chart-view-btn-heatmap"  onclick="App.switchChartView('heatmap',this)"  style="display:none">🗓 Heatmap năm</button>
       </div>
 
       <div id="chart-line-section">
@@ -214,6 +215,33 @@ const PAGES = {
             <button class="btn-outline" style="padding:6px 12px;font-size:12px" onclick="App.calendarMonthNav(1)">▶</button>
           </div>
           <div class="mood-calendar-grid" id="mood-calendar-grid"></div>
+        </div>
+      </div>
+
+      <!-- Heatmap cảm xúc năm (ẩn cho đến khi chọn view "Heatmap năm") -->
+      <div id="mood-heatmap-section" style="display:none">
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div style="font-size:15px;font-weight:600">Heatmap cảm xúc năm 🗓</div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button class="btn-outline" onclick="App.heatmapYearNav(-1)" style="padding:5px 12px;font-size:12px">◀</button>
+              <span id="heatmap-year-label" style="font-size:13px;font-weight:700;min-width:36px;text-align:center">—</span>
+              <button class="btn-outline" onclick="App.heatmapYearNav(1)"  style="padding:5px 12px;font-size:12px">▶</button>
+            </div>
+          </div>
+          <div id="heatmap-grid"></div>
+          <div class="heatmap-legend">
+            <span style="font-size:11px;color:var(--text-muted)">Chưa ghi</span>
+            <span class="hm-cell hm-none"></span>
+            <span class="hm-cell hm-1-4"></span>
+            <span style="font-size:11px;color:var(--text-muted)">1–4</span>
+            <span class="hm-cell hm-5-6"></span>
+            <span style="font-size:11px;color:var(--text-muted)">5–6</span>
+            <span class="hm-cell hm-7-8"></span>
+            <span style="font-size:11px;color:var(--text-muted)">7–8</span>
+            <span class="hm-cell hm-9-10"></span>
+            <span style="font-size:11px;color:var(--text-muted)">9–10</span>
+          </div>
         </div>
       </div>
     </div>`,
@@ -313,6 +341,7 @@ const PAGES = {
         <button class="tag sel" data-panel="dashboard" onclick="Admin.switchPanel('dashboard',this)">📊 Tổng quan</button>
         <button class="tag"     data-panel="articles"  onclick="Admin.switchPanel('articles',this)">📝 Bài viết</button>
         <button class="tag"     data-panel="users"     onclick="Admin.switchPanel('users',this)">👥 Người dùng</button>
+        <button class="tag"     data-panel="report"    onclick="Admin.switchPanel('report',this)">📈 Báo cáo</button>
         <button class="tag"     data-panel="settings"  onclick="Admin.switchPanel('settings',this)">⚙️ Cài đặt</button>
         <button class="tag"     data-panel="features"  onclick="Admin.switchPanel('features',this)">🚀 Tính năng</button>
       </div>
@@ -390,6 +419,11 @@ const PAGES = {
             </table>
           </div>
         </div>
+      </div>
+
+      <!-- Report panel -->
+      <div class="panel" id="adm-panel-report">
+        <div id="adm-report-content"><div class="loading-text">Đang tải...</div></div>
       </div>
 
       <!-- Features panel -->

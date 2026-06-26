@@ -134,6 +134,7 @@ const Admin = (() => {
     if (name === 'dashboard') loadDashboard();
     if (name === 'articles')  loadArticles();
     if (name === 'users')     loadUsers();
+    if (name === 'report')    loadReport();
     if (name === 'settings')  loadSettingsPanel();
     if (name === 'features')  loadFeaturesPanel();
   }
@@ -701,6 +702,92 @@ const Admin = (() => {
     catch (err) { showToast('❌ ' + err.message); }
   }
 
+  // ── Báo cáo hàng tháng ───────────────────────────────────────────────
+  async function loadReport() {
+    const container = document.getElementById('adm-report-content');
+    if (!container) return;
+    container.innerHTML = '<div class="loading-text">Đang tải...</div>';
+    try {
+      const data = await API.getAdminReport();
+      const monthly = data.monthly || [];
+      const moodDist = data.moodDist || [];
+
+      const labels  = monthly.map(m => { const [y, mo] = m.month.split('-'); return `T${parseInt(mo)}/${y.slice(2)}`; });
+      const moods   = monthly.map(m => parseFloat(m.avg_mood).toFixed(2));
+      const entries = monthly.map(m => m.total_entries);
+      const users   = monthly.map(m => m.active_users);
+
+      const last = monthly[monthly.length - 1];
+      const distData = Array.from({ length: 10 }, (_, i) => {
+        const row = moodDist.find(d => d.mood_score === i + 1);
+        return row ? row.cnt : 0;
+      });
+      const distColors = distData.map((_, i) => i < 4 ? '#fca5a5' : i < 6 ? '#fcd34d' : '#86efac');
+
+      container.innerHTML = `
+        <div class="grid-3" style="margin-bottom:16px">
+          <div class="stat-card-colored" style="background:linear-gradient(135deg,#6366f1,#818cf8)">
+            <div class="stat-val-white">${last ? parseFloat(last.avg_mood).toFixed(1) : '—'}</div>
+            <div class="stat-lbl-white">TB tâm trạng tháng này</div>
+          </div>
+          <div class="stat-card-colored" style="background:linear-gradient(135deg,#10b981,#34d399)">
+            <div class="stat-val-white">${last ? last.active_users : '—'}</div>
+            <div class="stat-lbl-white">Người dùng hoạt động</div>
+          </div>
+          <div class="stat-card-colored" style="background:linear-gradient(135deg,#f97316,#fb923c)">
+            <div class="stat-val-white">${last ? last.total_entries : '—'}</div>
+            <div class="stat-lbl-white">Nhật ký tháng này</div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div style="font-size:15px;font-weight:600;margin-bottom:12px">Xu hướng tâm trạng 6 tháng gần nhất</div>
+          <div class="chart-wrapper"><canvas id="adm-trend-chart"></canvas></div>
+        </div>
+        <div class="card">
+          <div style="font-size:15px;font-weight:600;margin-bottom:12px">Phân bố điểm tâm trạng (30 ngày gần nhất)</div>
+          <div class="chart-wrapper" style="max-height:180px"><canvas id="adm-dist-chart"></canvas></div>
+        </div>
+      `;
+
+      // Trend chart
+      new Chart(document.getElementById('adm-trend-chart'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'TB tâm trạng', data: moods, borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.08)', tension: 0.4, fill: true, yAxisID: 'y' },
+            { label: 'Nhật ký',      data: entries, borderColor: '#10b981', backgroundColor: 'transparent', tension: 0.4, fill: false, yAxisID: 'y1' },
+            { label: 'User hoạt động', data: users, borderColor: '#f97316', backgroundColor: 'transparent', tension: 0.4, fill: false, yAxisID: 'y1', borderDash: [4,3] },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: {
+            y:  { min: 0, max: 10, title: { display: true, text: 'Tâm trạng' } },
+            y1: { position: 'right', title: { display: true, text: 'Số lượng' }, beginAtZero: true, grid: { drawOnChartArea: false } },
+          },
+        },
+      });
+
+      // Dist chart
+      new Chart(document.getElementById('adm-dist-chart'), {
+        type: 'bar',
+        data: {
+          labels: ['1','2','3','4','5','6','7','8','9','10'],
+          datasets: [{ label: 'Số nhật ký', data: distData, backgroundColor: distColors, borderRadius: 4 }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true } },
+        },
+      });
+
+    } catch (e) {
+      container.innerHTML = `<div class="loading-text" style="color:var(--rose)">Lỗi tải báo cáo: ${e.message}</div>`;
+    }
+  }
+
   // ── Settings ──────────────────────────────────────────────────────────
   async function loadSettingsPanel() {
     try {
@@ -725,6 +812,7 @@ const Admin = (() => {
     promoteUser, demoteUser,
     openOutreachModal, closeOutreachModal, selectOutreachType, selectOutreachMood, sendOutreach,
     saveSOSSetting,
+    loadReport,
     toggleChangelog,
     showNewVersionForm, submitNewVersion,
     showAddFlagForm, submitAddFlag,

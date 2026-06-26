@@ -132,4 +132,36 @@ router.post('/outreach', async (req, res) => {
   }
 });
 
+// ── GET /api/admin/report — Báo cáo xu hướng tâm trạng hàng tháng ──────
+router.get('/report', async (req, res) => {
+  try {
+    const db = await getPool();
+    const [monthly, moodDist] = await Promise.all([
+      // Avg mood, entry count, active users per month (6 tháng)
+      db.request().query(`
+        SELECT FORMAT(created_at, 'yyyy-MM') AS month,
+               ROUND(AVG(CAST(mood_score AS FLOAT)), 2) AS avg_mood,
+               COUNT(*) AS total_entries,
+               COUNT(DISTINCT user_id) AS active_users
+        FROM DiaryEntries
+        WHERE created_at >= DATEADD(MONTH, -5, DATEFROMPARTS(YEAR(GETDATE()), MONTH(GETDATE()), 1))
+        GROUP BY FORMAT(created_at, 'yyyy-MM')
+        ORDER BY month
+      `),
+      // Phân bố điểm tâm trạng 30 ngày gần nhất
+      db.request().query(`
+        SELECT mood_score, COUNT(*) AS cnt
+        FROM DiaryEntries
+        WHERE created_at >= DATEADD(DAY, -30, GETDATE())
+        GROUP BY mood_score
+        ORDER BY mood_score
+      `),
+    ]);
+    res.json({ monthly: monthly.recordset, moodDist: moodDist.recordset });
+  } catch (err) {
+    console.error('Admin report error:', err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
 module.exports = router;

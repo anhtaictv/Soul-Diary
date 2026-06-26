@@ -25,6 +25,7 @@ const App = (() => {
   let diaryMode = 'free';   // 'free' hoặc 'cbt' — chỉ hiệu lực khi cbt_guided_writing được bật
   let checkinAnswers = [];  // mảng 31 phần tử của bài Check-in Sức khỏe Tinh thần đang làm dở
   let calendarMonth   = new Date(); // tháng đang xem ở Bản đồ thời tiết tâm hồn (mood_calendar)
+  let heatmapYear     = new Date().getFullYear(); // năm đang xem ở Heatmap cảm xúc
   let pendingMusicMood = null;      // mood chờ tự phát khi chuyển sang trang Nhạc (mood_ambience)
 
   // ── Navigation ──────────────────────────────────────────────────────
@@ -38,11 +39,18 @@ const App = (() => {
       case 'diary':     initDiaryPage();              break;
       case 'chart':
         calendarMonth = new Date();
+        heatmapYear   = new Date().getFullYear();
         setTimeout(() => {
           renderStreakCalendar('chart-streak-calendar');
           renderChart(14);
-          const toggle = document.getElementById('chart-view-toggle');
-          if (toggle) toggle.style.display = (window.FEATURES && window.FEATURES.mood_calendar) ? '' : 'none';
+          const hasCal     = !!(window.FEATURES && window.FEATURES.mood_calendar);
+          const hasHeatmap = !!(window.FEATURES && window.FEATURES.mood_heatmap);
+          const toggle     = document.getElementById('chart-view-toggle');
+          if (toggle) toggle.style.display = (hasCal || hasHeatmap) ? '' : 'none';
+          const calBtn  = document.getElementById('chart-view-btn-calendar');
+          const hmBtn   = document.getElementById('chart-view-btn-heatmap');
+          if (calBtn)  calBtn.style.display  = hasCal     ? '' : 'none';
+          if (hmBtn)   hmBtn.style.display   = hasHeatmap ? '' : 'none';
         }, 80);
         break;
       case 'library':   initLibrary(); break;
@@ -808,20 +816,18 @@ const App = (() => {
     } catch(err) { showToast('⚠️ Không thể tải biểu đồ: '+err.message); }
   }
 
-  // ── Bản đồ thời tiết tâm hồn (Mood Calendar) ───────────────────────────
+  // ── Bản đồ thời tiết tâm hồn (Mood Calendar) + Heatmap năm ─────────────
   function switchChartView(view, btn) {
     document.querySelectorAll('#chart-view-toggle .tag').forEach(b => b.classList.remove('sel'));
     (btn || document.getElementById(`chart-view-btn-${view}`))?.classList.add('sel');
-    const lineEl = document.getElementById('chart-line-section');
-    const calEl  = document.getElementById('mood-calendar-section');
-    if (view === 'calendar') {
-      if (lineEl) lineEl.style.display = 'none';
-      if (calEl)  calEl.style.display  = '';
-      renderMoodCalendar();
-    } else {
-      if (lineEl) lineEl.style.display = '';
-      if (calEl)  calEl.style.display  = 'none';
-    }
+    const lineEl    = document.getElementById('chart-line-section');
+    const calEl     = document.getElementById('mood-calendar-section');
+    const heatmapEl = document.getElementById('mood-heatmap-section');
+    if (lineEl)    lineEl.style.display    = view === 'chart'    ? '' : 'none';
+    if (calEl)     calEl.style.display     = view === 'calendar' ? '' : 'none';
+    if (heatmapEl) heatmapEl.style.display = view === 'heatmap'  ? '' : 'none';
+    if (view === 'calendar') renderMoodCalendar();
+    if (view === 'heatmap')  renderHeatmap();
   }
 
   function moodWeatherIcon(avg) {
@@ -876,6 +882,95 @@ const App = (() => {
         (next.getFullYear() === now.getFullYear() && next.getMonth() > now.getMonth())) return;
     calendarMonth = next;
     renderMoodCalendar();
+  }
+
+  // ── Heatmap cảm xúc năm ─────────────────────────────────────────────
+  async function renderHeatmap() {
+    const grid  = document.getElementById('heatmap-grid');
+    const label = document.getElementById('heatmap-year-label');
+    if (!grid) return;
+    if (label) label.textContent = heatmapYear;
+    grid.innerHTML = '<div class="loading-text">Đang tải...</div>';
+    try {
+      const data   = await API.getHeatmap(heatmapYear);
+      const dayMap = {};
+      (data.days || []).forEach(d => {
+        const key = (d.entry_date || '').split('T')[0];
+        dayMap[key] = d;
+      });
+
+      // Tính ngày bắt đầu grid (Chủ nhật của tuần chứa 1/1)
+      const jan1    = new Date(heatmapYear, 0, 1);
+      const gridStart = new Date(jan1);
+      gridStart.setDate(gridStart.getDate() - jan1.getDay());
+
+      // Build weeks
+      const weeks = [];
+      const cur   = new Date(gridStart);
+      while (true) {
+        const week = [];
+        for (let d = 0; d < 7; d++) {
+          const iso    = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`;
+          const inYear = cur.getFullYear() === heatmapYear;
+          week.push({ iso, inYear, data: inYear ? (dayMap[iso] || null) : null });
+          cur.setDate(cur.getDate() + 1);
+        }
+        weeks.push(week);
+        // Dừng sau khi đi qua hết năm
+        if (cur.getFullYear() > heatmapYear) break;
+      }
+
+      const MONTH_VI = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
+      let lastMonth = -1;
+      const monthMarks = [];
+      weeks.forEach((week, wi) => {
+        const first = week.find(d => d.inYear);
+        if (first) {
+          const mo = new Date(first.iso).getMonth();
+          if (mo !== lastMonth) { lastMonth = mo; monthMarks.push({ wi, label: MONTH_VI[mo] }); }
+        }
+      });
+
+      // Render
+      const cellW = 14; // px (cell 12 + gap 2)
+      let html = `<div class="hm-wrap">`;
+      // Month labels
+      html += `<div class="hm-months" style="width:${weeks.length * cellW + 28}px">`;
+      monthMarks.forEach(m => {
+        html += `<span class="hm-month-label" style="left:${28 + m.wi * cellW}px">${m.label}</span>`;
+      });
+      html += `</div>`;
+      // Grid: day-of-week labels + columns
+      html += `<div class="hm-grid">`;
+      html += `<div class="hm-day-labels"><span></span><span>T2</span><span></span><span>T4</span><span></span><span>T6</span><span></span></div>`;
+      html += `<div class="hm-cols">`;
+      weeks.forEach(week => {
+        html += `<div class="hm-col">`;
+        week.forEach(day => {
+          if (!day.inYear) {
+            html += `<span class="hm-cell hm-empty"></span>`;
+          } else if (!day.data) {
+            html += `<span class="hm-cell hm-none" title="${day.iso}"></span>`;
+          } else {
+            const m   = Math.round(day.data.avg_mood * 10) / 10;
+            const cls = m >= 9 ? 'hm-9-10' : m >= 7 ? 'hm-7-8' : m >= 5 ? 'hm-5-6' : 'hm-1-4';
+            html += `<span class="hm-cell ${cls}" title="${day.iso}: ${m}/10 (${day.data.entry_count} nhật ký)"></span>`;
+          }
+        });
+        html += `</div>`;
+      });
+      html += `</div></div></div>`;
+      grid.innerHTML = html;
+    } catch (e) {
+      grid.innerHTML = `<div class="loading-text" style="color:var(--rose)">Lỗi: ${e.message}</div>`;
+    }
+  }
+
+  function heatmapYearNav(delta) {
+    const next = heatmapYear + delta;
+    if (next > new Date().getFullYear()) return;
+    heatmapYear = next;
+    renderHeatmap();
   }
 
   // ── Library (API-driven) ──────────────────────────────────────────────
@@ -1893,5 +1988,5 @@ const App = (() => {
     nav('dashboard');
   }
 
-  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped};
+  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped};
 })();
