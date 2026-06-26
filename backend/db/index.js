@@ -445,6 +445,25 @@ async function initSchema() {
             'v1.6',N'Lan tỏa Tâm hồn',0,9)
   `);
 
+  // Bảng AdminMessages — tin nhắn admin/counselor gửi đến user (hộp thư hỗ trợ)
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AdminMessages' AND xtype='U')
+    CREATE TABLE AdminMessages (
+      id           INT           IDENTITY(1,1) PRIMARY KEY,
+      from_user_id INT           NOT NULL REFERENCES Users(id),
+      to_user_id   INT           NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      type         NVARCHAR(20)  NOT NULL DEFAULT 'message',
+      content      NVARCHAR(MAX) NOT NULL,
+      meta_json    NVARCHAR(MAX) NULL,
+      is_read      BIT           NOT NULL DEFAULT 0,
+      created_at   DATETIME2     DEFAULT GETDATE()
+    )
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_AdminMessages_to_user')
+    CREATE INDEX IX_AdminMessages_to_user ON AdminMessages(to_user_id, created_at DESC)
+  `);
+
   // Index
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_DiaryEntries_user_created')

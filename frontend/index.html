@@ -111,6 +111,7 @@
           <button class="nav-item" data-page="checkin" id="nav-checkin" style="display:none">
             <span class="nav-icon">🧪</span> Check-in tâm lý<span id="checkin-badge" class="nav-badge-dot" style="display:none"></span>
           </button>
+          <button class="nav-item" data-page="inbox" id="nav-inbox"><span class="nav-icon">💌</span> Hộp thư<span id="inbox-badge" class="nav-badge-dot" style="display:none"></span></button>
           <button class="nav-item" data-page="sos">            <span class="nav-icon">📞</span> Đường dây hỗ trợ</button>
           <button class="nav-item" data-page="admin" id="nav-admin" style="display:none"><span class="nav-icon">🛠️</span> Quản trị</button>
         </nav>
@@ -143,6 +144,42 @@
         <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">ngày 🔥</div>
         <div id="streak-modal-reward"></div>
         <button class="btn-primary" style="max-width:200px;margin:0 auto;margin-top:16px" onclick="App.closeStreakModal()">Tiếp tục ✨</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Outreach Modal -->
+  <div class="modal-overlay" id="outreach-modal">
+    <div class="modal" style="max-width:420px">
+      <div class="modal-header">
+        <div class="modal-title">💌 Gửi tin hỗ trợ</div>
+        <button class="modal-close" onclick="Admin.closeOutreachModal()">✕</button>
+      </div>
+      <div style="padding:4px 0 8px">
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Đến: <strong id="outreach-target-name">—</strong></div>
+        <div style="margin-bottom:14px">
+          <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Loại tin</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap" id="outreach-type-btns">
+            <button class="tag sel" data-type="message" onclick="Admin.selectOutreachType('message',this)">💬 Tin nhắn</button>
+            <button class="tag" data-type="cheer"   onclick="Admin.selectOutreachType('cheer',this)">✨ Động viên</button>
+            <button class="tag" data-type="song"    onclick="Admin.selectOutreachType('song',this)">🎵 Gợi ý nhạc</button>
+            <button class="tag" data-type="article" onclick="Admin.selectOutreachType('article',this)">📖 Bài viết</button>
+          </div>
+        </div>
+        <div id="outreach-song-section" style="display:none;margin-bottom:14px">
+          <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Mood nhạc gợi ý</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap" id="outreach-mood-btns">
+            <button class="tag sel" data-mood="chill"  onclick="Admin.selectOutreachMood('chill',this)">🌿 Thư giãn</button>
+            <button class="tag" data-mood="focus"  onclick="Admin.selectOutreachMood('focus',this)">📖 Tập trung</button>
+            <button class="tag" data-mood="sleep"  onclick="Admin.selectOutreachMood('sleep',this)">🌙 Dễ ngủ</button>
+            <button class="tag" data-mood="nature" onclick="Admin.selectOutreachMood('nature',this)">🍃 Thiên nhiên</button>
+          </div>
+        </div>
+        <div style="margin-bottom:16px">
+          <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Nội dung</div>
+          <textarea id="outreach-content" rows="4" style="width:100%;resize:vertical;font-size:14px" placeholder="Viết lời nhắn..."></textarea>
+        </div>
+        <button class="btn-primary" onclick="Admin.sendOutreach()">Gửi 💌</button>
       </div>
     </div>
   </div>

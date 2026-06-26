@@ -424,6 +424,8 @@ select.form-input{cursor:pointer}
 .adm-btn-primary:hover{transform:translateY(-1px);box-shadow:var(--shadow-md)}
 .adm-btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--text-muted)}
 .adm-btn-outline:hover{border-color:var(--primary);color:var(--primary)}
+.adm-btn-danger{background:transparent;border:1.5px solid var(--rose);color:var(--rose)}
+.adm-btn-danger:hover{background:var(--rose);color:#fff}
 .adm-btn-ghost{background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:20px;padding:4px 8px;border-radius:6px;transition:.15s}
 .adm-btn-ghost:hover{background:var(--surface);color:var(--text)}
 
@@ -434,6 +436,10 @@ select.form-input{cursor:pointer}
 .adm-color-grid{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
 .adm-color-opt{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:.12s}
 .adm-color-opt.sel{border-color:var(--text);transform:scale(1.2)}
+
+/* Inbox */
+.inbox-unread{border-left:3px solid var(--primary);background:linear-gradient(to right,rgba(99,102,241,.04),transparent)}
+.inbox-msg:hover{transform:translateY(-1px)}
 
 /* EasyMDE overrides */
 .EasyMDEContainer .CodeMirror{border-radius:0 0 8px 8px;font-family:'Be Vietnam Pro',sans-serif;font-size:14px;min-height:280px}

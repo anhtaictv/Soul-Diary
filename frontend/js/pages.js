@@ -274,6 +274,18 @@ const PAGES = {
       <div id="checkin-content"></div>
     </div>`,
 
+  inbox: () => `
+    <div class="page active" id="page-inbox">
+      <div class="page-header">
+        <div class="page-title">💌 Hộp thư</div>
+        <div class="page-sub">Tin nhắn từ counselor và quản trị viên</div>
+      </div>
+      <div id="inbox-list">
+        <div class="skeleton" style="height:90px;margin-bottom:12px;border-radius:12px"></div>
+        <div class="skeleton" style="height:90px;margin-bottom:12px;border-radius:12px"></div>
+      </div>
+    </div>`,
+
   sos: () => `
     <div class="page active" id="page-sos">
       <div class="page-header">

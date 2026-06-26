@@ -89,10 +89,18 @@ const API = (() => {
     deleteFeature:    (key)        => request(`/features/admin-list/${key}`,        { method: 'DELETE' }),
     releaseVersion:   (body)       => request('/features/admin-list/release',       { method: 'POST',   body }),
     scheduleVersion:  (body)       => request('/features/admin-list/schedule',      { method: 'POST',   body }),
+    revokeVersion:    (body)       => request('/features/admin-list/revoke',        { method: 'POST',   body }),
 
     // Check-in Sức khỏe Tinh thần hàng tuần
     getCheckinStatus:  ()        => request('/check-in/status'),
     submitCheckin:     (answers) => request('/check-in/submit', { method: 'POST', body: { answers } }),
     getCheckinHistory: ()        => request('/check-in/history'),
+
+    // Hộp thư hỗ trợ
+    getInbox:       ()          => request('/inbox'),
+    getInboxUnread: ()          => request('/inbox/unread-count'),
+    markInboxRead:  (id)        => request(`/inbox/${id}/read`, { method: 'PATCH' }),
+    sendOutreach:   (to_user_id, type, content, meta) =>
+      request('/admin/outreach', { method: 'POST', body: { to_user_id, type, content, meta } }),
   };
 })();

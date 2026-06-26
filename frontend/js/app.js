@@ -49,6 +49,7 @@ const App = (() => {
       case 'exercises': renderExercises();            break;
       case 'music':     initMusicPage();              break;
       case 'checkin':   initCheckinPage();            break;
+      case 'inbox':     initInboxPage();               break;
       case 'sos':       renderSOSContacts();          break;
       case 'admin':     Admin.initPage();             break;
     }
@@ -674,6 +675,74 @@ const App = (() => {
     document.getElementById('streak-modal').classList.add('open');
   }
   function closeStreakModal() { document.getElementById('streak-modal').classList.remove('open'); }
+
+  // ── Inbox (Hộp thư hỗ trợ) ──────────────────────────────────────────────
+  function fmtTimeAgo(iso) {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1)  return 'Vừa xong';
+    if (mins < 60) return `${mins} phút trước`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs  < 24) return `${hrs} giờ trước`;
+    const days = Math.floor(hrs / 24);
+    if (days < 7)  return `${days} ngày trước`;
+    return new Date(iso).toLocaleDateString('vi-VN');
+  }
+
+  async function loadInboxBadge() {
+    try {
+      const { count } = await API.getInboxUnread();
+      const badge = document.getElementById('inbox-badge');
+      if (badge) badge.style.display = count > 0 ? '' : 'none';
+    } catch {}
+  }
+
+  async function initInboxPage() {
+    try {
+      const { messages } = await API.getInbox();
+      const list = document.getElementById('inbox-list');
+      if (!list) return;
+      if (!messages.length) {
+        list.innerHTML = '<div style="text-align:center;padding:48px 0;color:var(--text-muted)"><div style="font-size:40px;margin-bottom:12px">💌</div><div>Chưa có tin nhắn nào</div></div>';
+        return;
+      }
+      const typeIcons   = { message:'💬', cheer:'✨', song:'🎵', article:'📖' };
+      const typeLabels  = { message:'Tin nhắn', cheer:'Động viên', song:'Gợi ý nhạc', article:'Gợi ý bài viết' };
+      const moodLabels  = { chill:'🌿 Thư giãn', focus:'📖 Tập trung', sleep:'🌙 Dễ ngủ', nature:'🍃 Thiên nhiên' };
+      list.innerHTML = messages.map(m => {
+        const meta = m.meta_json ? JSON.parse(m.meta_json) : {};
+        const songBtn = m.type === 'song' && meta.mood
+          ? `<div style="margin-top:10px"><button class="tag" onclick="event.stopPropagation();App.suggestAmbienceMusic('${meta.mood}')">🎵 Nghe ${moodLabels[meta.mood] || meta.mood}</button></div>`
+          : '';
+        return `
+          <div class="card inbox-msg${m.is_read ? '' : ' inbox-unread'}" style="cursor:pointer;margin-bottom:12px" onclick="App.readInboxMsg(${m.id},this)">
+            <div style="display:flex;align-items:flex-start;gap:10px">
+              <span style="font-size:24px;flex-shrink:0">${typeIcons[m.type] || '💌'}</span>
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                  <span style="font-size:12px;color:var(--text-muted)">${typeLabels[m.type] || 'Tin nhắn'} từ <strong>${escapeHtml(m.from_fullname || m.from_username)}</strong></span>
+                  <span style="font-size:11px;color:var(--text-hint);margin-left:auto;flex-shrink:0">${fmtTimeAgo(m.created_at)}</span>
+                  ${!m.is_read ? '<span style="width:8px;height:8px;background:var(--primary);border-radius:50%;display:inline-block;flex-shrink:0"></span>' : ''}
+                </div>
+                <div style="font-size:14px;color:var(--text);line-height:1.6;white-space:pre-wrap">${escapeHtml(m.content)}</div>
+                ${songBtn}
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    } catch (err) {
+      const list = document.getElementById('inbox-list');
+      if (list) list.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)">Không thể tải tin nhắn.</div>';
+    }
+  }
+
+  async function readInboxMsg(id, el) {
+    if (!el.classList.contains('inbox-unread')) return;
+    el.classList.remove('inbox-unread');
+    el.querySelector('span[style*="background:var(--primary)"]')?.remove();
+    await API.markInboxRead(id).catch(() => {});
+    loadInboxBadge();
+  }
 
   function showLowMoodAlert() { document.getElementById('lowmood-alert-modal').classList.add('open'); }
   function closeLowMoodAlert() { document.getElementById('lowmood-alert-modal').classList.remove('open'); }
@@ -1811,6 +1880,7 @@ const App = (() => {
     document.getElementById('entry-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeEntryModal();});
     document.getElementById('photo-lightbox').addEventListener('click',e=>{if(e.target===e.currentTarget)closeLightbox();});
     await loadFeatures();
+    loadInboxBadge();
     const navCheckin = document.getElementById('nav-checkin');
     if (navCheckin && window.FEATURES && window.FEATURES.weekly_checkin) {
       navCheckin.style.display = '';
@@ -1819,5 +1889,5 @@ const App = (() => {
     nav('dashboard');
   }
 
-  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped};
+  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped};
 })();
