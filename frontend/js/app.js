@@ -1880,7 +1880,11 @@ const App = (() => {
     document.getElementById('entry-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeEntryModal();});
     document.getElementById('photo-lightbox').addEventListener('click',e=>{if(e.target===e.currentTarget)closeLightbox();});
     await loadFeatures();
-    loadInboxBadge();
+    const navInbox = document.getElementById('nav-inbox');
+    if (navInbox && window.FEATURES && window.FEATURES.inbox_support) {
+      navInbox.style.display = '';
+      loadInboxBadge();
+    }
     const navCheckin = document.getElementById('nav-checkin');
     if (navCheckin && window.FEATURES && window.FEATURES.weekly_checkin) {
       navCheckin.style.display = '';
