@@ -2370,6 +2370,46 @@ const App = (() => {
     applyDarkMode(on);
   }
 
+  // ── Themes ────────────────────────────────────────────────────────────
+  const THEME_LIST = ['lavender','rose','emerald','warm','ocean','midnight'];
+  const THEME_LABELS = { '':'Xanh Dương', lavender:'Tím Oải Hương', rose:'Hồng Đào', emerald:'Xanh Lá Rừng', warm:'Nâu Ấm', ocean:'Xanh Biển Sâu', midnight:'Đêm Tím' };
+  function applyTheme(name) {
+    THEME_LIST.forEach(t => document.body.classList.remove('theme-' + t));
+    if (name) document.body.classList.add('theme-' + name);
+    localStorage.setItem('nhk_theme', name || '');
+    document.querySelectorAll('.theme-swatch').forEach(btn =>
+      btn.classList.toggle('active', (btn.dataset.theme || '') === (name || ''))
+    );
+    const lbl = document.getElementById('theme-name-label');
+    if (lbl) lbl.textContent = THEME_LABELS[name] || 'Xanh Dương';
+    const popup = document.getElementById('theme-picker-popup');
+    if (popup) popup.style.display = 'none';
+  }
+  function toggleThemePicker() {
+    const popup = document.getElementById('theme-picker-popup');
+    if (!popup) return;
+    if (popup.style.display === 'none') {
+      popup.style.display = 'block';
+      const cur = localStorage.getItem('nhk_theme') || '';
+      document.querySelectorAll('.theme-swatch').forEach(btn =>
+        btn.classList.toggle('active', (btn.dataset.theme || '') === cur)
+      );
+      const lbl = document.getElementById('theme-name-label');
+      if (lbl) lbl.textContent = THEME_LABELS[cur] || 'Xanh Dương';
+      setTimeout(() => {
+        function outsideClick(e) {
+          if (!popup.contains(e.target) && e.target.id !== 'theme-picker-btn') {
+            popup.style.display = 'none';
+            document.removeEventListener('click', outsideClick);
+          }
+        }
+        document.addEventListener('click', outsideClick);
+      }, 10);
+    } else {
+      popup.style.display = 'none';
+    }
+  }
+
   // ── Feature flags — tải tại khởi động, các tính năng mới dùng window.FEATURES.xxx ──
   async function loadFeatures() {
     try {
@@ -2922,6 +2962,7 @@ const App = (() => {
   // ── Init ─────────────────────────────────────────────────────────────
   async function init() {
     applyDarkMode(localStorage.getItem('nhk_dark') === '1');
+    applyTheme(localStorage.getItem('nhk_theme') || '');
     document.querySelectorAll('.nav-item').forEach(btn=>btn.addEventListener('click',()=>nav(btn.dataset.page)));
     const navAdmin = document.getElementById('nav-admin');
     if (navAdmin) navAdmin.style.display = (Auth.getUser()?.role === 'admin') ? '' : 'none';
@@ -2971,5 +3012,5 @@ const App = (() => {
     nav('dashboard');
   }
 
-  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch};
+  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,applyTheme,toggleThemePicker};
 })();
