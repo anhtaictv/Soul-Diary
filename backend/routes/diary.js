@@ -229,6 +229,67 @@ function dayOfYear(d) {
   return Math.floor((d - start) / 86400000);
 }
 
+// ── GET /api/diary/patterns — phân tích xu hướng cảm xúc 90 ngày ────────
+router.get('/patterns', async (req, res) => {
+  const DOW_VN = ['', 'Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+  try {
+    const db  = await getPool();
+    const uid = req.user.id;
+
+    const [dowR, monthR, overallR, tagR] = await Promise.all([
+      // Mood trung bình theo ngày trong tuần (90 ngày gần nhất)
+      db.request().input('uid', sql.Int, uid).query(`
+        SELECT DATEPART(WEEKDAY, created_at) AS dow,
+               AVG(CAST(mood_score AS FLOAT)) AS avg_mood,
+               COUNT(*) AS cnt
+        FROM DiaryEntries
+        WHERE user_id = @uid AND created_at >= DATEADD(DAY, -90, GETDATE())
+        GROUP BY DATEPART(WEEKDAY, created_at)
+        ORDER BY dow
+      `),
+      // Mood trung bình theo tháng (3 tháng gần nhất)
+      db.request().input('uid', sql.Int, uid).query(`
+        SELECT FORMAT(created_at, 'yyyy-MM') AS month,
+               AVG(CAST(mood_score AS FLOAT)) AS avg_mood,
+               COUNT(*) AS cnt
+        FROM DiaryEntries
+        WHERE user_id = @uid AND created_at >= DATEADD(MONTH, -3, GETDATE())
+        GROUP BY FORMAT(created_at, 'yyyy-MM')
+        ORDER BY month
+      `),
+      // Tổng quan toàn bộ
+      db.request().input('uid', sql.Int, uid).query(`
+        SELECT COUNT(*) AS total,
+               AVG(CAST(mood_score AS FLOAT)) AS overall_avg,
+               MIN(mood_score) AS min_mood, MAX(mood_score) AS max_mood
+        FROM DiaryEntries WHERE user_id = @uid
+      `),
+      // Top 5 tags được dùng nhiều nhất
+      db.request().input('uid', sql.Int, uid).query(`
+        SELECT TOP 5 tags, COUNT(*) AS cnt
+        FROM DiaryEntries
+        WHERE user_id = @uid AND tags IS NOT NULL AND tags != ''
+        GROUP BY tags ORDER BY cnt DESC
+      `),
+    ]);
+
+    const byDow = dowR.recordset;
+    const best  = byDow.length ? [...byDow].sort((a, b) => b.avg_mood - a.avg_mood)[0] : null;
+    const worst = byDow.length ? [...byDow].sort((a, b) => a.avg_mood - b.avg_mood)[0] : null;
+    const stats = overallR.recordset[0] || {};
+
+    res.json({
+      best_day:    best  ? { label: DOW_VN[best.dow],  avg: +best.avg_mood.toFixed(1)  } : null,
+      worst_day:   worst ? { label: DOW_VN[worst.dow], avg: +worst.avg_mood.toFixed(1) } : null,
+      by_dow:      byDow.map(r => ({ label: DOW_VN[r.dow], avg: +r.avg_mood.toFixed(1), cnt: r.cnt })),
+      monthly:     monthR.recordset.map(r => ({ month: r.month, avg: +r.avg_mood.toFixed(1), cnt: r.cnt })),
+      total:       stats.total || 0,
+      overall_avg: stats.overall_avg ? +stats.overall_avg.toFixed(1) : null,
+      top_tags:    tagR.recordset,
+    });
+  } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
 // ── GET /api/diary/search — tìm kiếm toàn văn nhật ký ──────────────────
 router.get('/search', async (req, res) => {
   try {

@@ -698,4 +698,60 @@ const PAGES = {
       '</div>' +
     '</div>';
   },
+
+  'future-letter': () => `
+    <div class="page active" id="page-future-letter">
+      <div class="page-header">
+        <div class="page-title">💌 Thư gửi tương lai</div>
+        <div class="page-sub">Viết thư cho chính mình trong tương lai — ứng dụng sẽ gửi email vào ngày bạn chọn.</div>
+      </div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="settings-section-title" style="margin-bottom:16px">✍️ Viết thư mới</div>
+        <div class="form-group">
+          <label class="form-label">Tiêu đề thư</label>
+          <input class="text-input" id="fl-subject" placeholder="Vd: Gửi mình vào ngày tốt nghiệp..." />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nội dung thư</label>
+          <textarea class="diary-textarea" id="fl-content" rows="7" placeholder="Bạn ơi, khi đọc thư này bạn đang ở đâu trong cuộc đời...&#10;&#10;Hôm nay mình muốn nhắn với bạn rằng..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Gửi vào ngày</label>
+          <input class="text-input" type="date" id="fl-send-date" style="max-width:220px" />
+        </div>
+        <button class="btn-primary" style="max-width:220px" onclick="App.createFutureLetter()">💌 Gửi thư đi</button>
+      </div>
+      <div class="section-label">Hộp thư đang chờ gửi</div>
+      <div id="fl-list"><div class="loading-text">Đang tải...</div></div>
+    </div>
+  `,
+
+  missions: () => `
+    <div class="page active" id="page-missions">
+      <div class="page-header">
+        <div class="page-title">🎯 Nhiệm vụ & Thẻ kỷ niệm</div>
+        <div class="page-sub">Hoàn thành nhiệm vụ hàng tuần để chăm sóc sức khoẻ tâm thần</div>
+      </div>
+
+      <div id="missions-list"><div class="loading-text">Đang tải nhiệm vụ...</div></div>
+
+      <div class="section-label" style="margin-top:24px">🃏 Memory Card</div>
+      <div class="card" style="text-align:center;padding:28px 16px;margin-bottom:20px">
+        <div style="font-size:40px;margin-bottom:12px">✨</div>
+        <div style="font-weight:700;color:var(--text);margin-bottom:6px">Tạo ảnh kỷ niệm</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:18px">Xuất thẻ ảnh đẹp với thống kê tâm trạng của bạn để chia sẻ</div>
+        <button class="btn-primary" style="max-width:240px;margin:0 auto" onclick="App.showMemoryCard()">✨ Tạo Memory Card</button>
+      </div>
+
+      <div class="section-label">📊 Phân tích xu hướng AI</div>
+      <div id="ai-patterns-section"><div class="loading-text">Đang phân tích...</div></div>
+
+      <div class="section-label" style="margin-top:24px">💾 Quản lý dữ liệu</div>
+      <div class="card" style="padding:20px">
+        <div style="font-weight:600;color:var(--text);margin-bottom:6px">Xuất toàn bộ dữ liệu</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Tải về file JSON chứa tất cả nhật ký, check-in và dữ liệu cá nhân.</div>
+        <button class="btn-secondary" onclick="App.exportUserData()">⬇️ Xuất dữ liệu (JSON)</button>
+      </div>
+    </div>
+  `,
 };

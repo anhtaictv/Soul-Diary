@@ -857,6 +857,75 @@ async function initSchema() {
             'v1.9',N'Trải nghiệm Cá nhân hoá',1,23)
   `);
 
+  // ── Bảng FutureLetters — thư gửi tương lai ──────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='FutureLetters' AND xtype='U')
+    CREATE TABLE FutureLetters (
+      id         INT           IDENTITY(1,1) PRIMARY KEY,
+      user_id    INT           NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      title      NVARCHAR(200) NOT NULL,
+      content    NVARCHAR(MAX) NOT NULL,
+      send_date  DATE          NOT NULL,
+      sent       BIT           DEFAULT 0,
+      created_at DATETIME2     DEFAULT GETDATE()
+    )
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_FutureLetters_send_date')
+    CREATE INDEX IX_FutureLetters_send_date ON FutureLetters(send_date, sent)
+  `);
+
+  // ── v2.0: Feature flags ─────────────────────────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='memory_card')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('memory_card',N'Thẻ kỷ niệm',
+            N'Tạo thẻ ảnh đẹp từ nhật ký để lưu và chia sẻ',
+            'v2.0',N'Đột phá v2.0',1,24)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='future_letter')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('future_letter',N'Thư gửi tương lai',
+            N'Viết thư cho bản thân trong tương lai, tự động gửi email đúng ngày',
+            'v2.0',N'Đột phá v2.0',1,25)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='pin_lock')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('pin_lock',N'Khoá PIN',
+            N'Bảo vệ nhật ký bằng mã PIN 4 chữ số',
+            'v2.0',N'Đột phá v2.0',1,26)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='ai_patterns')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('ai_patterns',N'AI Phân tích xu hướng',
+            N'Phân tích pattern cảm xúc 90 ngày: ngày tốt nhất, tệ nhất, xu hướng',
+            'v2.0',N'Đột phá v2.0',1,27)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='weekly_missions')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('weekly_missions',N'Nhiệm vụ hàng tuần',
+            N'5 nhiệm vụ thử thách mỗi tuần với phần thưởng kinh nghiệm',
+            'v2.0',N'Đột phá v2.0',1,28)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='data_export')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('data_export',N'Xuất dữ liệu',
+            N'Tải toàn bộ nhật ký và dữ liệu cá nhân về máy định dạng JSON',
+            'v2.0',N'Đột phá v2.0',1,29)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='offline_mode')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('offline_mode',N'Chế độ Offline',
+            N'Viết nhật ký khi mất mạng, tự đồng bộ khi có kết nối lại',
+            'v2.0',N'Đột phá v2.0',1,30)
+  `);
+
   // Index
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_DiaryEntries_user_created')

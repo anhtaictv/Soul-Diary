@@ -1,10 +1,66 @@
-// sw.js — Soul Diary Service Worker (Web Push)
-const CACHE_VERSION = 'souldiary-v1';
+// sw.js — Soul Diary Service Worker v2.0
+const CACHE_NAME    = 'souldiary-v2';
+const OFFLINE_URL   = '/offline.html';
+const STATIC_ASSETS = [
+  '/', '/index.html',
+  '/css/style.css',
+  '/js/config.js', '/js/data.js', '/js/api.js',
+  '/js/auth.js', '/js/pages.js', '/js/admin.js', '/js/app.js',
+  '/soul-diary-logo.jpg', '/app-icon.jpg',
+  '/manifest.webmanifest',
+];
 
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+// ── Install: cache static shell ───────────────────────────────────────────
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(STATIC_ASSETS).catch(() => {}))
+      .then(() => self.skipWaiting())
+  );
+});
 
-// Nhận push notification từ server
+// ── Activate: xóa cache cũ ───────────────────────────────────────────────
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())
+  );
+});
+
+// ── Fetch: cache-first cho static, network-first cho API ─────────────────
+self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+
+  // API calls: network-first, không cache
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(
+      fetch(event.request).catch(() =>
+        new Response(JSON.stringify({ message: 'Không có kết nối mạng.' }),
+          { status: 503, headers: { 'Content-Type': 'application/json' } })
+      )
+    );
+    return;
+  }
+
+  // Static assets: cache-first
+  event.respondWith(
+    caches.match(event.request).then(cached => {
+      if (cached) return cached;
+      return fetch(event.request).then(response => {
+        if (response && response.status === 200 && event.request.method === 'GET') {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match('/index.html'));
+    })
+  );
+});
+
+// ── Push notification ─────────────────────────────────────────────────────
 self.addEventListener('push', event => {
   let data = {};
   try { data = event.data?.json() || {}; } catch (_) {}
@@ -21,7 +77,7 @@ self.addEventListener('push', event => {
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Bấm vào notification → mở app
+// ── Notification click → mở app ──────────────────────────────────────────
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   event.waitUntil(

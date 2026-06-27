@@ -159,6 +159,8 @@
           <button class="nav-item" data-page="courses"   id="nav-courses" style="display:none"><span class="nav-icon">🎓</span> Khóa học</button>
           <button class="nav-item" data-page="goals"     id="nav-goals"   style="display:none"><span class="nav-icon">🎯</span> Mục tiêu</button>
           <button class="nav-item" data-page="year-review" id="nav-year-review" style="display:none"><span class="nav-icon">📆</span> Tổng kết năm</button>
+          <button class="nav-item" data-page="future-letter" id="nav-future-letter" style="display:none"><span class="nav-icon">💌</span> Thư tương lai</button>
+          <button class="nav-item" data-page="missions"      id="nav-missions"      style="display:none"><span class="nav-icon">🎯</span> Nhiệm vụ</button>
           <button class="nav-item" data-page="settings"><span class="nav-icon">⚙️</span> Cài đặt</button>
           <button class="nav-item" data-page="sos">            <span class="nav-icon">📞</span> Đường dây hỗ trợ</button>
           <button class="nav-item" data-page="admin" id="nav-admin" style="display:none"><span class="nav-icon">🛠️</span> Quản trị</button>
@@ -499,6 +501,40 @@
         <button class="adm-btn adm-btn-outline" onclick="Admin.saveArticle(false)">💾 Lưu nháp</button>
         <button class="adm-btn adm-btn-primary" onclick="Admin.saveArticle(true)">🚀 Đăng bài</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Offline Banner -->
+  <div id="offline-banner" class="offline-banner" style="display:none">
+    <span>📡 Mất kết nối mạng — Một số tính năng sẽ không khả dụng.</span>
+    <button onclick="this.parentElement.style.display='none'" style="background:none;border:none;color:inherit;font-size:18px;cursor:pointer;padding:0;margin-left:8px">✕</button>
+  </div>
+
+  <!-- PIN Lock Overlay -->
+  <div id="pin-overlay" class="pin-overlay" style="display:none">
+    <div class="pin-card">
+      <div class="pin-logo">🔒</div>
+      <div class="pin-title">Nhập mã PIN</div>
+      <div class="pin-subtitle">Soul Diary đã được khóa bảo vệ</div>
+      <div class="pin-dots" id="pin-dots">
+        <span></span><span></span><span></span><span></span>
+      </div>
+      <div class="pin-error" id="pin-error"></div>
+      <div class="pin-keypad">
+        <button class="pin-key" onclick="App.pinInput('1')">1</button>
+        <button class="pin-key" onclick="App.pinInput('2')">2</button>
+        <button class="pin-key" onclick="App.pinInput('3')">3</button>
+        <button class="pin-key" onclick="App.pinInput('4')">4</button>
+        <button class="pin-key" onclick="App.pinInput('5')">5</button>
+        <button class="pin-key" onclick="App.pinInput('6')">6</button>
+        <button class="pin-key" onclick="App.pinInput('7')">7</button>
+        <button class="pin-key" onclick="App.pinInput('8')">8</button>
+        <button class="pin-key" onclick="App.pinInput('9')">9</button>
+        <button class="pin-key pin-key-empty" disabled></button>
+        <button class="pin-key" onclick="App.pinInput('0')">0</button>
+        <button class="pin-key pin-key-del" onclick="App.pinDelete()">⌫</button>
+      </div>
+      <button onclick="Auth.logout()" style="background:none;border:none;color:var(--text-muted);font-size:13px;cursor:pointer;margin-top:8px;padding:8px">Đăng xuất</button>
     </div>
   </div>
 
