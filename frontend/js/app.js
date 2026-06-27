@@ -77,8 +77,10 @@ const App = (() => {
       case 'chat':        initChatPage();           break;
       case 'study':       initStudyPage();          break;
       case 'courses':     initCoursesPage();        break;
-      case 'goals':       initGoalsPage();          break;
-      case 'year-review': initYearReviewPage();     break;
+      case 'goals':         initGoalsPage();          break;
+      case 'year-review':   initYearReviewPage();     break;
+      case 'future-letter': initFutureLetterPage();   break;
+      case 'missions':      initMissionsPage();        break;
     }
   }
 
@@ -2976,6 +2978,380 @@ const App = (() => {
       </div>`;
   }
 
+  // ── PIN Lock (v2.0) ──────────────────────────────────────────────────
+  let _pinBuf = '';
+
+  async function _pinHash(pin) {
+    const enc = new TextEncoder().encode(pin);
+    const buf = await crypto.subtle.digest('SHA-256', enc);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+
+  function pinInput(digit) {
+    if (_pinBuf.length >= 4) return;
+    _pinBuf += digit;
+    _updatePinDots();
+    if (_pinBuf.length === 4) setTimeout(_checkPin, 120);
+  }
+
+  function pinDelete() {
+    _pinBuf = _pinBuf.slice(0, -1);
+    _updatePinDots();
+  }
+
+  function _updatePinDots() {
+    document.querySelectorAll('#pin-dots span').forEach((d, i) => {
+      d.className = i < _pinBuf.length ? 'filled' : '';
+    });
+  }
+
+  async function _checkPin() {
+    const stored = localStorage.getItem('nhk_pin');
+    if (!stored) { _hidePinOverlay(); return; }
+    const hash = await _pinHash(_pinBuf);
+    if (hash === stored) {
+      _hidePinOverlay();
+      sessionStorage.setItem('nhk_pin_ok', '1');
+    } else {
+      const dots = document.getElementById('pin-dots');
+      if (dots) { dots.classList.add('shake'); setTimeout(() => dots.classList.remove('shake'), 500); }
+      _pinBuf = '';
+      _updatePinDots();
+      const err = document.getElementById('pin-error');
+      if (err) { err.textContent = 'Mã PIN không đúng. Thử lại.'; setTimeout(() => { err.textContent = ''; }, 2000); }
+    }
+  }
+
+  function _hidePinOverlay() {
+    const el = document.getElementById('pin-overlay');
+    if (el) el.style.display = 'none';
+  }
+
+  function _showPinOverlay() {
+    _pinBuf = '';
+    _updatePinDots();
+    const el = document.getElementById('pin-overlay');
+    if (el) el.style.display = 'flex';
+  }
+
+  function _checkPinRequired() {
+    if (!localStorage.getItem('nhk_pin')) return;
+    if (!sessionStorage.getItem('nhk_pin_ok')) _showPinOverlay();
+  }
+
+  async function setPinLock(pin) {
+    if (pin && pin.length === 4 && /^\d{4}$/.test(pin)) {
+      const hash = await _pinHash(pin);
+      localStorage.setItem('nhk_pin', hash);
+      sessionStorage.setItem('nhk_pin_ok', '1');
+      showToast('✅ Đã bật khóa PIN');
+    } else if (!pin) {
+      localStorage.removeItem('nhk_pin');
+      sessionStorage.removeItem('nhk_pin_ok');
+      showToast('✅ Đã tắt khóa PIN');
+    } else {
+      showToast('PIN phải là 4 chữ số');
+    }
+  }
+
+  // ── Memory Card — Canvas → PNG (v2.0) ─────────────────────────────
+  function showMemoryCard() {
+    const user   = Auth.getUser();
+    const streak = user ? (user.streak || 0) : 0;
+    const entries = cachedEntries.length;
+    const theme  = localStorage.getItem('nhk_theme') || '';
+    const themeGrads = {
+      '':         ['#2563eb','#8b5cf6'],
+      lavender:   ['#7C3AED','#6366F1'],
+      rose:       ['#DB2777','#9333EA'],
+      emerald:    ['#059669','#0D9488'],
+      warm:       ['#B45309','#D97706'],
+      ocean:      ['#0891B2','#0D9488'],
+      midnight:   ['#4338CA','#6366F1'],
+    };
+    const [c1, c2] = themeGrads[theme] || themeGrads[''];
+    const mood = cachedEntries[0] ? MOOD_DATA[cachedEntries[0].mood_score] : null;
+    const quotes = [
+      '"Cảm xúc được gọi tên, tâm trí tìm thấy lối về."',
+      '"Mỗi trang nhật ký là một bước chữa lành."',
+      '"Hiểu mình hơn mỗi ngày — đó là dũng cảm."',
+    ];
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 900; canvas.height = 480;
+    const ctx = canvas.getContext('2d');
+
+    // Background
+    const grad = ctx.createLinearGradient(0, 0, 900, 480);
+    grad.addColorStop(0, c1); grad.addColorStop(1, c2);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.roundRect(0, 0, 900, 480, 24); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.beginPath(); ctx.roundRect(0, 0, 900, 480, 24); ctx.fill();
+
+    // Watermark circles
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.beginPath(); ctx.arc(780, 80, 120, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(820, 400, 80, 0, Math.PI * 2); ctx.fill();
+
+    // Header
+    ctx.fillStyle = 'rgba(255,255,255,0.96)';
+    ctx.font = 'bold 40px system-ui, -apple-system, sans-serif';
+    ctx.fillText('Soul Diary', 60, 90);
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '17px system-ui, sans-serif';
+    ctx.fillText('Nhật ký cảm xúc số', 60, 118);
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(60, 140); ctx.lineTo(840, 140); ctx.stroke();
+
+    // Stats
+    const stats = [
+      { val: streak + ' ngày', lbl: '🔥 Chuỗi streak', x: 60  },
+      { val: entries + ' trang', lbl: '📖 Nhật ký',     x: 320 },
+      { val: mood ? mood.emoji + ' ' + mood.label : '—', lbl: '😊 Tâm trạng gần nhất', x: 580 },
+    ];
+    stats.forEach(s => {
+      ctx.fillStyle = 'rgba(255,255,255,0.96)';
+      ctx.font = 'bold 38px system-ui, sans-serif';
+      ctx.fillText(s.val, s.x, 240);
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.font = '14px system-ui, sans-serif';
+      ctx.fillText(s.lbl, s.x, 266);
+    });
+
+    // Quote
+    ctx.fillStyle = 'rgba(255,255,255,0.72)';
+    ctx.font = 'italic 19px Georgia, "Times New Roman", serif';
+    ctx.fillText(quotes[Math.floor(Math.random() * quotes.length)], 60, 360);
+
+    // Date footer
+    const today = new Date().toLocaleDateString('vi-VN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.font = '13px system-ui, sans-serif';
+    ctx.fillText(today, 60, 438);
+
+    const a = document.createElement('a');
+    a.download = `soul-diary-${new Date().toISOString().split('T')[0]}.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+    showToast('✅ Đã tạo Memory Card!');
+  }
+
+  // ── Weekly Missions (v2.0) ──────────────────────────────────────────
+  async function initMissionsPage() {
+    const user   = Auth.getUser();
+    const streak = user ? (user.streak || 0) : 0;
+    const todayStr = new Date().toDateString();
+    const wroteTodayEntry = cachedEntries.some(e => new Date(e.created_at).toDateString() === todayStr);
+    const totalEntries = cachedEntries.length;
+
+    const missions = [
+      {
+        title: '📖 Viết nhật ký hôm nay',
+        desc:  'Ghi lại cảm xúc của bạn trong ngày hôm nay.',
+        done:  wroteTodayEntry,
+        action: "App.nav('diary')", actionLabel: 'Viết ngay',
+      },
+      {
+        title: '🔥 Duy trì chuỗi 7 ngày',
+        desc:  `Hiện tại bạn đang ở chuỗi ${streak} ngày. Tiếp tục để đạt mốc 7 ngày!`,
+        done:  streak >= 7,
+      },
+      {
+        title: '📚 Đọc 1 bài viết sức khoẻ tâm thần',
+        desc:  'Tìm đọc một bài viết bổ ích trong thư viện kiến thức.',
+        done:  false,
+        action: "App.nav('library')", actionLabel: 'Xem thư viện',
+      },
+      {
+        title: '🧘 Thực hiện bài tập thở',
+        desc:  'Dành 5 phút thực hành kỹ thuật thở 4-7-8 hoặc Box Breathing.',
+        done:  false,
+        action: "App.nav('exercises')", actionLabel: 'Bài tập thở',
+      },
+      {
+        title: '📝 Đạt 10 nhật ký tổng cộng',
+        desc:  `Bạn đã viết ${totalEntries} nhật ký. ${totalEntries >= 10 ? 'Xuất sắc!' : 'Tiếp tục nhé!'}`,
+        done:  totalEntries >= 10,
+      },
+    ];
+
+    const doneCount = missions.filter(m => m.done).length;
+    const pct = Math.round((doneCount / missions.length) * 100);
+    const el = document.getElementById('missions-list');
+    if (!el) return;
+
+    el.innerHTML = `
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-weight:700;color:var(--text)">Tiến độ tuần này</div>
+          <div style="font-weight:700;color:var(--primary);font-size:15px">${doneCount}/${missions.length}</div>
+        </div>
+        <div style="background:var(--border);border-radius:8px;height:10px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,var(--primary),var(--primary-dark));border-radius:8px;transition:width .6s ease"></div>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:8px">${pct}% hoàn thành</div>
+      </div>
+      ${missions.map(m => `
+        <div class="mission-card ${m.done ? 'done' : ''}">
+          <div class="mission-check">${m.done ? '✅' : '⬜'}</div>
+          <div class="mission-body">
+            <div class="mission-title">${m.title}</div>
+            <div class="mission-desc">${m.desc}</div>
+            ${m.action && !m.done ? `<button class="btn-sm" style="margin-top:8px" onclick="${m.action}">${m.actionLabel}</button>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    `;
+
+    await loadAIPatterns();
+  }
+
+  async function loadAIPatterns() {
+    const el = document.getElementById('ai-patterns-section');
+    if (!el) return;
+    if (!(window.FEATURES && window.FEATURES.ai_patterns)) {
+      el.innerHTML = '<div style="color:var(--text-hint);font-size:13px;padding:8px 0">Tính năng phân tích AI chưa được bật. Vào Admin để bật.</div>';
+      return;
+    }
+    try {
+      const data = await API.getDiaryPatterns();
+      if (!data || !data.total) {
+        el.innerHTML = '<div style="color:var(--text-hint);font-size:13px;padding:8px 0">Cần ít nhất 7 nhật ký để phân tích xu hướng.</div>';
+        return;
+      }
+      const days = ['CN','T2','T3','T4','T5','T6','T7'];
+      const maxM = Math.max(...(data.by_dow || []).map(d => parseFloat(d.avg_mood) || 0), 1);
+      el.innerHTML = `
+        <div class="card" style="margin-bottom:14px">
+          <div class="settings-section-title">📅 Tâm trạng theo ngày trong tuần</div>
+          <div style="display:flex;gap:5px;align-items:flex-end;height:84px;margin-top:14px">
+            ${(data.by_dow || []).map(d => {
+              const pct = d.avg_mood ? Math.round((parseFloat(d.avg_mood) / 10) * 80) : 4;
+              const isBest  = data.best_day  && d.day_of_week === data.best_day.day_of_week;
+              const isWorst = data.worst_day && d.day_of_week === data.worst_day.day_of_week;
+              return `<div style="flex:1;text-align:center">
+                <div style="background:${isBest?'#059669':isWorst?'#dc2626':'var(--primary)'};height:${pct}px;border-radius:4px 4px 0 0;min-height:4px;opacity:.85;transition:height .5s"></div>
+                <div style="font-size:10px;color:var(--text-muted);margin-top:4px">${days[d.day_of_week]}</div>
+              </div>`;
+            }).join('')}
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            ${data.best_day  ? `<span class="entry-tag" style="background:#dcfce7;color:#166534">😊 Tốt nhất: ${days[data.best_day.day_of_week]}</span>`  : ''}
+            ${data.worst_day ? `<span class="entry-tag" style="background:#fee2e2;color:#991b1b">😔 Khó nhất: ${days[data.worst_day.day_of_week]}</span>` : ''}
+            ${data.top_tags && data.top_tags[0] ? `<span class="entry-tag">🏷️ Tag thường gặp: ${escapeHtml(data.top_tags[0].tag)}</span>` : ''}
+          </div>
+        </div>
+        <div class="card">
+          <div class="settings-section-title">📈 Xu hướng 3 tháng qua</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+            ${(data.monthly || []).map(m => `
+              <div class="stat-card" style="min-width:90px;flex:1">
+                <div class="stat-val" style="font-size:20px">${m.avg_mood ? parseFloat(m.avg_mood).toFixed(1) : '—'}</div>
+                <div class="stat-lbl">${m.month}</div>
+                <div class="stat-lbl" style="font-size:11px">${m.entries} nhật ký</div>
+              </div>
+            `).join('')}
+          </div>
+          <div style="margin-top:12px;font-size:13px;color:var(--text-muted)">
+            Tổng: <strong>${data.total}</strong> nhật ký · Mood TB: <strong>${data.overall_avg ? parseFloat(data.overall_avg).toFixed(1) : '—'}</strong>/10
+          </div>
+        </div>
+      `;
+    } catch(e) {
+      el.innerHTML = '<div style="color:var(--text-hint);font-size:13px;padding:8px 0">Không thể tải dữ liệu phân tích.</div>';
+    }
+  }
+
+  // ── Thư gửi tương lai (v2.0) ───────────────────────────────────────
+  async function initFutureLetterPage() {
+    const dateEl = document.getElementById('fl-send-date');
+    if (dateEl) {
+      const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+      const iso = tomorrow.toISOString().split('T')[0];
+      dateEl.min = iso; dateEl.value = iso;
+    }
+    await loadFutureLetters();
+  }
+
+  async function loadFutureLetters() {
+    const el = document.getElementById('fl-list');
+    if (!el) return;
+    el.innerHTML = '<div class="loading-text">Đang tải...</div>';
+    try {
+      const data = await API.getLetters();
+      const letters = data.letters || [];
+      if (!letters.length) {
+        el.innerHTML = `<div class="empty-state" style="padding:40px 0;text-align:center">
+          <div style="font-size:48px;margin-bottom:12px">💌</div>
+          <div style="color:var(--text-muted)">Chưa có thư nào. Hãy viết thư đầu tiên cho tương lai!</div>
+        </div>`;
+        return;
+      }
+      el.innerHTML = letters.map(l => `
+        <div class="card" style="margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;color:var(--text);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(l.subject)}</div>
+              <div style="font-size:12px;color:var(--primary);font-weight:600;margin-bottom:8px">📅 Gửi vào: ${new Date(l.send_date).toLocaleDateString('vi-VN', {weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div>
+              <div style="font-size:13px;color:var(--text-muted);white-space:pre-wrap;line-height:1.6">${escapeHtml((l.preview||'').slice(0,180))}${(l.preview||'').length >= 180 ? '…' : ''}</div>
+            </div>
+            <button onclick="App.deleteFutureLetter(${l.id})" title="Xóa thư" style="background:none;border:none;color:var(--text-hint);font-size:18px;cursor:pointer;padding:4px;flex-shrink:0;line-height:1">🗑️</button>
+          </div>
+        </div>
+      `).join('');
+    } catch(e) {
+      el.innerHTML = '<div class="empty-state" style="padding:32px 0;text-align:center;color:var(--text-muted)">Không thể tải danh sách thư.</div>';
+    }
+  }
+
+  async function createFutureLetter() {
+    const subject  = (document.getElementById('fl-subject')?.value || '').trim();
+    const content  = (document.getElementById('fl-content')?.value  || '').trim();
+    const sendDate = document.getElementById('fl-send-date')?.value;
+    if (!subject || !content || !sendDate) { showToast('Vui lòng điền đầy đủ tiêu đề, nội dung và ngày gửi.'); return; }
+    try {
+      await API.createLetter({ subject, content, send_date: sendDate });
+      document.getElementById('fl-subject').value = '';
+      document.getElementById('fl-content').value  = '';
+      showToast('✅ Thư đã được lên lịch gửi!');
+      await loadFutureLetters();
+    } catch(e) { showToast('❌ ' + e.message); }
+  }
+
+  async function deleteFutureLetter(id) {
+    if (!confirm('Xóa thư này? Không thể khôi phục.')) return;
+    try { await API.deleteLetter(id); showToast('✅ Đã xóa thư.'); await loadFutureLetters(); }
+    catch(e) { showToast('❌ ' + e.message); }
+  }
+
+  // ── Xuất dữ liệu (v2.0) ─────────────────────────────────────────────
+  async function exportUserData() {
+    try {
+      showToast('⏳ Đang chuẩn bị dữ liệu...');
+      const data = await API.exportData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = `soul-diary-export-${new Date().toISOString().split('T')[0]}.json`;
+      a.click(); URL.revokeObjectURL(url);
+      showToast('✅ Đã xuất dữ liệu thành công!');
+    } catch(e) { showToast('❌ ' + e.message); }
+  }
+
+  // ── Offline Detection (v2.0) ──────────────────────────────────────
+  function initOfflineDetection() {
+    function update() {
+      const banner = document.getElementById('offline-banner');
+      if (banner) banner.style.display = navigator.onLine ? 'none' : 'flex';
+    }
+    window.addEventListener('online',  update);
+    window.addEventListener('offline', update);
+    update();
+  }
+
   // ── Init ─────────────────────────────────────────────────────────────
   async function init() {
     applyDarkMode(localStorage.getItem('nhk_dark') === '1');
@@ -3026,8 +3402,20 @@ const App = (() => {
         if (el) el.style.display = '';
       }
     });
+    // v2.0 feature-gated nav items
+    const v20 = { future_letter:'nav-future-letter', weekly_missions:'nav-missions' };
+    Object.entries(v20).forEach(([flag, navId]) => {
+      if (window.FEATURES && window.FEATURES[flag]) {
+        const el = document.getElementById(navId);
+        if (el) el.style.display = '';
+      }
+    });
+    // v2.0 init
+    initOfflineDetection();
+    _checkPinRequired();
     nav('dashboard');
   }
 
-  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,applyTheme,toggleThemePicker,loadMoreDiary};
+  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,applyTheme,toggleThemePicker,loadMoreDiary,
+    pinInput,pinDelete,setPinLock,showMemoryCard,createFutureLetter,deleteFutureLetter,exportUserData};
 })();

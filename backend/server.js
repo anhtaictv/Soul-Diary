@@ -81,6 +81,8 @@ app.use('/api/chat',       apiLimiter, require('./routes/chat'));
 app.use('/api/study',      apiLimiter, require('./routes/study'));
 app.use('/api/courses',    apiLimiter, require('./routes/courses'));
 app.use('/api/goals',      apiLimiter, require('./routes/goals'));
+app.use('/api/letters',    apiLimiter, require('./routes/letters'));
+app.use('/api/user',       apiLimiter, require('./routes/user'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -273,6 +275,57 @@ cron.schedule('0 1 * * *', async () => {
     if (sentCount > 0) console.log(`💙 Đã gửi cảnh báo tâm trạng tiêu cực cho ${sentCount} người dùng`);
   } catch (err) {
     console.error('Low mood cron error:', err.message);
+  }
+});
+
+// ── Cron: Gửi thư tương lai đến hạn (8h sáng giờ VN = 1h UTC) ───────────
+cron.schedule('0 1 * * *', async () => {
+  try {
+    const { createTransporter } = require('./utils/mailer');
+    const transporter = createTransporter();
+    const db = await getPool();
+    const result = await db.request().query(`
+      SELECT fl.id, fl.title, fl.content, fl.send_date,
+             u.email, u.fullname
+      FROM FutureLetters fl
+      JOIN Users u ON u.id = fl.user_id
+      WHERE fl.sent = 0
+        AND fl.send_date <= CAST(DATEADD(HOUR,7,GETDATE()) AS DATE)
+    `);
+    for (const letter of result.recordset) {
+      if (transporter) {
+        try {
+          const from = process.env.SMTP_FROM || `Soul Diary <${process.env.SMTP_USER}>`;
+          await transporter.sendMail({
+            from, to: letter.email,
+            subject: `💌 Thư từ quá khứ gửi đến bạn: "${letter.title}"`,
+            html: `
+              <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#faf5ff;border-radius:16px">
+                <h2 style="color:#7c3aed;margin-bottom:8px">💌 ${letter.title}</h2>
+                <p style="color:#6b7280;font-size:13px;margin-bottom:24px">
+                  Bạn đã viết lá thư này vào ngày ${new Date(letter.send_date).toLocaleDateString('vi-VN')}
+                </p>
+                <div style="background:#fff;border-radius:12px;padding:24px;border-left:4px solid #7c3aed;white-space:pre-wrap;line-height:1.8;color:#1e293b">
+                  ${letter.content}
+                </div>
+                <p style="color:#94a3b8;font-size:12px;margin-top:24px;text-align:center">
+                  Gửi từ Soul Diary — Nhật ký cảm xúc của bạn 🌱
+                </p>
+              </div>
+            `,
+          });
+        } catch (mailErr) {
+          console.error('[letter-cron] Lỗi gửi email:', mailErr.message);
+        }
+      }
+      await db.request()
+        .input('id', sql.Int, letter.id)
+        .query('UPDATE FutureLetters SET sent = 1 WHERE id = @id');
+    }
+    if (result.recordset.length > 0)
+      console.log(`💌 Đã gửi ${result.recordset.length} thư tương lai`);
+  } catch (err) {
+    console.error('[letter-cron] Lỗi:', err.message);
   }
 });
 

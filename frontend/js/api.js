@@ -75,6 +75,7 @@ const API = (() => {
 
     getDiary:         (page = 1, limit = 20) => request(`/diary?page=${page}&limit=${limit}`),
     searchDiary:      (q, from, to)          => request(`/diary/search?q=${encodeURIComponent(q)}${from?'&from='+from:''}${to?'&to='+to:''}`),
+    getDiaryPatterns: ()                     => request('/diary/patterns'),
     getStats:         (days = 14)            => request(`/diary/stats?days=${days}`),
     getMoodCalendar:  (month)                => request(`/diary/calendar${month ? '?month='+month : ''}`),
     getHeatmap:       (year)                 => request(`/diary/heatmap?year=${year || new Date().getFullYear()}`),
@@ -170,5 +171,13 @@ const API = (() => {
     // v1.8 — Tổng kết Năm & Giấc ngủ
     getYearReview: (year) => request(`/diary/year-review?year=${year || new Date().getFullYear()}`),
     getSleepStats: ()     => request('/diary/sleep-stats'),
+
+    // v2.0 — Thư gửi tương lai
+    getLetters:    ()     => request('/letters'),
+    createLetter:  (body) => request('/letters',      { method: 'POST',   body }),
+    deleteLetter:  (id)   => request(`/letters/${id}`, { method: 'DELETE' }),
+
+    // v2.0 — Xuất dữ liệu
+    exportData: () => request('/user/export'),
   };
 })();
