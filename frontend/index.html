@@ -164,6 +164,20 @@
           <button class="nav-item" data-page="admin" id="nav-admin" style="display:none"><span class="nav-icon">🛠️</span> Quản trị</button>
         </nav>
         <div class="sidebar-footer">
+          <!-- Theme Picker Popup -->
+          <div id="theme-picker-popup" class="theme-picker-popup" style="display:none">
+            <div class="theme-picker-title">Chọn giao diện màu</div>
+            <div class="theme-swatches">
+              <button class="theme-swatch" data-theme=""         title="Xanh Dương (mặc định)" onclick="App.applyTheme('')"        style="background:linear-gradient(135deg,#2563eb,#8b5cf6)"></button>
+              <button class="theme-swatch" data-theme="lavender" title="Tím Oải Hương"          onclick="App.applyTheme('lavender')" style="background:linear-gradient(135deg,#7C3AED,#6366F1)"></button>
+              <button class="theme-swatch" data-theme="rose"     title="Hồng Đào"               onclick="App.applyTheme('rose')"     style="background:linear-gradient(135deg,#DB2777,#9333EA)"></button>
+              <button class="theme-swatch" data-theme="emerald"  title="Xanh Lá Rừng"           onclick="App.applyTheme('emerald')"  style="background:linear-gradient(135deg,#059669,#0D9488)"></button>
+              <button class="theme-swatch" data-theme="warm"     title="Nâu Ấm Nhật Ký"         onclick="App.applyTheme('warm')"     style="background:linear-gradient(135deg,#B45309,#D97706)"></button>
+              <button class="theme-swatch" data-theme="ocean"    title="Xanh Biển Sâu"           onclick="App.applyTheme('ocean')"    style="background:linear-gradient(135deg,#0891B2,#0D9488)"></button>
+              <button class="theme-swatch" data-theme="midnight" title="Đêm Tím"                 onclick="App.applyTheme('midnight')" style="background:linear-gradient(135deg,#1E1B4B,#6366F1)"></button>
+            </div>
+            <div class="theme-name-label" id="theme-name-label">Xanh Dương</div>
+          </div>
           <div class="user-badge">
             <div class="user-avatar" id="user-avatar">SD</div>
             <div>
@@ -171,9 +185,10 @@
               <div class="user-streak" id="streak-display">🔥 0 ngày</div>
             </div>
           </div>
-          <div style="display:flex;gap:8px;margin-bottom:8px">
+          <div style="display:flex;gap:6px;margin-bottom:8px">
             <button class="btn-logout" style="flex:1" onclick="Auth.logout()">⬅ Đăng xuất</button>
-            <button id="dark-mode-toggle" class="btn-logout" style="width:40px;flex-shrink:0;padding:8px;font-size:16px" onclick="App.toggleDarkMode()" title="Chế độ tối/sáng">🌙</button>
+            <button id="dark-mode-toggle" class="btn-logout" style="width:36px;flex-shrink:0;padding:8px;font-size:15px" onclick="App.toggleDarkMode()" title="Chế độ tối/sáng">🌙</button>
+            <button id="theme-picker-btn" class="btn-logout" style="width:36px;flex-shrink:0;padding:8px;font-size:15px" onclick="App.toggleThemePicker()" title="Đổi màu giao diện">🎨</button>
           </div>
         </div>
       </aside>

@@ -70,7 +70,7 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#f1f5f9;color:var(--text
 .nav-item.active{background:linear-gradient(135deg,rgba(37,99,235,.4),rgba(139,92,246,.3));color:#e0e7ff}
 .nav-icon{font-size:18px;width:20px;text-align:center}
 .nav-badge-dot{width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;margin-left:auto}
-.sidebar-footer{padding:14px;border-top:1px solid rgba(255,255,255,.08)}
+.sidebar-footer{padding:14px;border-top:1px solid rgba(255,255,255,.08);position:relative}
 .user-badge{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .user-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#f97316,#ec4899);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0}
 .user-name{font-size:12px;color:#c7d2fe;font-weight:600}
@@ -839,3 +839,128 @@ body.dark-mode .auth-slogan { color:#94a3b8; }
 .search-highlight { background:#fef9c3; color:#713f12; border-radius:2px; padding:0 2px; }
 body.dark-mode .search-highlight { background:#422006; color:#fcd34d; }
 body.dark-mode .diary-search-input { background:#2d3748; border-color:#3d4f63; }
+
+/* ══════════════════════════════════════════════════════════════
+   THEME SYSTEM — v1.9
+   6 themes controlled by body.theme-* class.
+   Each theme overrides --primary, --sidebar-bg, and optional
+   surface/bg tokens. Dark mode composes on top of themes.
+══════════════════════════════════════════════════════════════ */
+
+/* ── 1. Tím Oải Hương (Lavender) ─────────────────────────── */
+body.theme-lavender {
+  --primary:#7C3AED; --primary-light:#F5F3FF; --primary-dark:#6D28D9;
+  --sidebar-bg:#2D1B69;
+  --shadow-md:0 4px 16px rgba(124,58,237,.15);
+}
+body.theme-lavender .nav-item.active{background:linear-gradient(135deg,rgba(124,58,237,.42),rgba(99,102,241,.28))}
+body.theme-lavender .text-input:focus,
+body.theme-lavender textarea:focus{box-shadow:0 0 0 3px rgba(124,58,237,.12)}
+body.theme-lavender .diary-search-input:focus{box-shadow:0 0 0 3px rgba(124,58,237,.12)}
+
+/* ── 2. Hồng Đào (Rose) ──────────────────────────────────── */
+body.theme-rose {
+  --primary:#DB2777; --primary-light:#FDF2F8; --primary-dark:#BE185D;
+  --sidebar-bg:#500724;
+  --shadow-md:0 4px 16px rgba(219,39,119,.15);
+}
+body.theme-rose .nav-item.active{background:linear-gradient(135deg,rgba(219,39,119,.42),rgba(244,114,182,.28))}
+body.theme-rose .text-input:focus,
+body.theme-rose textarea:focus{box-shadow:0 0 0 3px rgba(219,39,119,.12)}
+body.theme-rose .diary-search-input:focus{box-shadow:0 0 0 3px rgba(219,39,119,.12)}
+body.theme-rose .btn-primary{background:linear-gradient(135deg,#DB2777,#9333EA)}
+body.theme-rose .btn-auth{background:linear-gradient(135deg,#DB2777,#9333EA)}
+
+/* ── 3. Xanh Lá Rừng (Emerald) ──────────────────────────── */
+body.theme-emerald {
+  --primary:#059669; --primary-light:#F0FDF4; --primary-dark:#047857;
+  --sidebar-bg:#064E3B;
+  --shadow-md:0 4px 16px rgba(5,150,105,.15);
+}
+body.theme-emerald .nav-item.active{background:linear-gradient(135deg,rgba(5,150,105,.42),rgba(16,185,129,.28))}
+body.theme-emerald .text-input:focus,
+body.theme-emerald textarea:focus{box-shadow:0 0 0 3px rgba(5,150,105,.12)}
+body.theme-emerald .diary-search-input:focus{box-shadow:0 0 0 3px rgba(5,150,105,.12)}
+body.theme-emerald .btn-primary{background:linear-gradient(135deg,#059669,#0D9488)}
+body.theme-emerald .btn-auth{background:linear-gradient(135deg,#059669,#0D9488)}
+
+/* ── 4. Nâu Ấm Nhật Ký (Warm) ───────────────────────────── */
+body.theme-warm {
+  --primary:#B45309; --primary-light:#FFFBEB; --primary-dark:#92400E;
+  --sidebar-bg:#451A03;
+  --bg:#FFFDF8; --surface:#FEF9EC;
+  --shadow-md:0 4px 16px rgba(180,83,9,.15);
+}
+body.theme-warm .nav-item.active{background:linear-gradient(135deg,rgba(180,83,9,.45),rgba(217,119,6,.28))}
+body.theme-warm .text-input:focus,
+body.theme-warm textarea:focus{box-shadow:0 0 0 3px rgba(180,83,9,.12)}
+body.theme-warm .diary-search-input:focus{box-shadow:0 0 0 3px rgba(180,83,9,.12)}
+body.theme-warm .btn-primary{background:linear-gradient(135deg,#B45309,#D97706)}
+body.theme-warm .btn-auth{background:linear-gradient(135deg,#B45309,#D97706)}
+
+/* ── 5. Xanh Biển Sâu (Ocean) ───────────────────────────── */
+body.theme-ocean {
+  --primary:#0891B2; --primary-light:#ECFEFF; --primary-dark:#0E7490;
+  --sidebar-bg:#164E63;
+  --shadow-md:0 4px 16px rgba(8,145,178,.15);
+}
+body.theme-ocean .nav-item.active{background:linear-gradient(135deg,rgba(8,145,178,.42),rgba(6,182,212,.28))}
+body.theme-ocean .text-input:focus,
+body.theme-ocean textarea:focus{box-shadow:0 0 0 3px rgba(8,145,178,.12)}
+body.theme-ocean .diary-search-input:focus{box-shadow:0 0 0 3px rgba(8,145,178,.12)}
+body.theme-ocean .btn-primary{background:linear-gradient(135deg,#0891B2,#0D9488)}
+body.theme-ocean .btn-auth{background:linear-gradient(135deg,#0891B2,#0D9488)}
+
+/* ── 6. Đêm Tím (Midnight) — always-dark theme ──────────── */
+body.theme-midnight {
+  --primary:#818CF8; --primary-light:#EEF2FF; --primary-dark:#6366F1;
+  --sidebar-bg:#0F0F23;
+  --bg:#1A1A2E; --surface:#16213E;
+  --text:#E2E8F0; --text-muted:#94A3B8; --text-hint:#64748B;
+  --border:#2D3748;
+  --shadow-md:0 4px 16px rgba(99,102,241,.22);
+}
+body.theme-midnight{background:#0F0F23}
+body.theme-midnight .app{background:#1A1A2E}
+body.theme-midnight .card,body.theme-midnight .card-sm{background:#1E2537;border-color:#2D3748}
+body.theme-midnight .stat-card{background:#1E2537;border-color:#2D3748}
+body.theme-midnight .modal{background:#1E2537}
+body.theme-midnight .text-input,body.theme-midnight textarea{background:#2D3748;color:#E2E8F0;border-color:#3D4F63}
+body.theme-midnight .diary-search-input{background:#2D3748;border-color:#3D4F63}
+body.theme-midnight .tag{background:#2D3748;color:#A5B4FC;border-color:#3D4F63}
+body.theme-midnight .tag.sel{background:var(--primary);color:#fff}
+body.theme-midnight .entry-item{background:#1E2537;border-color:#2D3748}
+body.theme-midnight .entry-item:hover{border-color:var(--primary);background:#EEF2FF10}
+body.theme-midnight .modal-overlay{background:rgba(0,0,0,.75)}
+body.theme-midnight .auth-bg{background:linear-gradient(150deg,#0F0F23,#1A1A2E,#0D0D1A)}
+body.theme-midnight .auth-card{background:rgba(30,37,55,.96)}
+body.theme-midnight .auth-slogan{color:#94A3B8}
+body.theme-midnight .nav-item.active{background:linear-gradient(135deg,rgba(99,102,241,.52),rgba(129,140,248,.32))}
+body.theme-midnight .text-input:focus,
+body.theme-midnight textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(99,102,241,.16)}
+body.theme-midnight .diary-search-input:focus{box-shadow:0 0 0 3px rgba(99,102,241,.16)}
+body.theme-midnight .badge-item{background:#1E2537;border-color:#2D3748}
+body.theme-midnight .skeleton{background:linear-gradient(90deg,#2D3748 25%,#3D4F63 50%,#2D3748 75%);background-size:200% 100%}
+
+/* ── Theme Picker Widget ─────────────────────────────────── */
+.theme-picker-popup{
+  position:absolute;bottom:calc(100% + 8px);left:0;right:0;
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:var(--radius-lg);padding:14px;
+  box-shadow:0 -4px 24px rgba(0,0,0,.18);
+  z-index:200;
+}
+body.theme-midnight .theme-picker-popup{background:#1E2537;border-color:#2D3748}
+.theme-picker-title{font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
+.theme-swatches{display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between;margin-bottom:10px}
+.theme-swatch{
+  width:34px;height:34px;border-radius:50%;border:2.5px solid transparent;
+  cursor:pointer;transition:transform .15s,border-color .15s,box-shadow .15s;
+  padding:0;flex-shrink:0;
+}
+.theme-swatch:hover{transform:scale(1.18)}
+.theme-swatch.active{
+  border-color:#fff;
+  box-shadow:0 0 0 3px var(--primary);
+}
+.theme-name-label{font-size:11px;font-weight:600;color:var(--text-muted);text-align:center;min-height:16px}
