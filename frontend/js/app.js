@@ -8,6 +8,10 @@ const App = (() => {
   let breathCycles  = 0;
   let boxBreathTimeout = null;
   let boxBreathCycles  = 0;
+  let pmrInterval   = null; let pmrGroupIdx = 0; let pmrPhaseIdx = 0; let pmrCountdown = 0;
+  let scanInterval  = null; let scanZoneIdx = 0;  let scanCountdown = 0;
+  let groundingStep = 0;    let groundingChecked = [];
+  let gratStep      = 0;
   let cachedEntries = [];
   let isRecording   = false;
   let mediaRecorder = null;
@@ -1459,7 +1463,8 @@ const App = (() => {
 
   // ── Exercises ────────────────────────────────────────────────────────
   async function renderExercises() {
-    document.getElementById('exercises-grid').innerHTML=EXERCISES.map(ex=>`<div class="exercise-card"><div class="ex-icon" style="background:${ex.bg}">${ex.icon}</div><div class="ex-title">${ex.title}</div><span class="ex-duration" style="background:${ex.bg};color:var(--text-muted)">⏱ ${ex.duration}</span><div class="ex-desc">${ex.desc}</div><ol class="ex-steps">${ex.steps.map(s=>`<li class="ex-step">${s}</li>`).join('')}</ol>${ex.action==='breath'?`<button class="btn-outline" style="margin-top:14px;font-size:12px" onclick="App.openBreathModal()">▶ Bắt đầu có hướng dẫn</button>`:''}${ex.action==='box_breath'?`<button class="btn-outline" style="margin-top:14px;font-size:12px" onclick="App.openBoxBreathModal()">▶ Bắt đầu có hướng dẫn</button>`:''}${ex.action==='unsent_letter'?`<button class="btn-outline" style="margin-top:14px;font-size:12px" onclick="App.openLetterModal()">✍️ Viết thư</button>`:''}${ex.action==='evidence_testing'?`<button class="btn-outline" style="margin-top:14px;font-size:12px" onclick="App.openEvidenceModal()">⚖️ Bắt đầu</button>`:''}</div>`).join('');
+    const exBtn = (action,label,fn) => action?`<button class="btn-outline" style="margin-top:14px;font-size:12px" onclick="${fn}">${label}</button>`:'';
+    document.getElementById('exercises-grid').innerHTML=EXERCISES.map(ex=>`<div class="exercise-card"><div class="ex-icon" style="background:${ex.bg}">${ex.icon}</div><div class="ex-title">${ex.title}</div><span class="ex-duration" style="background:${ex.bg};color:var(--text-muted)">⏱ ${ex.duration}</span><div class="ex-desc">${ex.desc}</div><ol class="ex-steps">${ex.steps.map(s=>`<li class="ex-step">${s}</li>`).join('')}</ol>${exBtn(ex.action==='breath','▶ Bắt đầu có hướng dẫn','App.openBreathModal()')}${exBtn(ex.action==='box_breath','▶ Bắt đầu có hướng dẫn','App.openBoxBreathModal()')}${exBtn(ex.action==='unsent_letter','✍️ Viết thư','App.openLetterModal()')}${exBtn(ex.action==='evidence_testing','⚖️ Bắt đầu','App.openEvidenceModal()')}${exBtn(ex.action==='pmr','💪 Bắt đầu có hướng dẫn','App.openPMRModal()')}${exBtn(ex.action==='bodyscan','🌊 Bắt đầu có hướng dẫn','App.openBodyScanModal()')}${exBtn(ex.action==='grounding','🧘 Bắt đầu','App.openGroundingModal()')}${exBtn(ex.action==='gratitude','🙏 Mở nhật ký','App.openGratitudeModal()')}</div>`).join('');
 
     try {
       const res = await API.getArticles('', '', 'exercise');
@@ -1927,6 +1932,212 @@ const App = (() => {
       }
     },4000);
   }
+
+  // ── PMR Modal (Thư giãn cơ tiến triển) ──────────────────────────────
+  const PMR_ZONES = [
+    { name:'Bàn chân',       svgClass:'zone-feet',      tip:'Co chặt các ngón chân và bàn chân' },
+    { name:'Bắp chân',       svgClass:'zone-calves',    tip:'Co bắp chân lên, nhón gót cao' },
+    { name:'Đùi',            svgClass:'zone-thighs',    tip:'Ép chặt hai đùi vào nhau' },
+    { name:'Ngực & Bụng',   svgClass:'zone-chest',     tip:'Hóp bụng, ép căng cơ ngực' },
+    { name:'Tay & Cánh tay',svgClass:'zone-arms',      tip:'Nắm chặt tay, co cứng cánh tay' },
+    { name:'Vai & Cổ',      svgClass:'zone-shoulders', tip:'Nhún vai lên tai, ép chặt cổ' },
+    { name:'Mặt',           svgClass:'zone-face',      tip:'Nhắm chặt mắt, nhăn trán và mặt' },
+  ];
+  const BODY_SCAN_ZONES = [
+    { name:'Bàn chân & Ngón chân', svgClass:'zone-feet',      prompt:'Chú ý mọi cảm giác ở ngón chân và bàn chân — ấm, lạnh, tê, hay ngứa ran.' },
+    { name:'Bắp chân & Mắt cá',   svgClass:'zone-calves',    prompt:'Di chuyển sự chú ý lên bắp chân và mắt cá. Cảm nhận trọng lượng của chân.' },
+    { name:'Đùi & Đầu gối',        svgClass:'zone-thighs',   prompt:'Chú ý vùng đùi và đầu gối. Thả lỏng mọi căng cứng bạn nhận ra.' },
+    { name:'Bụng & Ngực',          svgClass:'zone-chest',    prompt:'Theo dõi nhịp thở. Bụng phồng lên khi hít, xẹp xuống khi thở. Cảm nhận tim đập.' },
+    { name:'Tay & Cánh tay',       svgClass:'zone-arms',     prompt:'Chú ý bàn tay, cẳng tay, cánh tay. Thả lỏng ngón tay.' },
+    { name:'Vai & Cổ',             svgClass:'zone-shoulders',prompt:'Cảm nhận vai và cổ — nơi thường chứa nhiều căng thẳng nhất. Thả lỏng từ từ.' },
+    { name:'Mặt & Đầu',            svgClass:'zone-face',     prompt:'Thả lỏng hàm, lưỡi, quanh mắt, trán. Cho phép mặt hoàn toàn thư giãn.' },
+  ];
+  const GROUNDING_STEPS = [
+    { n:5, sense:'Nhìn', icon:'👁️', hint:'Nhìn xung quanh và đặt tên 5 vật thể bạn thấy ngay lúc này.', count:5 },
+    { n:4, sense:'Chạm', icon:'✋', hint:'Chạm vào 4 vật thể khác nhau. Chú ý kết cấu, nhiệt độ.', count:4 },
+    { n:3, sense:'Nghe', icon:'👂', hint:'Lắng nghe và đặt tên 3 âm thanh xung quanh bạn.', count:3 },
+    { n:2, sense:'Ngửi', icon:'👃', hint:'Ngửi và nhận biết 2 mùi hương bạn cảm nhận được.', count:2 },
+    { n:1, sense:'Nếm',  icon:'👅', hint:'Chú ý 1 hương vị trong miệng bạn ngay lúc này.', count:1 },
+  ];
+  const GRATITUDE_PROMPTS = [
+    { q:'Hôm nay, điều gì khiến bạn cảm thấy biết ơn?', hint:'Có thể là bất cứ điều gì — một bữa ăn ngon, một khoảnh khắc nhỏ, hay ai đó đã giúp bạn.' },
+    { q:'Tại sao điều đó có ý nghĩa với bạn?',           hint:'Hãy đi sâu hơn — điều đó chạm đến nhu cầu hoặc giá trị nào của bạn?' },
+    { q:'Nếu không có điều đó, cuộc sống sẽ thế nào?',  hint:'Tưởng tượng ngược lại để cảm nhận sâu hơn về sự biết ơn.' },
+  ];
+
+  function _updatePMRSvg(svgId, zones, activeIdx) {
+    const svg = document.getElementById(svgId); if (!svg) return;
+    zones.forEach((z, i) => {
+      const el = svg.querySelector('.' + z.svgClass);
+      if (!el) return;
+      el.classList.remove('bz-active', 'bz-done');
+      if (i < activeIdx) el.classList.add('bz-done');
+      else if (i === activeIdx) el.classList.add('bz-active');
+    });
+  }
+  function _clearPMRSvg(svgId) {
+    const svg = document.getElementById(svgId); if (!svg) return;
+    svg.classList.remove('pmr-tense','pmr-relax','bodyscan-active');
+    svg.querySelectorAll('.body-zone').forEach(g => g.classList.remove('bz-active','bz-done'));
+  }
+
+  function openPMRModal()  { document.getElementById('pmr-modal').classList.add('open'); }
+  function closePMRModal() {
+    clearInterval(pmrInterval); pmrInterval=null; pmrGroupIdx=0; pmrPhaseIdx=0;
+    document.getElementById('pmr-modal').classList.remove('open');
+    _clearPMRSvg('pmr-svg');
+    document.getElementById('pmr-phase-label').className='pmr-phase-label';
+    document.getElementById('pmr-phase-label').textContent='Sẵn sàng';
+    document.getElementById('pmr-countdown').textContent='—';
+    document.getElementById('pmr-zone-name').textContent='—';
+    document.getElementById('pmr-progress').textContent='Nhấn bắt đầu để khởi động';
+    document.getElementById('pmr-start-btn').textContent='▶ Bắt đầu';
+  }
+  function startPMR() {
+    const btn=document.getElementById('pmr-start-btn');
+    if(pmrInterval){clearInterval(pmrInterval);pmrInterval=null;btn.textContent='▶ Bắt đầu';return;}
+    btn.textContent='⏸ Dừng'; pmrGroupIdx=0; pmrPhaseIdx=0; _clearPMRSvg('pmr-svg'); runPMRPhase();
+  }
+  function runPMRPhase() {
+    const grp=PMR_ZONES[pmrGroupIdx]; if(!grp){finishPMR();return;}
+    const isTense=pmrPhaseIdx===0; const dur=isTense?5:15;
+    const svg=document.getElementById('pmr-svg'); if(!svg)return;
+    _updatePMRSvg('pmr-svg',PMR_ZONES,pmrGroupIdx);
+    svg.classList.remove('pmr-tense','pmr-relax');
+    svg.classList.add(isTense?'pmr-tense':'pmr-relax');
+    document.getElementById('pmr-zone-name').textContent=isTense?grp.tip:grp.name+' — thả lỏng hoàn toàn';
+    const lbl=document.getElementById('pmr-phase-label');
+    lbl.textContent=isTense?'🔴 CO CƠ':'🟢 THẢ LỎNG'; lbl.className='pmr-phase-label '+(isTense?'tense':'relax');
+    document.getElementById('pmr-progress').textContent=`Nhóm cơ ${pmrGroupIdx+1} / ${PMR_ZONES.length}`;
+    pmrCountdown=dur; document.getElementById('pmr-countdown').textContent=pmrCountdown;
+    clearInterval(pmrInterval);
+    pmrInterval=setInterval(()=>{
+      pmrCountdown--; const cd=document.getElementById('pmr-countdown'); if(cd)cd.textContent=pmrCountdown;
+      if(pmrCountdown<=0){
+        clearInterval(pmrInterval); pmrInterval=null;
+        pmrPhaseIdx++; if(pmrPhaseIdx>=2){pmrPhaseIdx=0;pmrGroupIdx++;} runPMRPhase();
+      }
+    },1000);
+  }
+  function finishPMR() {
+    clearInterval(pmrInterval); pmrInterval=null;
+    const svg=document.getElementById('pmr-svg');
+    if(svg){svg.classList.remove('pmr-tense','pmr-relax');svg.querySelectorAll('.body-zone').forEach(g=>g.classList.add('bz-done'));}
+    document.getElementById('pmr-phase-label').textContent='✅ Hoàn thành!'; document.getElementById('pmr-phase-label').className='pmr-phase-label';
+    document.getElementById('pmr-countdown').textContent='🎉';
+    document.getElementById('pmr-zone-name').textContent='Toàn bộ cơ thể đã được thư giãn';
+    document.getElementById('pmr-progress').textContent=`${PMR_ZONES.length}/${PMR_ZONES.length} nhóm cơ hoàn thành`;
+    document.getElementById('pmr-start-btn').textContent='▶ Bắt đầu lại';
+  }
+
+  // ── Body Scan Modal ───────────────────────────────────────────────────
+  function openBodyScanModal()  { document.getElementById('bodyscan-modal').classList.add('open'); }
+  function closeBodyScanModal() {
+    clearInterval(scanInterval); scanInterval=null; scanZoneIdx=0;
+    document.getElementById('bodyscan-modal').classList.remove('open');
+    _clearPMRSvg('bodyscan-svg');
+    document.getElementById('scan-zone-name').textContent='—';
+    document.getElementById('scan-prompt').textContent='Nhấn bắt đầu để bắt đầu quét cơ thể';
+    document.getElementById('scan-countdown').textContent='—';
+    document.getElementById('scan-progress').textContent='Nhấn bắt đầu để khởi động';
+    document.getElementById('scan-start-btn').textContent='▶ Bắt đầu';
+  }
+  function startBodyScan() {
+    const btn=document.getElementById('scan-start-btn');
+    if(scanInterval){clearInterval(scanInterval);scanInterval=null;btn.textContent='▶ Bắt đầu';return;}
+    btn.textContent='⏸ Dừng'; scanZoneIdx=0; _clearPMRSvg('bodyscan-svg'); runScanZone();
+  }
+  function runScanZone() {
+    const zone=BODY_SCAN_ZONES[scanZoneIdx]; if(!zone){finishBodyScan();return;}
+    const svg=document.getElementById('bodyscan-svg'); if(!svg)return;
+    _updatePMRSvg('bodyscan-svg',BODY_SCAN_ZONES,scanZoneIdx);
+    svg.classList.add('bodyscan-active');
+    document.getElementById('scan-zone-name').textContent=zone.name;
+    document.getElementById('scan-prompt').textContent=zone.prompt;
+    document.getElementById('scan-progress').textContent=`Vùng ${scanZoneIdx+1} / ${BODY_SCAN_ZONES.length}`;
+    scanCountdown=30; document.getElementById('scan-countdown').textContent=scanCountdown;
+    clearInterval(scanInterval);
+    scanInterval=setInterval(()=>{
+      scanCountdown--; const cd=document.getElementById('scan-countdown'); if(cd)cd.textContent=scanCountdown;
+      if(scanCountdown<=0){clearInterval(scanInterval);scanInterval=null;scanZoneIdx++;runScanZone();}
+    },1000);
+  }
+  function finishBodyScan() {
+    clearInterval(scanInterval); scanInterval=null;
+    const svg=document.getElementById('bodyscan-svg');
+    if(svg){svg.classList.remove('bodyscan-active');svg.querySelectorAll('.body-zone').forEach(g=>g.classList.add('bz-done'));}
+    document.getElementById('scan-zone-name').textContent='Hoàn thành quét cơ thể';
+    document.getElementById('scan-prompt').textContent='Nằm yên thêm vài giây để cảm nhận sự thư giãn trải khắp cơ thể bạn.';
+    document.getElementById('scan-countdown').textContent='🌟';
+    document.getElementById('scan-progress').textContent=`${BODY_SCAN_ZONES.length}/${BODY_SCAN_ZONES.length} vùng hoàn thành`;
+    document.getElementById('scan-start-btn').textContent='▶ Bắt đầu lại';
+  }
+
+  // ── Grounding 5-4-3-2-1 Modal ────────────────────────────────────────
+  function openGroundingModal()  { groundingStep=0; _renderGroundingStep(false); document.getElementById('grounding-modal').classList.add('open'); }
+  function closeGroundingModal() { document.getElementById('grounding-modal').classList.remove('open'); groundingStep=0; }
+  function _renderGroundingStep(started) {
+    const step=GROUNDING_STEPS[groundingStep]; if(!step)return;
+    groundingChecked=new Array(step.count).fill(false);
+    // force re-animation by cloning the num element
+    const numEl=document.getElementById('grounding-num');
+    if(numEl){numEl.textContent=step.n; numEl.style.animation='none'; void numEl.offsetWidth; numEl.style.animation='';}
+    document.getElementById('grounding-icon').textContent=step.icon;
+    document.getElementById('grounding-sense').textContent=step.sense;
+    document.getElementById('grounding-hint').textContent=started?step.hint:'Nhấn bắt đầu để khởi động bài tập chánh niệm';
+    const items=document.getElementById('grounding-items');
+    items.innerHTML=started?Array.from({length:step.count},(_,i)=>
+      `<div class="grounding-item" id="gi-${i}" onclick="App.toggleGroundingItem(${i})"><span class="gi-check" id="gic-${i}">○</span><span class="gi-text">Vật thể / Cảm giác ${i+1}</span></div>`
+    ).join(''):'';
+    document.getElementById('grounding-next-btn').style.display=started?'inline-block':'none';
+    document.getElementById('grounding-start-btn').style.display=started?'none':'inline-block';
+    document.getElementById('grounding-start-btn').textContent='▶ Bắt đầu';
+  }
+  function startGrounding() { _renderGroundingStep(true); }
+  function toggleGroundingItem(i) {
+    groundingChecked[i]=!groundingChecked[i];
+    const el=document.getElementById('gi-'+i); if(!el)return;
+    el.classList.toggle('checked',groundingChecked[i]);
+    document.getElementById('gic-'+i).textContent=groundingChecked[i]?'✓':'○';
+  }
+  function nextGroundingStep() {
+    groundingStep++;
+    if(groundingStep>=GROUNDING_STEPS.length){
+      document.getElementById('grounding-num').textContent='✅';
+      document.getElementById('grounding-icon').textContent='';
+      document.getElementById('grounding-sense').textContent='Hoàn thành!';
+      document.getElementById('grounding-hint').textContent='Bạn đã hoàn thành 5-4-3-2-1. Chú ý cảm giác hiện tại — có khác trước không?';
+      document.getElementById('grounding-items').innerHTML='';
+      document.getElementById('grounding-next-btn').style.display='none';
+      const sb=document.getElementById('grounding-start-btn');
+      sb.style.display='inline-block'; sb.textContent='▶ Làm lại';
+      groundingStep=0;
+    } else {
+      _renderGroundingStep(true);
+    }
+  }
+
+  // ── Gratitude Journal Modal ───────────────────────────────────────────
+  function openGratitudeModal()  { gratStep=0; _renderGratitudeStep(); document.getElementById('gratitude-modal').classList.add('open'); }
+  function closeGratitudeModal() {
+    document.getElementById('gratitude-modal').classList.remove('open');
+    gratStep=0; document.getElementById('gratitude-answer').value='';
+  }
+  function _renderGratitudeStep() {
+    const p=GRATITUDE_PROMPTS[gratStep];
+    document.getElementById('gratitude-step-label').textContent=`Câu ${gratStep+1} / ${GRATITUDE_PROMPTS.length}`;
+    document.getElementById('gratitude-question').textContent=p.q;
+    document.getElementById('gratitude-hint').textContent=p.hint;
+    document.getElementById('gratitude-answer').value='';
+    document.getElementById('gratitude-back-btn').style.display=gratStep>0?'inline-block':'none';
+    document.getElementById('gratitude-next-btn').textContent=
+      gratStep<GRATITUDE_PROMPTS.length-1?'Tiếp theo →':'✅ Hoàn thành';
+  }
+  function gratitudeNext() {
+    if(gratStep<GRATITUDE_PROMPTS.length-1){gratStep++;_renderGratitudeStep();}
+    else{showToast('🙏 Cảm ơn bạn đã dành thời gian biết ơn hôm nay!');closeGratitudeModal();}
+  }
+  function gratitudeBack() { if(gratStep>0){gratStep--;_renderGratitudeStep();} }
 
   // ── Bức thư chưa gửi (Unsent Letter) — viết rồi "đốt", không lưu lại ──
   function openLetterModal() { document.getElementById('letter-modal').classList.add('open'); }
@@ -3371,6 +3582,16 @@ const App = (() => {
     document.getElementById('close-evidence-modal').addEventListener('click',()=>closeEvidenceModal());
     document.getElementById('evidence-done-btn').addEventListener('click',finishEvidenceTesting);
     document.getElementById('evidence-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeEvidenceModal(e);});
+    document.getElementById('close-pmr-modal').addEventListener('click',closePMRModal);
+    document.getElementById('pmr-start-btn').addEventListener('click',startPMR);
+    document.getElementById('pmr-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closePMRModal();});
+    document.getElementById('close-bodyscan-modal').addEventListener('click',closeBodyScanModal);
+    document.getElementById('scan-start-btn').addEventListener('click',startBodyScan);
+    document.getElementById('bodyscan-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeBodyScanModal();});
+    document.getElementById('close-grounding-modal').addEventListener('click',closeGroundingModal);
+    document.getElementById('grounding-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeGroundingModal();});
+    document.getElementById('close-gratitude-modal').addEventListener('click',closeGratitudeModal);
+    document.getElementById('gratitude-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeGratitudeModal();});
     document.getElementById('article-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeArticleModal();});
     document.getElementById('entry-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeEntryModal();});
     document.getElementById('photo-lightbox').addEventListener('click',e=>{if(e.target===e.currentTarget)closeLightbox();});
@@ -3417,5 +3638,6 @@ const App = (() => {
   }
 
   return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,applyTheme,toggleThemePicker,loadMoreDiary,
-    pinInput,pinDelete,setPinLock,showMemoryCard,createFutureLetter,deleteFutureLetter,exportUserData};
+    pinInput,pinDelete,setPinLock,showMemoryCard,createFutureLetter,deleteFutureLetter,exportUserData,
+    openPMRModal,openBodyScanModal,openGroundingModal,startGrounding,toggleGroundingItem,nextGroundingStep,openGratitudeModal,gratitudeNext,gratitudeBack};
 })();
