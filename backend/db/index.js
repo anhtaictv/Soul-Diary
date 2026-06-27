@@ -841,11 +841,32 @@ async function initSchema() {
     CREATE INDEX IX_AdminMessages_to_user ON AdminMessages(to_user_id, created_at DESC)
   `);
 
+  // ── v1.9: Feature flags ───────────────────────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='dark_mode')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('dark_mode',N'Chế độ tối (Dark Mode)',
+            N'Giao diện tối bảo vệ mắt, phù hợp dùng ban đêm — toggle ngay trong sidebar',
+            'v1.9',N'Trải nghiệm Cá nhân hoá',1,22)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='diary_search')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('diary_search',N'Tìm kiếm Nhật ký',
+            N'Tìm kiếm toàn văn trong tất cả nhật ký đã viết theo từ khóa, tag và khoảng thời gian',
+            'v1.9',N'Trải nghiệm Cá nhân hoá',1,23)
+  `);
+
   // Index
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_DiaryEntries_user_created')
     CREATE INDEX IX_DiaryEntries_user_created
       ON DiaryEntries(user_id, created_at DESC)
+  `);
+  // Index hỗ trợ tìm kiếm nhanh theo tags
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_DiaryEntries_tags')
+    CREATE INDEX IX_DiaryEntries_tags ON DiaryEntries(user_id, tags)
   `);
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_Articles_published')

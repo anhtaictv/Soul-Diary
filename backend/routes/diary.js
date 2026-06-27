@@ -229,6 +229,41 @@ function dayOfYear(d) {
   return Math.floor((d - start) / 86400000);
 }
 
+// ── GET /api/diary/search — tìm kiếm toàn văn nhật ký ──────────────────
+router.get('/search', async (req, res) => {
+  try {
+    const q    = (req.query.q || '').trim();
+    const from = req.query.from || null;
+    const to   = req.query.to   || null;
+    if (!q) return res.json({ entries: [] });
+
+    const db = await getPool();
+    const r  = db.request().input('user_id', sql.Int, req.user.id).input('q', sql.NVarChar, `%${q}%`);
+    if (from) r.input('from', sql.Date, from);
+    if (to)   r.input('to',   sql.Date, to);
+
+    const result = await r.query(`
+      SELECT TOP 50 id, mood_score, event_text, tags, cbt_data, created_at
+      FROM DiaryEntries
+      WHERE user_id = @user_id
+        AND (event_text LIKE @q OR thoughts LIKE @q OR gratitude LIKE @q OR tags LIKE @q)
+        ${from ? 'AND CAST(created_at AS DATE) >= @from' : ''}
+        ${to   ? 'AND CAST(created_at AS DATE) <= @to'   : ''}
+      ORDER BY created_at DESC
+    `);
+
+    res.json({
+      entries: result.recordset.map(e => ({
+        ...e,
+        tags: e.tags ? e.tags.split('|') : [],
+      })),
+    });
+  } catch (err) {
+    console.error('Search diary error:', err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
 // ── GET /api/diary — danh sách nhật ký (có phân trang) ──────────────────
 router.get('/', async (req, res) => {
   try {

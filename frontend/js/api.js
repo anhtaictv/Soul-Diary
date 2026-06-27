@@ -10,27 +10,37 @@ const API = (() => {
     const headers = { 'Content-Type': 'application/json', ...options.headers };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await fetch(`${CONFIG.API_URL}${path}`, {
-      ...options,
-      headers,
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    });
+    const controller = new AbortController();
+    const timeoutId  = setTimeout(() => controller.abort(), 15000);
 
-    const data = await res.json().catch(() => ({}));
+    try {
+      const res = await fetch(`${CONFIG.API_URL}${path}`, {
+        ...options,
+        headers,
+        body: options.body ? JSON.stringify(options.body) : undefined,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
 
-    if (res.status === 401) {
-      // Token hết hạn → đăng xuất
-      localStorage.removeItem('nhk_token');
-      localStorage.removeItem('nhk_user');
-      window.location.reload();
-      return;
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 401) {
+        localStorage.removeItem('nhk_token');
+        localStorage.removeItem('nhk_user');
+        window.location.reload();
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(data.message || `HTTP ${res.status}`);
+      }
+
+      return data;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') throw new Error('Yêu cầu quá thời gian chờ. Vui lòng thử lại.');
+      throw err;
     }
-
-    if (!res.ok) {
-      throw new Error(data.message || `HTTP ${res.status}`);
-    }
-
-    return data;
   }
 
   return {
@@ -64,6 +74,7 @@ const API = (() => {
     togglePublish:    (id)        => request(`/articles/${id}/publish`, { method: 'PATCH' }),
 
     getDiary:         (page = 1, limit = 20) => request(`/diary?page=${page}&limit=${limit}`),
+    searchDiary:      (q, from, to)          => request(`/diary/search?q=${encodeURIComponent(q)}${from?'&from='+from:''}${to?'&to='+to:''}`),
     getStats:         (days = 14)            => request(`/diary/stats?days=${days}`),
     getMoodCalendar:  (month)                => request(`/diary/calendar${month ? '?month='+month : ''}`),
     getHeatmap:       (year)                 => request(`/diary/heatmap?year=${year || new Date().getFullYear()}`),
