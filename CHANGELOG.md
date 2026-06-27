@@ -99,3 +99,5 @@
   | Nâu Ấm Nhật Ký | `#B45309` | Cozy, viết tay |
   | Xanh Biển Sâu | `#0891B2` | Trong sáng, tập trung |
   | Đêm Tím *(luôn tối)* | `#818CF8` | Thâm trầm, ban đêm |
+- **Cải thiện theme**: nền trang đổi gradient theo theme, stat cards/tags tint màu, auth screen blobs đổi màu theo theme; dark mode có 4 lớp phân tầng rõ (`#0D1117 → #161B22 → #21262D → #2D333B`)
+- **Phân trang Nhật ký** — hiện 5 entry mới nhất, nút "Xem thêm (còn X)" load thêm 5 cái tiếp, dùng pagination của backend `GET /diary?page=&limit=` (commit `609cfb3`)
