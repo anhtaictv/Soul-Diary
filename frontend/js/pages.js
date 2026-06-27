@@ -157,6 +157,18 @@ const PAGES = {
         </div>
         <div>
           <div class="section-label">Các nhật ký đã lưu</div>
+
+          <!-- Tìm kiếm nhật ký (v1.9) -->
+          <div class="diary-search-bar">
+            <input type="text" class="diary-search-input" id="diary-search-input" placeholder="🔍 Tìm theo từ khoá, cảm xúc, tag..." onkeydown="if(event.key==='Enter')App.searchDiary()" />
+            <button class="diary-search-btn" onclick="App.searchDiary()">Tìm</button>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+            <input type="date" class="text-input" id="diary-search-from" style="flex:1;min-width:120px;padding:8px 10px;font-size:12px" title="Từ ngày" />
+            <input type="date" class="text-input" id="diary-search-to"   style="flex:1;min-width:120px;padding:8px 10px;font-size:12px" title="Đến ngày" />
+            <button class="btn-outline" onclick="App.clearSearch()" style="font-size:12px;padding:8px 12px">✕ Xoá</button>
+          </div>
+          <div id="search-result-label" class="search-result-label" style="display:none"></div>
           <div id="diary-entries-list"><div class="loading-text">Đang tải...</div></div>
 
           <!-- Xuất nhật ký (ẩn cho đến khi feature diary_export được bật) -->

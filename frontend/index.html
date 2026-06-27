@@ -171,7 +171,10 @@
               <div class="user-streak" id="streak-display">🔥 0 ngày</div>
             </div>
           </div>
-          <button class="btn-logout" onclick="Auth.logout()">⬅ Đăng xuất</button>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <button class="btn-logout" style="flex:1" onclick="Auth.logout()">⬅ Đăng xuất</button>
+            <button id="dark-mode-toggle" class="btn-logout" style="width:40px;flex-shrink:0;padding:8px;font-size:16px" onclick="App.toggleDarkMode()" title="Chế độ tối/sáng">🌙</button>
+          </div>
         </div>
       </aside>
       <main class="main" id="main-content"></main>
