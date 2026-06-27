@@ -70,3 +70,32 @@
 
 ## v1.8 — Soul Chat & Học liệu Toàn diện
 6 tính năng mới (commit `451db88`)
+
+---
+
+## v1.9 — Trải nghiệm Cá nhân hoá
+**Sửa lỗi, tối ưu hiệu năng & 4 tính năng mới** (commit `6a90191`, `cea7a02`)
+
+**Sửa lỗi:**
+- XSS trong in PDF nhật ký — escape nội dung user trước khi inject vào print window
+- Toast có thể click để đóng sớm, không chồng timer
+- Timeout 15 giây cho mọi API call (AbortController) — tránh request treo khi mất mạng
+
+**Tối ưu hiệu năng:**
+- Cache nhạc Jamendo theo mood trong phiên — không gọi lại API khi đổi qua lại
+- Backend search dùng parameterized SQL chuẩn + index `IX_DiaryEntries_tags`
+
+**Tính năng mới:**
+- **Dark Mode** — toggle 🌙/☀️ trong sidebar, lưu `localStorage`, áp dụng ngay khi tải trang
+- **Tìm kiếm Nhật ký** — ô tìm từ khoá + bộ lọc ngày; backend `GET /api/diary/search` (TOP 50)
+- **Theme System** — 6 theme màu sắc chọn qua nút 🎨 trong sidebar, lưu `localStorage`:
+
+  | Theme | Màu chủ đạo | Cảm giác |
+  |---|---|---|
+  | Xanh Dương *(mặc định)* | `#2563eb` | Quen thuộc, tin cậy |
+  | Tím Oải Hương | `#7C3AED` | Tĩnh lặng, chữa lành |
+  | Hồng Đào | `#DB2777` | Ấm áp, nhẹ nhàng |
+  | Xanh Lá Rừng | `#059669` | Tươi mát, tăng trưởng |
+  | Nâu Ấm Nhật Ký | `#B45309` | Cozy, viết tay |
+  | Xanh Biển Sâu | `#0891B2` | Trong sáng, tập trung |
+  | Đêm Tím *(luôn tối)* | `#818CF8` | Thâm trầm, ban đêm |
