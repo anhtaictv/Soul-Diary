@@ -792,42 +792,47 @@ select.form-input{cursor:pointer}
 .yr-month-bar   { width:100%; border-radius:3px 3px 0 0; min-height:2px; transition:height .3s; }
 .yr-month-lbl   { font-size:9px; color:var(--text-hint); }
 
-/* ══════════════ DARK MODE ══════════════ */
+/* ══════════════ DARK MODE ══════════════
+   Layered dark tones (4 levels):
+   body #0D1117 → app #161B22 → card #21262D → surface #2D333B
+══════════════════════════════════════════ */
 body.dark-mode {
-  --text:#e2e8f0; --text-muted:#94a3b8; --text-hint:#64748b;
-  --border:#2d3748; --bg:#1a202c; --surface:#2d3748;
-  --primary-light:#1e3a5f; --teal-light:#0d2e2a; --green-light:#0d2e19;
+  --text:#E6EDF3; --text-muted:#8B949E; --text-hint:#6E7681;
+  --border:#30363D; --bg:#21262D; --surface:#2D333B;
+  --primary-light:#1c2d4a; --teal-light:#0d2e2a; --green-light:#0d2e19;
   --rose-light:#2d1515; --amber-light:#2d2010;
 }
-body.dark-mode { background:#111827; }
-body.dark-mode .app { background:#1a202c; }
-body.dark-mode .card { background:#1e2533; border-color:#2d3748; }
-body.dark-mode .stat-card { background:#1e2533; border-color:#2d3748; }
-body.dark-mode .modal { background:#1e2533; }
+body.dark-mode { background:#0D1117; }
+body.dark-mode .app { background:#161B22; }
+body.dark-mode .card,body.dark-mode .card-sm { background:#21262D; border-color:#30363D; }
+body.dark-mode .stat-card { background:#21262D; border-color:#30363D; }
+body.dark-mode .modal { background:#21262D; }
 body.dark-mode .text-input,
-body.dark-mode textarea { background:#2d3748; color:#e2e8f0; border-color:#3d4f63; }
+body.dark-mode textarea { background:#2D333B; color:#E6EDF3; border-color:#444C56; }
 body.dark-mode .text-input:focus,
 body.dark-mode textarea:focus { border-color:var(--primary); }
-body.dark-mode .tag { background:#2d3748; color:#a5b4fc; border-color:#3d4f63; }
+body.dark-mode .tag { background:#2D333B; color:#a5b4fc; border-color:#444C56; }
 body.dark-mode .tag.sel { background:var(--primary); color:#fff; }
 body.dark-mode .weekly-recap-card { background:linear-gradient(135deg,#0d2e19,#052e16); border-color:#166534; }
 body.dark-mode .recap-title { color:#4ade80; }
 body.dark-mode .recap-val  { color:#4ade80; }
 body.dark-mode .recap-lbl  { color:#22c55e; }
-body.dark-mode .disclaimer { background:#1f2937; border-color:#374151; color:#9ca3af; }
+body.dark-mode .disclaimer { background:#21262D; border-color:#30363D; color:#8B949E; }
 body.dark-mode .level-bar-card { background:linear-gradient(135deg,#1e1b4b,#312e81); border-color:#4338ca; }
-body.dark-mode .badge-item { background:#1e2533; border-color:#2d3748; }
+body.dark-mode .badge-item { background:#21262D; border-color:#30363D; }
 body.dark-mode .badge-item.earned { background:linear-gradient(135deg,#2d2010,#1f1a08); border-color:#b45309; }
-body.dark-mode .entry-item { background:#1e2533; border-color:#2d3748; }
-body.dark-mode .modal-overlay { background:rgba(0,0,0,.7); }
+body.dark-mode .entry-item { background:#21262D; border-color:#30363D; }
+body.dark-mode .modal-overlay { background:rgba(0,0,0,.75); }
 body.dark-mode #dark-mode-toggle { color:#fbbf24; }
 body.dark-mode .soul-seed-card { background:linear-gradient(135deg,#052e16,#0d2e19); border-color:#166534; }
 body.dark-mode .ai-insight-card { background:rgba(34,197,94,.08); }
-body.dark-mode .push-banner { background:linear-gradient(135deg,#1e3a5f,#1e1b4b); border-color:#3b82f6; }
-body.dark-mode .settings-tab { background:#1e2533; }
-body.dark-mode .auth-bg { background:linear-gradient(150deg,#1a1510,#12100c,#0e0c08); }
-body.dark-mode .auth-card { background:rgba(30,37,51,.95); }
-body.dark-mode .auth-slogan { color:#94a3b8; }
+body.dark-mode .push-banner { background:linear-gradient(135deg,#1c2d4a,#1e1b4b); border-color:#3b82f6; }
+body.dark-mode .settings-tab { background:#21262D; }
+body.dark-mode .photo-upload-area { background:#2D333B; border-color:#444C56; }
+body.dark-mode .audio-recorder { background:#2D333B; border-color:#444C56; }
+body.dark-mode .auth-bg { background:linear-gradient(150deg,#0D1117,#161B22,#0a0c10); }
+body.dark-mode .auth-card { background:rgba(33,38,45,.97); border:1px solid #30363D; }
+body.dark-mode .auth-slogan { color:#8B949E; }
 
 /* ══════════════ DIARY SEARCH (v1.9) ══════════════ */
 .diary-search-bar { display:flex; gap:8px; margin-bottom:16px; }
@@ -842,105 +847,156 @@ body.dark-mode .diary-search-input { background:#2d3748; border-color:#3d4f63; }
 
 /* ══════════════════════════════════════════════════════════════
    THEME SYSTEM — v1.9
-   6 themes controlled by body.theme-* class.
-   Each theme overrides --primary, --sidebar-bg, and optional
-   surface/bg tokens. Dark mode composes on top of themes.
+   Mỗi theme thay đổi TOÀN BỘ trải nghiệm màu sắc:
+   body bg → surface → border → primary → sidebar → auth screen
 ══════════════════════════════════════════════════════════════ */
 
 /* ── 1. Tím Oải Hương (Lavender) ─────────────────────────── */
 body.theme-lavender {
-  --primary:#7C3AED; --primary-light:#F5F3FF; --primary-dark:#6D28D9;
-  --sidebar-bg:#2D1B69;
-  --shadow-md:0 4px 16px rgba(124,58,237,.15);
+  --primary:#7C3AED; --primary-light:#EDE9FE; --primary-dark:#6D28D9;
+  --sidebar-bg:#2D1B69; --surface:#F3EEFF; --border:#DDD6FE;
+  --shadow-md:0 4px 16px rgba(124,58,237,.18);
+  background:linear-gradient(160deg,#F0EBFF 0%,#EDE9FE 60%,#E8E3FF 100%);
 }
-body.theme-lavender .nav-item.active{background:linear-gradient(135deg,rgba(124,58,237,.42),rgba(99,102,241,.28))}
-body.theme-lavender .text-input:focus,
-body.theme-lavender textarea:focus{box-shadow:0 0 0 3px rgba(124,58,237,.12)}
-body.theme-lavender .diary-search-input:focus{box-shadow:0 0 0 3px rgba(124,58,237,.12)}
+body.theme-lavender .app{background:#F8F5FF}
+body.theme-lavender .card,body.theme-lavender .card-sm{background:#fff;border-color:#DDD6FE}
+body.theme-lavender .stat-card{background:#EDE9FE;border-color:#C4B5FD}
+body.theme-lavender .nav-item.active{background:linear-gradient(135deg,rgba(124,58,237,.45),rgba(99,102,241,.3))}
+body.theme-lavender .text-input:focus,body.theme-lavender textarea:focus{border-color:#7C3AED;box-shadow:0 0 0 3px rgba(124,58,237,.14)}
+body.theme-lavender .diary-search-input:focus{box-shadow:0 0 0 3px rgba(124,58,237,.14)}
+body.theme-lavender .auth-bg{background:linear-gradient(150deg,#EDE9FE 0%,#DDD6FE 40%,#C4B5FD 100%)}
+body.theme-lavender .auth-blob.b1{background:#a78bfa}
+body.theme-lavender .auth-blob.b2{background:#7c3aed}
+body.theme-lavender .auth-blob.b3{background:#c4b5fd}
+body.theme-lavender .entry-item:hover{border-color:#7C3AED;background:#F3EEFF}
+body.theme-lavender .tag{background:#EDE9FE;border-color:#C4B5FD;color:#5B21B6}
+body.theme-lavender .tag.sel{border-color:#7C3AED;background:#7C3AED;color:#fff}
 
 /* ── 2. Hồng Đào (Rose) ──────────────────────────────────── */
 body.theme-rose {
-  --primary:#DB2777; --primary-light:#FDF2F8; --primary-dark:#BE185D;
-  --sidebar-bg:#500724;
-  --shadow-md:0 4px 16px rgba(219,39,119,.15);
+  --primary:#DB2777; --primary-light:#FCE7F3; --primary-dark:#BE185D;
+  --sidebar-bg:#500724; --surface:#FDF0F6; --border:#FBCFE8;
+  --shadow-md:0 4px 16px rgba(219,39,119,.18);
+  background:linear-gradient(160deg,#FFF0F8 0%,#FCE7F3 60%,#FBCFE8 100%);
 }
-body.theme-rose .nav-item.active{background:linear-gradient(135deg,rgba(219,39,119,.42),rgba(244,114,182,.28))}
-body.theme-rose .text-input:focus,
-body.theme-rose textarea:focus{box-shadow:0 0 0 3px rgba(219,39,119,.12)}
-body.theme-rose .diary-search-input:focus{box-shadow:0 0 0 3px rgba(219,39,119,.12)}
+body.theme-rose .app{background:#FEF6FA}
+body.theme-rose .card,body.theme-rose .card-sm{background:#fff;border-color:#FBCFE8}
+body.theme-rose .stat-card{background:#FCE7F3;border-color:#F9A8D4}
+body.theme-rose .nav-item.active{background:linear-gradient(135deg,rgba(219,39,119,.45),rgba(244,114,182,.3))}
+body.theme-rose .text-input:focus,body.theme-rose textarea:focus{border-color:#DB2777;box-shadow:0 0 0 3px rgba(219,39,119,.14)}
+body.theme-rose .diary-search-input:focus{box-shadow:0 0 0 3px rgba(219,39,119,.14)}
 body.theme-rose .btn-primary{background:linear-gradient(135deg,#DB2777,#9333EA)}
 body.theme-rose .btn-auth{background:linear-gradient(135deg,#DB2777,#9333EA)}
+body.theme-rose .auth-bg{background:linear-gradient(150deg,#FCE7F3 0%,#FBCFE8 40%,#F9A8D4 100%)}
+body.theme-rose .auth-blob.b1{background:#f472b6}
+body.theme-rose .auth-blob.b2{background:#db2777}
+body.theme-rose .auth-blob.b3{background:#fbcfe8}
+body.theme-rose .entry-item:hover{border-color:#DB2777;background:#FDF0F6}
+body.theme-rose .tag{background:#FCE7F3;border-color:#F9A8D4;color:#9D174D}
+body.theme-rose .tag.sel{border-color:#DB2777;background:#DB2777;color:#fff}
 
 /* ── 3. Xanh Lá Rừng (Emerald) ──────────────────────────── */
 body.theme-emerald {
-  --primary:#059669; --primary-light:#F0FDF4; --primary-dark:#047857;
-  --sidebar-bg:#064E3B;
-  --shadow-md:0 4px 16px rgba(5,150,105,.15);
+  --primary:#059669; --primary-light:#D1FAE5; --primary-dark:#047857;
+  --sidebar-bg:#064E3B; --surface:#ECFDF5; --border:#A7F3D0;
+  --shadow-md:0 4px 16px rgba(5,150,105,.18);
+  background:linear-gradient(160deg,#EDFAF4 0%,#D1FAE5 60%,#A7F3D0 100%);
 }
-body.theme-emerald .nav-item.active{background:linear-gradient(135deg,rgba(5,150,105,.42),rgba(16,185,129,.28))}
-body.theme-emerald .text-input:focus,
-body.theme-emerald textarea:focus{box-shadow:0 0 0 3px rgba(5,150,105,.12)}
-body.theme-emerald .diary-search-input:focus{box-shadow:0 0 0 3px rgba(5,150,105,.12)}
+body.theme-emerald .app{background:#F0FDF7}
+body.theme-emerald .card,body.theme-emerald .card-sm{background:#fff;border-color:#A7F3D0}
+body.theme-emerald .stat-card{background:#D1FAE5;border-color:#6EE7B7}
+body.theme-emerald .nav-item.active{background:linear-gradient(135deg,rgba(5,150,105,.45),rgba(16,185,129,.3))}
+body.theme-emerald .text-input:focus,body.theme-emerald textarea:focus{border-color:#059669;box-shadow:0 0 0 3px rgba(5,150,105,.14)}
+body.theme-emerald .diary-search-input:focus{box-shadow:0 0 0 3px rgba(5,150,105,.14)}
 body.theme-emerald .btn-primary{background:linear-gradient(135deg,#059669,#0D9488)}
 body.theme-emerald .btn-auth{background:linear-gradient(135deg,#059669,#0D9488)}
+body.theme-emerald .auth-bg{background:linear-gradient(150deg,#D1FAE5 0%,#A7F3D0 40%,#6EE7B7 100%)}
+body.theme-emerald .auth-blob.b1{background:#34d399}
+body.theme-emerald .auth-blob.b2{background:#059669}
+body.theme-emerald .auth-blob.b3{background:#6ee7b7}
+body.theme-emerald .entry-item:hover{border-color:#059669;background:#ECFDF5}
+body.theme-emerald .tag{background:#D1FAE5;border-color:#6EE7B7;color:#065F46}
+body.theme-emerald .tag.sel{border-color:#059669;background:#059669;color:#fff}
 
 /* ── 4. Nâu Ấm Nhật Ký (Warm) ───────────────────────────── */
 body.theme-warm {
-  --primary:#B45309; --primary-light:#FFFBEB; --primary-dark:#92400E;
-  --sidebar-bg:#451A03;
-  --bg:#FFFDF8; --surface:#FEF9EC;
-  --shadow-md:0 4px 16px rgba(180,83,9,.15);
+  --primary:#B45309; --primary-light:#FEF3C7; --primary-dark:#92400E;
+  --sidebar-bg:#451A03; --bg:#FFFDF8; --surface:#FEF9EC; --border:#FDE68A;
+  --shadow-md:0 4px 16px rgba(180,83,9,.18);
+  background:linear-gradient(160deg,#FFFBF0 0%,#FEF3C7 60%,#FDE68A 100%);
 }
-body.theme-warm .nav-item.active{background:linear-gradient(135deg,rgba(180,83,9,.45),rgba(217,119,6,.28))}
-body.theme-warm .text-input:focus,
-body.theme-warm textarea:focus{box-shadow:0 0 0 3px rgba(180,83,9,.12)}
-body.theme-warm .diary-search-input:focus{box-shadow:0 0 0 3px rgba(180,83,9,.12)}
+body.theme-warm .app{background:#FFFDF8}
+body.theme-warm .card,body.theme-warm .card-sm{background:#fff;border-color:#FDE68A}
+body.theme-warm .stat-card{background:#FEF3C7;border-color:#FCD34D}
+body.theme-warm .nav-item.active{background:linear-gradient(135deg,rgba(180,83,9,.48),rgba(217,119,6,.3))}
+body.theme-warm .text-input:focus,body.theme-warm textarea:focus{border-color:#B45309;box-shadow:0 0 0 3px rgba(180,83,9,.14)}
+body.theme-warm .diary-search-input:focus{box-shadow:0 0 0 3px rgba(180,83,9,.14)}
 body.theme-warm .btn-primary{background:linear-gradient(135deg,#B45309,#D97706)}
 body.theme-warm .btn-auth{background:linear-gradient(135deg,#B45309,#D97706)}
+body.theme-warm .auth-bg{background:linear-gradient(150deg,#FEF3C7 0%,#FDE68A 40%,#FCD34D 100%)}
+body.theme-warm .auth-blob.b1{background:#fbbf24}
+body.theme-warm .auth-blob.b2{background:#b45309}
+body.theme-warm .auth-blob.b3{background:#fcd34d}
+body.theme-warm .entry-item:hover{border-color:#B45309;background:#FEF9EC}
+body.theme-warm .tag{background:#FEF3C7;border-color:#FCD34D;color:#78350F}
+body.theme-warm .tag.sel{border-color:#B45309;background:#B45309;color:#fff}
 
 /* ── 5. Xanh Biển Sâu (Ocean) ───────────────────────────── */
 body.theme-ocean {
-  --primary:#0891B2; --primary-light:#ECFEFF; --primary-dark:#0E7490;
-  --sidebar-bg:#164E63;
-  --shadow-md:0 4px 16px rgba(8,145,178,.15);
+  --primary:#0891B2; --primary-light:#CFFAFE; --primary-dark:#0E7490;
+  --sidebar-bg:#164E63; --surface:#ECFEFF; --border:#A5F3FC;
+  --shadow-md:0 4px 16px rgba(8,145,178,.18);
+  background:linear-gradient(160deg,#EBF8FF 0%,#CFFAFE 60%,#A5F3FC 100%);
 }
-body.theme-ocean .nav-item.active{background:linear-gradient(135deg,rgba(8,145,178,.42),rgba(6,182,212,.28))}
-body.theme-ocean .text-input:focus,
-body.theme-ocean textarea:focus{box-shadow:0 0 0 3px rgba(8,145,178,.12)}
-body.theme-ocean .diary-search-input:focus{box-shadow:0 0 0 3px rgba(8,145,178,.12)}
+body.theme-ocean .app{background:#F0FBFF}
+body.theme-ocean .card,body.theme-ocean .card-sm{background:#fff;border-color:#A5F3FC}
+body.theme-ocean .stat-card{background:#CFFAFE;border-color:#67E8F9}
+body.theme-ocean .nav-item.active{background:linear-gradient(135deg,rgba(8,145,178,.45),rgba(6,182,212,.3))}
+body.theme-ocean .text-input:focus,body.theme-ocean textarea:focus{border-color:#0891B2;box-shadow:0 0 0 3px rgba(8,145,178,.14)}
+body.theme-ocean .diary-search-input:focus{box-shadow:0 0 0 3px rgba(8,145,178,.14)}
 body.theme-ocean .btn-primary{background:linear-gradient(135deg,#0891B2,#0D9488)}
 body.theme-ocean .btn-auth{background:linear-gradient(135deg,#0891B2,#0D9488)}
+body.theme-ocean .auth-bg{background:linear-gradient(150deg,#CFFAFE 0%,#A5F3FC 40%,#67E8F9 100%)}
+body.theme-ocean .auth-blob.b1{background:#22d3ee}
+body.theme-ocean .auth-blob.b2{background:#0891b2}
+body.theme-ocean .auth-blob.b3{background:#67e8f9}
+body.theme-ocean .entry-item:hover{border-color:#0891B2;background:#ECFEFF}
+body.theme-ocean .tag{background:#CFFAFE;border-color:#67E8F9;color:#155E75}
+body.theme-ocean .tag.sel{border-color:#0891B2;background:#0891B2;color:#fff}
 
-/* ── 6. Đêm Tím (Midnight) — always-dark theme ──────────── */
+/* ── 6. Đêm Tím (Midnight) — always-dark, purple accent ─── */
 body.theme-midnight {
-  --primary:#818CF8; --primary-light:#EEF2FF; --primary-dark:#6366F1;
-  --sidebar-bg:#0F0F23;
-  --bg:#1A1A2E; --surface:#16213E;
+  --primary:#818CF8; --primary-light:#312E81; --primary-dark:#6366F1;
+  --sidebar-bg:#0A0A1A; --bg:#13131F; --surface:#1C1C30;
   --text:#E2E8F0; --text-muted:#94A3B8; --text-hint:#64748B;
-  --border:#2D3748;
-  --shadow-md:0 4px 16px rgba(99,102,241,.22);
+  --border:#2A2A45; --shadow-md:0 4px 20px rgba(99,102,241,.25);
+  background:#08080F;
 }
-body.theme-midnight{background:#0F0F23}
-body.theme-midnight .app{background:#1A1A2E}
-body.theme-midnight .card,body.theme-midnight .card-sm{background:#1E2537;border-color:#2D3748}
-body.theme-midnight .stat-card{background:#1E2537;border-color:#2D3748}
-body.theme-midnight .modal{background:#1E2537}
-body.theme-midnight .text-input,body.theme-midnight textarea{background:#2D3748;color:#E2E8F0;border-color:#3D4F63}
-body.theme-midnight .diary-search-input{background:#2D3748;border-color:#3D4F63}
-body.theme-midnight .tag{background:#2D3748;color:#A5B4FC;border-color:#3D4F63}
-body.theme-midnight .tag.sel{background:var(--primary);color:#fff}
-body.theme-midnight .entry-item{background:#1E2537;border-color:#2D3748}
-body.theme-midnight .entry-item:hover{border-color:var(--primary);background:#EEF2FF10}
-body.theme-midnight .modal-overlay{background:rgba(0,0,0,.75)}
-body.theme-midnight .auth-bg{background:linear-gradient(150deg,#0F0F23,#1A1A2E,#0D0D1A)}
-body.theme-midnight .auth-card{background:rgba(30,37,55,.96)}
+body.theme-midnight .app{background:#0F0F1E}
+body.theme-midnight .card,body.theme-midnight .card-sm{background:#13131F;border-color:#2A2A45}
+body.theme-midnight .stat-card{background:#1C1C30;border-color:#2A2A45}
+body.theme-midnight .modal{background:#13131F}
+body.theme-midnight .text-input,body.theme-midnight textarea{background:#1C1C30;color:#E2E8F0;border-color:#2A2A45}
+body.theme-midnight .diary-search-input{background:#1C1C30;border-color:#2A2A45}
+body.theme-midnight .tag{background:#1C1C30;color:#A5B4FC;border-color:#2A2A45}
+body.theme-midnight .tag.sel{background:#4F46E5;color:#fff;border-color:#4F46E5}
+body.theme-midnight .entry-item{background:#13131F;border-color:#2A2A45}
+body.theme-midnight .entry-item:hover{border-color:#818CF8;background:#1C1C30}
+body.theme-midnight .modal-overlay{background:rgba(0,0,0,.82)}
+body.theme-midnight .badge-item{background:#13131F;border-color:#2A2A45}
+body.theme-midnight .skeleton{background:linear-gradient(90deg,#1C1C30 25%,#2A2A45 50%,#1C1C30 75%);background-size:200% 100%}
+body.theme-midnight .auth-bg{background:radial-gradient(ellipse at top,#1a1a3e,#08080F 70%)}
+body.theme-midnight .auth-blob.b1{background:#4F46E5}
+body.theme-midnight .auth-blob.b2{background:#6366F1}
+body.theme-midnight .auth-blob.b3{background:#818CF8}
+body.theme-midnight .auth-card{background:rgba(19,19,31,.97);border:1px solid #2A2A45}
 body.theme-midnight .auth-slogan{color:#94A3B8}
-body.theme-midnight .nav-item.active{background:linear-gradient(135deg,rgba(99,102,241,.52),rgba(129,140,248,.32))}
-body.theme-midnight .text-input:focus,
-body.theme-midnight textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(99,102,241,.16)}
-body.theme-midnight .diary-search-input:focus{box-shadow:0 0 0 3px rgba(99,102,241,.16)}
-body.theme-midnight .badge-item{background:#1E2537;border-color:#2D3748}
-body.theme-midnight .skeleton{background:linear-gradient(90deg,#2D3748 25%,#3D4F63 50%,#2D3748 75%);background-size:200% 100%}
+body.theme-midnight .settings-tab{background:#1C1C30}
+body.theme-midnight .nav-item.active{background:linear-gradient(135deg,rgba(79,70,229,.55),rgba(129,140,248,.35))}
+body.theme-midnight .text-input:focus,body.theme-midnight textarea:focus{border-color:#818CF8;box-shadow:0 0 0 3px rgba(99,102,241,.18)}
+body.theme-midnight .diary-search-input:focus{box-shadow:0 0 0 3px rgba(99,102,241,.18)}
+body.theme-midnight .photo-upload-area{background:#1C1C30;border-color:#2A2A45}
+body.theme-midnight .audio-recorder{background:#1C1C30;border-color:#2A2A45}
 
 /* ── Theme Picker Widget ─────────────────────────────────── */
 .theme-picker-popup{
