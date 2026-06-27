@@ -835,6 +835,10 @@ body.dark-mode .auth-card { background:rgba(33,38,45,.97); border:1px solid #303
 body.dark-mode .auth-slogan { color:#8B949E; }
 
 /* ══════════════ DIARY SEARCH (v1.9) ══════════════ */
+.btn-load-more{display:block;width:100%;padding:11px;margin-top:8px;background:var(--surface);border:1.5px dashed var(--border);border-radius:var(--radius);font-family:inherit;font-size:13px;font-weight:600;color:var(--text-muted);cursor:pointer;transition:.15s;text-align:center}
+.btn-load-more:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
+body.dark-mode .btn-load-more{background:var(--surface);border-color:var(--border)}
+
 .diary-search-bar { display:flex; gap:8px; margin-bottom:16px; }
 .diary-search-input { flex:1; padding:10px 14px; border:1.5px solid var(--border); border-radius:var(--radius); font-family:inherit; font-size:13px; background:var(--bg); color:var(--text); transition:.2s; }
 .diary-search-input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(37,99,235,.1); }

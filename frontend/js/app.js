@@ -450,19 +450,36 @@ const App = (() => {
     nav('music');
   }
 
-  async function loadDiaryEntries() {
+  const DIARY_PAGE_SIZE = 5;
+  let _diaryPage = 1;
+  let _diaryTotal = 0;
+
+  async function loadDiaryEntries(reset = true) {
     const el = document.getElementById('diary-entries-list');
     if (!el) return;
-    el.innerHTML = '<div class="loading-text">Đang tải...</div>';
+    if (reset) {
+      _diaryPage = 1;
+      el.innerHTML = '<div class="loading-text">Đang tải...</div>';
+    }
     try {
-      const res = await API.getDiary(1, 15);
-      cachedEntries = res.entries || [];
+      const res = await API.getDiary(_diaryPage, DIARY_PAGE_SIZE);
+      const entries = res.entries || [];
+      _diaryTotal = res.pagination?.total || 0;
+      if (reset) cachedEntries = entries;
+      else cachedEntries = [...cachedEntries, ...entries];
       if (!cachedEntries.length) {
-        el.innerHTML='<div style="text-align:center;color:var(--text-hint);font-size:13px;padding:40px 0">Chưa có nhật ký nào. Hãy viết nhật ký đầu tiên! 🌱</div>';
+        el.innerHTML = '<div style="text-align:center;color:var(--text-hint);font-size:13px;padding:40px 0">Chưa có nhật ký nào. Hãy viết nhật ký đầu tiên! 🌱</div>';
         return;
       }
-      el.innerHTML = cachedEntries.map(e => entryHTML(e, true)).join('');
-    } catch(err) { el.innerHTML=`<div class="loading-text" style="color:var(--rose)">Lỗi: ${err.message}</div>`; }
+      const hasMore = cachedEntries.length < _diaryTotal;
+      el.innerHTML = cachedEntries.map(e => entryHTML(e, true)).join('') +
+        (hasMore ? `<button class="btn-load-more" onclick="App.loadMoreDiary()">Xem thêm (còn ${_diaryTotal - cachedEntries.length})</button>` : '');
+    } catch(err) { el.innerHTML = `<div class="loading-text" style="color:var(--rose)">Lỗi: ${err.message}</div>`; }
+  }
+
+  async function loadMoreDiary() {
+    _diaryPage++;
+    await loadDiaryEntries(false);
   }
 
   function toggleTag(el) {
@@ -3012,5 +3029,5 @@ const App = (() => {
     nav('dashboard');
   }
 
-  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,applyTheme,toggleThemePicker};
+  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,applyTheme,toggleThemePicker,loadMoreDiary};
 })();
