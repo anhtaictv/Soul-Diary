@@ -159,6 +159,24 @@ After editing backend files, restart the PM2 process (`pm2 restart souldiary-api
 
   **Gotcha share routes**: `GET /api/diary/share/:token` phải đăng ký **trước** `router.use(authMiddleware)` trong `routes/diary.js` vì router đó áp auth cho toàn bộ. `POST /api/diary/:id/share` và `DELETE /api/diary/:id/share` đăng ký sau auth bình thường.
 
+### v2.3 — Streak Bạn bè & Nhật ký Định kỳ *(gate sau feature flags — bật trong admin)*
+
+- **Streak bạn bè** (`friend_streaks`) — bảng `Friendships` (user_id, friend_id, status 'pending'|'accepted', UNIQUE constraint + index `IX_Friendships_friend`). Route `routes/friends.js`:
+  - `GET /api/friends` — danh sách bạn bè đã chấp nhận + streak, sorted theo streak DESC
+  - `GET /api/friends/requests` — lời mời đang chờ gửi đến mình
+  - `POST /api/friends/request` — gửi lời mời theo username (kiểm tra tồn tại 2 chiều)
+  - `PUT /api/friends/:id/accept` — chấp nhận lời mời
+  - `DELETE /api/friends/:id` — xóa bạn hoặc từ chối lời mời
+  - Frontend: trang `friends` với bảng xếp hạng streak (🥇🥈🥉), form thêm bạn bằng username, section lời mời đang chờ ẩn khi trống.
+  - Badge `#friends-badge` (`.nav-badge-dot`) trên nav-friends, load tại `App.init()` và cập nhật sau mỗi chấp nhận/từ chối. `App.loadFriendsBadge()`.
+
+- **Nhật ký định kỳ (Templates)** (`diary_templates`) — bảng `DiaryTemplates` (user_id, title, content, gratitude, tags, default_mood). Route `routes/templates.js`:
+  - `GET /api/templates` — danh sách template của user
+  - `POST /api/templates` — tạo mới (giới hạn 20/user)
+  - `PUT /api/templates/:id` — cập nhật template
+  - `DELETE /api/templates/:id` — xóa template
+  - Frontend: trang `templates` với form tạo/sửa template (title, content, gratitude, tags bằng dấu phẩy → lưu `|`, mood 1-10). Nút ✏️ Sửa điền lại form + đổi nút thành "Cập nhật". Nút 📋 Dùng template trong diary form (ẩn khi user chưa có template) → modal picker chọn và áp vào form nhật ký. `App.createTemplate()`, `App.editTemplate(id)`, `App.saveEditTemplate(id)`, `App.openTemplatePicker()`, `App.applyTemplate(id)`.
+
 ## Feature Flag — quy tắc bắt buộc
 
 ### Nguyên tắc cốt lõi (QUAN TRỌNG — áp dụng cho mọi lần nâng cấp sau này)
