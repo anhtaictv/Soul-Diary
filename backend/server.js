@@ -88,6 +88,7 @@ app.use('/api/templates',   apiLimiter, require('./routes/templates'));
 app.use('/api/reflections', apiLimiter, require('./routes/reflections'));
 app.use('/api/habits',      apiLimiter, require('./routes/habits'));
 app.use('/api/quotes',      apiLimiter, require('./routes/quotes'));
+app.use('/api/notes',       apiLimiter, require('./routes/notes'));
 
 // Health check
 app.get('/api/health', (req, res) => {

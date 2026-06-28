@@ -218,5 +218,12 @@ const API = (() => {
     // v2.6
     getQuoteToday: ()      => request('/quotes/today'),
     getYearStats:  (year)  => request(`/diary/year-stats${year ? '?year='+year : ''}`),
+
+    // v2.7
+    getDiaryGallery: ()           => request('/diary/gallery'),
+    compareMood:     (p)          => request(`/diary/compare?from1=${p.from1}&to1=${p.to1}&from2=${p.from2}&to2=${p.to2}`),
+    getNotes:        ()           => request('/notes'),
+    createNote:      (body)       => request('/notes',       { method: 'POST',   body }),
+    deleteNote:      (id)         => request(`/notes/${id}`, { method: 'DELETE' }),
   };
 })();

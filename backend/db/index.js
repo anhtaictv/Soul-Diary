@@ -1110,12 +1110,28 @@ async function initSchema() {
     }
   }
 
+  // ── v2.7: Ghi chú nhanh ──────────────────────────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='QuickNotes' AND xtype='U')
+    CREATE TABLE QuickNotes (
+      id         INT IDENTITY PRIMARY KEY,
+      user_id    INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      content    NVARCHAR(500) NOT NULL,
+      color      NVARCHAR(10) DEFAULT 'yellow',
+      created_at DATETIME2 DEFAULT GETDATE()
+    )
+  `);
+
   // ── v2.6: Seed feature flags ──────────────────────────────────────────────
   const v26flags = [
     { key: 'pomodoro_timer',  label: 'Pomodoro Timer',           desc: 'Bộ đếm thời gian học tập 25/5 phút, tùy chỉnh, đếm phiên hôm nay',    ver: 'v2.6', title: 'Năng lượng & Sáng tạo', sort: 260 },
     { key: 'daily_quote',     label: 'Câu truyền cảm hứng',      desc: 'Câu truyền cảm hứng thay đổi mỗi ngày trên dashboard',                ver: 'v2.6', title: 'Năng lượng & Sáng tạo', sort: 261 },
     { key: 'year_stats',      label: 'Thống kê năm',             desc: 'Tổng quan cả năm: avg mood, tháng tốt nhất, biểu đồ 12 tháng',        ver: 'v2.6', title: 'Năng lượng & Sáng tạo', sort: 262 },
     { key: 'auto_draft',      label: 'Tự động lưu nháp',         desc: 'Tự lưu bản nháp nhật ký mỗi 30 giây, khôi phục nếu đóng tab lỡ tay', ver: 'v2.6', title: 'Năng lượng & Sáng tạo', sort: 263 },
+    { key: 'photo_gallery',   label: 'Gallery ảnh nhật ký',      desc: 'Xem tất cả ảnh đính kèm nhật ký dưới dạng lưới, click để mở entry',   ver: 'v2.7', title: 'Khám phá & Ghi nhớ', sort: 270 },
+    { key: 'quick_notes',     label: 'Ghi chú nhanh',            desc: 'Sticky notes màu sắc trên dashboard và trang riêng, tối đa 10 ghi chú', ver: 'v2.7', title: 'Khám phá & Ghi nhớ', sort: 271 },
+    { key: 'mood_compare',    label: 'So sánh tâm trạng',        desc: 'So sánh mood giữa 2 khoảng thời gian tự chọn, thống kê song song',    ver: 'v2.7', title: 'Khám phá & Ghi nhớ', sort: 272 },
+    { key: 'wellness_alert',  label: 'Cảnh báo sức khỏe nhẹ',   desc: 'Gợi ý nhẹ nhàng trên dashboard khi mood trung bình 7 ngày ≤ 4',       ver: 'v2.7', title: 'Khám phá & Ghi nhớ', sort: 273 },
   ];
   for (const f of v26flags) {
     await db.request()
