@@ -2692,6 +2692,8 @@ const App = (() => {
         <div>Ngày tham gia: <strong>${joined}</strong></div>
         <div>Tổng nhật ký: <strong>${user.totalEntries || '—'}</strong></div>`;
     }
+    // PIN status
+    refreshPinStatus();
     // Đồng bộ notif prefs từ DB
     try {
       const fresh = await API.getMe();
@@ -3265,6 +3267,32 @@ const App = (() => {
     }
   }
 
+  function refreshPinStatus() {
+    const hasPIN = !!localStorage.getItem('nhk_pin');
+    const statusEl = document.getElementById('set-pin-status');
+    const removeBtn = document.getElementById('set-pin-remove-btn');
+    if (statusEl) statusEl.innerHTML = hasPIN
+      ? '<span style="color:#16a34a;font-weight:600">✅ Đang bật</span> — Nhật ký được bảo vệ bằng PIN 4 chữ số.'
+      : '<span style="color:var(--text-muted)">🔓 Chưa bật</span> — Nhật ký không có khóa PIN.';
+    if (removeBtn) removeBtn.style.display = hasPIN ? '' : 'none';
+  }
+
+  async function managePinLock(action) {
+    const hasPIN = !!localStorage.getItem('nhk_pin');
+    if (action === 'remove') {
+      if (!hasPIN) return;
+      if (!confirm('Xóa khóa PIN? Nhật ký sẽ không được bảo vệ nữa.')) return;
+      await setPinLock(null);
+      refreshPinStatus();
+      return;
+    }
+    const pin = prompt(hasPIN ? 'Nhập PIN mới (4 chữ số):' : 'Tạo PIN mới (4 chữ số):');
+    if (pin === null) return;
+    if (!/^\d{4}$/.test(pin)) { showToast('PIN phải là đúng 4 chữ số'); return; }
+    await setPinLock(pin);
+    refreshPinStatus();
+  }
+
   // ── Memory Card — Canvas → PNG (v2.0) ─────────────────────────────
   function showMemoryCard() {
     const user   = Auth.getUser();
@@ -3306,11 +3334,12 @@ const App = (() => {
     ctx.beginPath(); ctx.arc(820, 400, 80, 0, Math.PI * 2); ctx.fill();
 
     // Header
+    const VN_FONT = '"Segoe UI", "Noto Sans", system-ui, -apple-system, Arial, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.96)';
-    ctx.font = 'bold 40px system-ui, -apple-system, sans-serif';
+    ctx.font = `bold 40px ${VN_FONT}`;
     ctx.fillText('Soul Diary', 60, 90);
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.font = '17px system-ui, sans-serif';
+    ctx.font = `17px ${VN_FONT}`;
     ctx.fillText('Nhật ký cảm xúc số', 60, 118);
 
     ctx.strokeStyle = 'rgba(255,255,255,0.25)';
@@ -3325,22 +3354,22 @@ const App = (() => {
     ];
     stats.forEach(s => {
       ctx.fillStyle = 'rgba(255,255,255,0.96)';
-      ctx.font = 'bold 38px system-ui, sans-serif';
+      ctx.font = `bold 38px ${VN_FONT}`;
       ctx.fillText(s.val, s.x, 240);
       ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      ctx.font = '14px system-ui, sans-serif';
+      ctx.font = `14px ${VN_FONT}`;
       ctx.fillText(s.lbl, s.x, 266);
     });
 
     // Quote
     ctx.fillStyle = 'rgba(255,255,255,0.72)';
-    ctx.font = 'italic 19px Georgia, "Times New Roman", serif';
+    ctx.font = `italic 19px ${VN_FONT}`;
     ctx.fillText(quotes[Math.floor(Math.random() * quotes.length)], 60, 360);
 
     // Date footer
     const today = new Date().toLocaleDateString('vi-VN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
     ctx.fillStyle = 'rgba(255,255,255,0.45)';
-    ctx.font = '13px system-ui, sans-serif';
+    ctx.font = `13px ${VN_FONT}`;
     ctx.fillText(today, 60, 438);
 
     const a = document.createElement('a');
@@ -3552,6 +3581,28 @@ const App = (() => {
     } catch(e) { showToast('❌ ' + e.message); }
   }
 
+  // ── PWA Install Prompt (v2.1) ────────────────────────────────────
+  let _pwaPrompt = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    _pwaPrompt = e;
+    const btn = document.getElementById('pwa-install-btn');
+    if (btn) btn.style.display = '';
+  });
+  window.addEventListener('appinstalled', () => {
+    _pwaPrompt = null;
+    const btn = document.getElementById('pwa-install-btn');
+    if (btn) btn.style.display = 'none';
+    showToast('✅ Đã cài Soul Diary về máy!');
+  });
+
+  async function installPWA() {
+    if (!_pwaPrompt) return;
+    _pwaPrompt.prompt();
+    const { outcome } = await _pwaPrompt.userChoice;
+    if (outcome === 'accepted') _pwaPrompt = null;
+  }
+
   // ── Offline Detection (v2.0) ──────────────────────────────────────
   function initOfflineDetection() {
     function update() {
@@ -3638,6 +3689,6 @@ const App = (() => {
   }
 
   return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,applyTheme,toggleThemePicker,loadMoreDiary,
-    pinInput,pinDelete,setPinLock,showMemoryCard,createFutureLetter,deleteFutureLetter,exportUserData,
+    pinInput,pinDelete,setPinLock,managePinLock,installPWA,showMemoryCard,createFutureLetter,deleteFutureLetter,exportUserData,
     openPMRModal,openBodyScanModal,openGroundingModal,startGrounding,toggleGroundingItem,nextGroundingStep,openGratitudeModal,gratitudeNext,gratitudeBack};
 })();
