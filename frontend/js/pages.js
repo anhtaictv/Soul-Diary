@@ -43,6 +43,12 @@ const PAGES = {
       <!-- Câu truyền cảm hứng (v2.6, ẩn cho đến khi daily_quote flag bật) -->
       <div id="daily-quote-card" style="display:none;margin-bottom:16px"></div>
 
+      <!-- Cảnh báo sức khỏe nhẹ nhàng (v2.7, ẩn mặc định) -->
+      <div id="wellness-alert-banner" style="display:none;margin-bottom:16px"></div>
+
+      <!-- Ghi chú nhanh widget (v2.7) -->
+      <div id="notes-dashboard-widget" style="display:none;margin-bottom:16px"></div>
+
       <div class="section-label">Gợi ý dành cho bạn</div>
       <div id="recommendations"></div>
 
@@ -1000,6 +1006,83 @@ const PAGES = {
       <div id="habits-list">
         <div class="loading-text">Đang tải...</div>
       </div>
+    </div>
+  `,
+
+  // ── v2.7: Gallery ảnh nhật ký ────────────────────────────────────────────
+  gallery: () => `
+    <div class="page active" id="page-gallery">
+      <div class="page-header">
+        <div class="page-title">🖼 Gallery ảnh</div>
+        <div class="page-subtitle">Tất cả ảnh đính kèm trong nhật ký của bạn</div>
+      </div>
+      <div id="gallery-content">
+        <div class="loading-text">Đang tải...</div>
+      </div>
+    </div>
+  `,
+
+  // ── v2.7: Ghi chú nhanh ───────────────────────────────────────────────────
+  notes: () => `
+    <div class="page active" id="page-notes">
+      <div class="page-header">
+        <div class="page-title">📝 Ghi chú nhanh</div>
+        <div class="page-subtitle">Sticky notes của riêng bạn · Tối đa 10 ghi chú</div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="settings-section-title" style="margin-bottom:12px">➕ Thêm ghi chú mới</div>
+        <textarea class="text-input" id="note-content" rows="3"
+          placeholder="Viết ghi chú, ý tưởng, nhắc nhở..." maxlength="500"
+          style="resize:vertical;margin-bottom:10px"></textarea>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="font-size:13px;color:var(--text-muted)">Màu:</span>
+            ${[['yellow','#FEF08A'],['green','#BBF7D0'],['blue','#BFDBFE'],['pink','#FBCFE8'],['white','var(--surface)']].map(([c,bg])=>
+              `<button onclick="App.selectNoteColor('${c}',this)" data-color="${c}"
+                style="width:24px;height:24px;border-radius:50%;background:${bg};border:2px solid transparent;cursor:pointer"
+                title="${c}"></button>`).join('')}
+          </div>
+          <input type="hidden" id="note-color" value="yellow" />
+          <button class="btn-primary" onclick="App.createNote()" style="margin-left:auto;padding:8px 20px">Thêm</button>
+        </div>
+      </div>
+
+      <div id="notes-list">
+        <div class="loading-text">Đang tải...</div>
+      </div>
+    </div>
+  `,
+
+  // ── v2.7: So sánh tâm trạng ──────────────────────────────────────────────
+  'mood-compare': () => `
+    <div class="page active" id="page-mood-compare">
+      <div class="page-header">
+        <div class="page-title">⚖️ So sánh tâm trạng</div>
+        <div class="page-subtitle">Chọn 2 khoảng thời gian để so sánh mood</div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div>
+            <div class="settings-section-title" style="margin-bottom:10px;color:var(--primary)">📅 Khoảng thời gian 1</div>
+            <div style="display:flex;gap:8px;flex-direction:column">
+              <div><label class="form-label">Từ ngày</label><input class="text-input" type="date" id="cmp-from1" /></div>
+              <div><label class="form-label">Đến ngày</label><input class="text-input" type="date" id="cmp-to1" /></div>
+            </div>
+          </div>
+          <div>
+            <div class="settings-section-title" style="margin-bottom:10px;color:#d97706">📅 Khoảng thời gian 2</div>
+            <div style="display:flex;gap:8px;flex-direction:column">
+              <div><label class="form-label">Từ ngày</label><input class="text-input" type="date" id="cmp-from2" /></div>
+              <div><label class="form-label">Đến ngày</label><input class="text-input" type="date" id="cmp-to2" /></div>
+            </div>
+          </div>
+        </div>
+        <button class="btn-primary" onclick="App.loadMoodCompare()" style="margin-top:16px;width:100%">So sánh</button>
+      </div>
+
+      <div id="compare-result"></div>
     </div>
   `,
 

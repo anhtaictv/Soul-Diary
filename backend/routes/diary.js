@@ -1289,6 +1289,85 @@ router.delete('/:id/share', async (req, res) => {
   }
 });
 
+// ── GET /api/diary/gallery — ảnh nhật ký (1 ảnh/entry, TOP 50) ──────────
+router.get('/gallery', authMiddleware, async (req, res) => {
+  try {
+    const db = await getPool();
+    const { bufferToDataUri } = require('../utils/media');
+    const r  = await db.request()
+      .input('uid', sql.Int, req.user.id)
+      .query(`
+        SELECT TOP 50 e.id, e.mood_score, e.created_at,
+               SUBSTRING(ISNULL(e.event_text,''), 1, 80) AS event_text,
+               m.mime_type, m.data
+        FROM DiaryEntries e
+        INNER JOIN DiaryMedia m
+          ON m.entry_id = e.id AND m.kind = 'photo' AND m.sort_order = 0
+        WHERE e.user_id = @uid
+        ORDER BY e.created_at DESC
+      `);
+    const entries = r.recordset.map(row => ({
+      id:         row.id,
+      mood_score: row.mood_score,
+      created_at: row.created_at,
+      event_text: row.event_text,
+      photo:      bufferToDataUri(row.mime_type, row.data),
+    }));
+    res.json({ entries });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+// ── GET /api/diary/compare — so sánh 2 khoảng thời gian ─────────────────
+router.get('/compare', authMiddleware, async (req, res) => {
+  try {
+    const { from1, to1, from2, to2 } = req.query;
+    if (!from1 || !to1 || !from2 || !to2)
+      return res.status(400).json({ message: 'Cần đủ 4 tham số: from1, to1, from2, to2.' });
+
+    const db  = await getPool();
+    const uid = req.user.id;
+
+    async function periodStats(from, to) {
+      const base = await db.request()
+        .input('uid',  sql.Int,      uid)
+        .input('from', sql.NVarChar, from)
+        .input('to',   sql.NVarChar, to)
+        .query(`
+          SELECT COUNT(*) as total,
+                 ROUND(AVG(CAST(mood_score AS FLOAT)), 1) as avgMood,
+                 MAX(mood_score) as maxMood,
+                 MIN(mood_score) as minMood
+          FROM DiaryEntries
+          WHERE user_id = @uid
+            AND CAST(created_at AS DATE) BETWEEN @from AND @to
+        `);
+      const tags = await db.request()
+        .input('uid',  sql.Int,      uid)
+        .input('from', sql.NVarChar, from)
+        .input('to',   sql.NVarChar, to)
+        .query(`
+          SELECT TOP 5 value as tag, COUNT(*) as count
+          FROM DiaryEntries
+          CROSS APPLY STRING_SPLIT(tags, '|')
+          WHERE user_id = @uid
+            AND CAST(created_at AS DATE) BETWEEN @from AND @to
+            AND tags IS NOT NULL AND tags != '' AND value != ''
+          GROUP BY value ORDER BY count DESC
+        `);
+      return { ...base.recordset[0], topTags: tags.recordset };
+    }
+
+    const [p1, p2] = await Promise.all([periodStats(from1, to1), periodStats(from2, to2)]);
+    res.json({ period1: { from: from1, to: to1, ...p1 }, period2: { from: from2, to: to2, ...p2 } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
 // ── GET /api/diary/year-stats — thống kê cả năm ─────────────────────────
 router.get('/year-stats', authMiddleware, async (req, res) => {
   try {

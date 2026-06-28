@@ -95,6 +95,9 @@ const App = (() => {
       case 'habits':        initHabitsPage();          break;
       case 'pomodoro':      initPomodoroPage();        break;
       case 'year-stats':    initYearStatsPage();       break;
+      case 'gallery':       initGalleryPage();         break;
+      case 'notes':         initNotesPage();           break;
+      case 'mood-compare':  initMoodComparePage();     break;
     }
   }
 
@@ -215,6 +218,10 @@ const App = (() => {
     if (window.FEATURES && window.FEATURES.pinned_entries) renderPinnedEntries(cachedEntries);
     // Daily quote (v2.6)
     if (window.FEATURES && window.FEATURES.daily_quote) loadDailyQuote();
+    // Ghi chú nhanh widget (v2.7)
+    if (window.FEATURES && window.FEATURES.quick_notes) _loadNotesDashboardWidget();
+    // Cảnh báo sức khỏe (v2.7)
+    _checkWellnessAlert();
   }
 
   function renderRecommendations(mood) {
@@ -3990,6 +3997,19 @@ const App = (() => {
       const el = document.getElementById('nav-year-stats');
       if (el) el.style.display = '';
     }
+    // v2.7 — hiện nav sau flag
+    if (window.FEATURES && window.FEATURES.photo_gallery) {
+      const el = document.getElementById('nav-gallery');
+      if (el) el.style.display = '';
+    }
+    if (window.FEATURES && window.FEATURES.quick_notes) {
+      const el = document.getElementById('nav-notes');
+      if (el) el.style.display = '';
+    }
+    if (window.FEATURES && window.FEATURES.mood_compare) {
+      const el = document.getElementById('nav-mood-compare');
+      if (el) el.style.display = '';
+    }
     nav('dashboard');
   }
 
@@ -4482,6 +4502,207 @@ const App = (() => {
         setTimeout(() => _showExerciseSuggest(score), 800);
       }
     } catch (err) { showToast('❌ ' + err.message); }
+  }
+
+  // ── v2.7: Gallery ảnh nhật ký ────────────────────────────────────────────
+  async function initGalleryPage() {
+    const el = document.getElementById('gallery-content');
+    if (!el) return;
+    el.innerHTML = '<div class="loading-text">Đang tải ảnh...</div>';
+    try {
+      const d = await API.getDiaryGallery();
+      if (!d.entries.length) {
+        el.innerHTML = `<div class="card" style="text-align:center;padding:40px;color:var(--text-muted)">
+          <div style="font-size:40px;margin-bottom:12px">📷</div>
+          <div>Chưa có ảnh nào được đính kèm trong nhật ký.</div>
+          <div style="font-size:12px;margin-top:8px">Thêm ảnh khi viết nhật ký để xem ở đây.</div>
+        </div>`;
+        return;
+      }
+      const MOOD_COLORS = ['','#dc2626','#dc2626','#f97316','#f97316','#d97706','#d97706','#65a30d','#65a30d','#16a34a','#16a34a'];
+      el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">
+        ${d.entries.map(e => `
+          <div onclick="App.openEntry(${e.id})" style="cursor:pointer;border-radius:var(--radius);overflow:hidden;position:relative;aspect-ratio:1;background:var(--border)">
+            <img src="${e.photo}" alt="" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" />
+            <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.6));padding:8px 6px 6px">
+              <span style="color:#fff;font-size:11px;font-weight:700">${new Date(e.created_at).toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit'})}</span>
+              <span style="color:${MOOD_COLORS[e.mood_score]||'#fff'};font-size:11px;font-weight:700;float:right">${e.mood_score}/10</span>
+            </div>
+          </div>`).join('')}
+      </div>
+      <div style="text-align:center;color:var(--text-muted);font-size:12px;margin-top:16px">Hiển thị ${d.entries.length} ảnh gần nhất</div>`;
+    } catch {
+      el.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:24px">Không tải được ảnh.</div>';
+    }
+  }
+
+  // ── v2.7: Ghi chú nhanh ──────────────────────────────────────────────────
+  let _selectedNoteColor = 'yellow';
+  const NOTE_BG = { yellow:'#FEF08A', green:'#BBF7D0', blue:'#BFDBFE', pink:'#FBCFE8', white:'var(--surface)' };
+
+  function selectNoteColor(color, btn) {
+    _selectedNoteColor = color;
+    document.querySelectorAll('[data-color]').forEach(b => b.style.border = '2px solid transparent');
+    if (btn) btn.style.border = '2px solid var(--primary)';
+    const hidden = document.getElementById('note-color');
+    if (hidden) hidden.value = color;
+  }
+
+  async function initNotesPage() {
+    _loadNotesList();
+    // Set default color highlight
+    const firstBtn = document.querySelector('[data-color="yellow"]');
+    if (firstBtn) firstBtn.style.border = '2px solid var(--primary)';
+  }
+
+  async function _loadNotesList() {
+    const el = document.getElementById('notes-list');
+    if (!el) return;
+    try {
+      const d = await API.getNotes();
+      if (!d.notes.length) {
+        el.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text-muted)">
+          <div style="font-size:36px;margin-bottom:12px">📝</div>Chưa có ghi chú nào. Hãy thêm ghi chú đầu tiên!</div>`;
+        return;
+      }
+      el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">
+        ${d.notes.map(n => `
+          <div style="background:${NOTE_BG[n.color]||NOTE_BG.yellow};border-radius:var(--radius);padding:14px;position:relative;min-height:100px;box-shadow:0 2px 6px rgba(0,0,0,.08)">
+            <button onclick="App.deleteNote(${n.id},this)" title="Xóa"
+              style="position:absolute;top:8px;right:8px;background:none;border:none;cursor:pointer;font-size:16px;color:rgba(0,0,0,.4);line-height:1">×</button>
+            <div style="font-size:13px;color:#1e293b;white-space:pre-wrap;line-height:1.5;padding-right:20px">${escapeHtml(n.content)}</div>
+            <div style="font-size:11px;color:rgba(0,0,0,.4);margin-top:10px">${new Date(n.created_at).toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'})}</div>
+          </div>`).join('')}
+      </div>`;
+    } catch {
+      el.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px">Không tải được ghi chú.</div>';
+    }
+  }
+
+  async function createNote() {
+    const content = (document.getElementById('note-content')?.value || '').trim();
+    if (!content) { showToast('Nhập nội dung ghi chú!'); return; }
+    try {
+      await API.createNote({ content, color: _selectedNoteColor });
+      const el = document.getElementById('note-content');
+      if (el) el.value = '';
+      showToast('📝 Đã thêm ghi chú!');
+      _loadNotesList();
+      _loadNotesDashboardWidget();
+    } catch (err) { showToast('❌ ' + err.message); }
+  }
+
+  async function deleteNote(id, btn) {
+    try {
+      await API.deleteNote(id);
+      showToast('Đã xóa ghi chú.');
+      _loadNotesList();
+      _loadNotesDashboardWidget();
+    } catch (err) { showToast('❌ ' + err.message); }
+  }
+
+  async function _loadNotesDashboardWidget() {
+    const el = document.getElementById('notes-dashboard-widget');
+    if (!el) return;
+    try {
+      const d = await API.getNotes();
+      if (!d.notes.length) { el.style.display = 'none'; return; }
+      const preview = d.notes.slice(0, 3);
+      el.innerHTML = `<div class="card" style="padding:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-weight:600;font-size:13px">📝 Ghi chú của tôi</div>
+          <button onclick="App.nav('notes')" style="font-size:12px;color:var(--primary);background:none;border:none;cursor:pointer">Xem tất cả →</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${preview.map(n => `<div style="background:${NOTE_BG[n.color]||NOTE_BG.yellow};border-radius:6px;padding:8px 10px;font-size:12px;color:#1e293b;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${escapeHtml(n.content)}</div>`).join('')}
+        </div>
+      </div>`;
+      el.style.display = '';
+    } catch { el.style.display = 'none'; }
+  }
+
+  // ── v2.7: So sánh tâm trạng ──────────────────────────────────────────────
+  function initMoodComparePage() {
+    const today = new Date().toISOString().slice(0, 10);
+    const w7    = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    const w14   = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
+    const set = (id, val) => { const el = document.getElementById(id); if (el && !el.value) el.value = val; };
+    set('cmp-from1', w14); set('cmp-to1', w7);
+    set('cmp-from2', new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10)); set('cmp-to2', today);
+  }
+
+  async function loadMoodCompare() {
+    const from1 = document.getElementById('cmp-from1')?.value;
+    const to1   = document.getElementById('cmp-to1')?.value;
+    const from2 = document.getElementById('cmp-from2')?.value;
+    const to2   = document.getElementById('cmp-to2')?.value;
+    if (!from1 || !to1 || !from2 || !to2) { showToast('Chọn đủ 4 ngày để so sánh!'); return; }
+    const el = document.getElementById('compare-result');
+    if (el) el.innerHTML = '<div class="loading-text">Đang so sánh...</div>';
+    try {
+      const d = await API.compareMood({ from1, to1, from2, to2 });
+      const moodColor = m => !m ? 'var(--text-muted)' : m >= 8 ? '#16a34a' : m >= 5 ? '#d97706' : '#dc2626';
+      const renderPeriod = (p, label, accent) => {
+        const tagHtml = p.topTags?.length
+          ? p.topTags.map(t => `<span class="tag" style="cursor:default">#${escapeHtml(t.tag)}</span>`).join(' ')
+          : '<span style="color:var(--text-muted);font-size:12px">Không có tag</span>';
+        return `<div class="card" style="border-top:3px solid ${accent}">
+          <div style="font-weight:700;font-size:14px;margin-bottom:12px;color:${accent}">${label}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">${p.from} → ${p.to}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+            <div class="stat-card" style="padding:10px"><div class="stat-value" style="color:${moodColor(p.avgMood)}">${p.avgMood ?? '-'}</div><div class="stat-label">Mood TB</div></div>
+            <div class="stat-card" style="padding:10px"><div class="stat-value">${p.total ?? 0}</div><div class="stat-label">Bài viết</div></div>
+          </div>
+          ${p.total > 0 ? `<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Min: <b>${p.minMood}</b> · Max: <b>${p.maxMood}</b></div>` : ''}
+          <div style="display:flex;flex-wrap:wrap;gap:4px">${tagHtml}</div>
+        </div>`;
+      };
+      const diff = (d.period1.avgMood && d.period2.avgMood)
+        ? (d.period2.avgMood - d.period1.avgMood).toFixed(1)
+        : null;
+      const diffHtml = diff !== null
+        ? `<div class="card" style="text-align:center;padding:14px;margin-bottom:12px">
+            <div style="font-size:13px;color:var(--text-muted)">Thay đổi mood</div>
+            <div style="font-size:28px;font-weight:700;color:${diff >= 0 ? '#16a34a' : '#dc2626'}">${diff >= 0 ? '+' : ''}${diff}</div>
+            <div style="font-size:12px;color:var(--text-muted)">${diff >= 0 ? '📈 Cải thiện' : '📉 Giảm'} so với khoảng 1</div>
+          </div>` : '';
+      if (el) el.innerHTML = diffHtml +
+        `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          ${renderPeriod(d.period1, '📅 Khoảng 1', 'var(--primary)')}
+          ${renderPeriod(d.period2, '📅 Khoảng 2', '#d97706')}
+        </div>`;
+    } catch (err) {
+      if (el) el.innerHTML = `<div style="color:var(--text-muted);text-align:center;padding:20px">Không so sánh được.</div>`;
+    }
+  }
+
+  // ── v2.7: Cảnh báo sức khỏe tâm thần nhẹ nhàng ───────────────────────────
+  async function _checkWellnessAlert() {
+    if (!window.FEATURES || !window.FEATURES.wellness_alert) return;
+    if (sessionStorage.getItem('nhk_wellness_dismissed')) return;
+    const banner = document.getElementById('wellness-alert-banner');
+    if (!banner) return;
+    try {
+      const d = await API.getStats(7);
+      if (!d.stats || d.stats.length < 3) return;
+      const avgMood = d.stats.reduce((s, r) => s + r.avg_mood, 0) / d.stats.length;
+      if (avgMood > 4) return;
+      banner.innerHTML = `<div class="card" style="padding:14px 16px;background:linear-gradient(135deg,#fef2f2,#fff7ed);border-left:4px solid #f97316">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <span style="font-size:24px;flex-shrink:0">💛</span>
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:14px;margin-bottom:4px">Bạn đang trải qua giai đoạn khó khăn</div>
+            <div style="font-size:13px;color:var(--text-muted);line-height:1.5">Mood trung bình 7 ngày gần đây khá thấp. Hãy thử làm bài check-in tâm lý hoặc gọi đường dây hỗ trợ.</div>
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+              <button onclick="App.nav('checkin')" style="padding:5px 12px;border-radius:6px;border:none;background:var(--primary);color:#fff;cursor:pointer;font-size:12px">📋 Check-in tâm lý</button>
+              <button onclick="App.nav('sos')" style="padding:5px 12px;border-radius:6px;border:none;background:#f97316;color:#fff;cursor:pointer;font-size:12px">📞 Hỗ trợ ngay</button>
+              <button onclick="sessionStorage.setItem('nhk_wellness_dismissed','1');document.getElementById('wellness-alert-banner').style.display='none'" style="padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;font-size:12px">Đã hiểu</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+      banner.style.display = '';
+    } catch {}
   }
 
   // ── v2.6: Pomodoro Timer ─────────────────────────────────────────────────
@@ -5026,5 +5247,7 @@ const App = (() => {
     loadMonthlyReport,submitReflection,quickLogMood,
     initHabitsPage,createHabit,deleteHabit,toggleHabit,togglePinEntry,
     initPomodoroPage,setPomodoroMode,togglePomodoro,resetPomodoro,updatePomodoroTimes,
-    loadYearStats,restoreDraft,discardDraft};
+    loadYearStats,restoreDraft,discardDraft,
+    initGalleryPage,initNotesPage,selectNoteColor,createNote,deleteNote,
+    initMoodComparePage,loadMoodCompare};
 })();
