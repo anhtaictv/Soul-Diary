@@ -64,6 +64,39 @@ router.post('/', async (req, res) => {
   }
 });
 
+// PUT /api/templates/:id — cập nhật template
+router.put('/:id', async (req, res) => {
+  try {
+    const { title, content, gratitude, tags, default_mood } = req.body;
+    if (!title || !title.trim())
+      return res.status(400).json({ message: 'Tên template không được để trống.' });
+    if (title.length > 200)
+      return res.status(400).json({ message: 'Tên tối đa 200 ký tự.' });
+
+    const mood = Math.min(10, Math.max(1, parseInt(default_mood) || 5));
+    const db = await getPool();
+    const r = await db.request()
+      .input('id',    sql.Int,          req.params.id)
+      .input('uid',   sql.Int,          req.user.id)
+      .input('title', sql.NVarChar(200), title.trim())
+      .input('cont',  sql.NVarChar,     content   || null)
+      .input('grat',  sql.NVarChar,     gratitude || null)
+      .input('tags',  sql.NVarChar(500), tags     || null)
+      .input('mood',  sql.Int,           mood)
+      .query(`
+        UPDATE DiaryTemplates
+        SET title=@title, content=@cont, gratitude=@grat, tags=@tags, default_mood=@mood
+        WHERE id=@id AND user_id=@uid
+      `);
+    if (!r.rowsAffected[0])
+      return res.status(404).json({ message: 'Không tìm thấy template.' });
+    res.json({ message: 'Đã cập nhật template.' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
 // DELETE /api/templates/:id — xóa template
 router.delete('/:id', async (req, res) => {
   try {

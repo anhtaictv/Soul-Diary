@@ -193,8 +193,9 @@ const API = (() => {
     removeFriend:       (id)       => request(`/friends/${id}`,        { method: 'DELETE' }),
 
     // v2.3 — Nhật ký định kỳ (templates)
-    getTemplates:    ()     => request('/templates'),
-    createTemplate:  (body) => request('/templates',       { method: 'POST',   body }),
-    deleteTemplate:  (id)   => request(`/templates/${id}`, { method: 'DELETE' }),
+    getTemplates:    ()          => request('/templates'),
+    createTemplate:  (body)      => request('/templates',       { method: 'POST',   body }),
+    updateTemplate:  (id, body)  => request(`/templates/${id}`, { method: 'PUT',    body }),
+    deleteTemplate:  (id)        => request(`/templates/${id}`, { method: 'DELETE' }),
   };
 })();

@@ -3928,6 +3928,7 @@ const App = (() => {
     if (window.FEATURES && window.FEATURES.friend_streaks) {
       const el = document.getElementById('nav-friends');
       if (el) el.style.display = '';
+      loadFriendsBadge();
     }
     if (window.FEATURES && window.FEATURES.diary_templates) {
       const el = document.getElementById('nav-templates');
@@ -3937,7 +3938,16 @@ const App = (() => {
   }
 
   // ── Streak bạn bè ─────────────────────────────────────────────────────
+  async function loadFriendsBadge() {
+    try {
+      const d = await API.getFriendRequests();
+      const badge = document.getElementById('friends-badge');
+      if (badge) badge.style.display = d.requests.length > 0 ? '' : 'none';
+    } catch {}
+  }
+
   async function initFriendsPage() {
+    loadFriendsBadge();
     _loadFriendRequests();
     _loadFriendsList();
   }
@@ -4019,6 +4029,7 @@ const App = (() => {
       showToast('✅ Đã chấp nhận lời mời!');
       _loadFriendRequests();
       _loadFriendsList();
+      loadFriendsBadge();
     } catch (err) { showToast('❌ ' + err.message); }
   }
 
@@ -4026,6 +4037,7 @@ const App = (() => {
     try {
       await API.removeFriend(id);
       _loadFriendRequests();
+      loadFriendsBadge();
     } catch {}
   }
 
@@ -4070,7 +4082,8 @@ const App = (() => {
               <div style="font-size:11px;color:var(--text-hint);margin-top:4px">Mood mặc định: ${t.default_mood}/10${t.tags ? ' · #' + t.tags.split('|').join(' #') : ''}</div>
             </div>
             <button onclick="App.applyTemplate(${t.id})" class="btn-outline" style="font-size:12px;padding:6px 10px;white-space:nowrap">📝 Dùng ngay</button>
-            <button onclick="App.deleteTemplate(${t.id},this)" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-hint);padding:4px">🗑</button>
+            <button onclick="App.editTemplate(${t.id})" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-muted);padding:4px" title="Chỉnh sửa">✏️</button>
+            <button onclick="App.deleteTemplate(${t.id},this)" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-hint);padding:4px" title="Xóa">🗑</button>
           </div>
         </div>`).join('');
     } catch (err) {
@@ -4082,13 +4095,14 @@ const App = (() => {
     const title     = (document.getElementById('tpl-title')?.value     || '').trim();
     const content   = (document.getElementById('tpl-content')?.value   || '').trim();
     const gratitude = (document.getElementById('tpl-gratitude')?.value || '').trim();
-    const tags      = (document.getElementById('tpl-tags')?.value      || '').trim();
+    const rawTags   = (document.getElementById('tpl-tags')?.value      || '').trim();
     const mood      = parseInt(document.getElementById('tpl-mood')?.value) || 5;
     const msg       = document.getElementById('tpl-msg');
+    const tags = rawTags ? rawTags.split(',').map(s => s.trim()).filter(Boolean).join('|') : null;
 
     if (!title) { if (msg) { msg.textContent = 'Tên template không được để trống.'; msg.className = 'settings-msg error'; msg.style.display = ''; } return; }
     try {
-      await API.createTemplate({ title, content: content || null, gratitude: gratitude || null, tags: tags || null, default_mood: mood });
+      await API.createTemplate({ title, content: content || null, gratitude: gratitude || null, tags, default_mood: mood });
       if (msg) { msg.textContent = '✅ Đã lưu template!'; msg.className = 'settings-msg success'; msg.style.display = ''; }
       document.getElementById('tpl-title').value     = '';
       document.getElementById('tpl-content').value   = '';
@@ -4109,6 +4123,62 @@ const App = (() => {
       _cachedTemplates = null;
       await _loadTemplates();
     } catch (err) { showToast('❌ ' + err.message); if (btn) btn.disabled = false; }
+  }
+
+  function editTemplate(id) {
+    if (!_cachedTemplates) return;
+    const t = _cachedTemplates.find(x => x.id === id);
+    if (!t) return;
+    // Điền vào form tạo template để chỉnh sửa
+    const titleEl = document.getElementById('tpl-title');
+    const contEl  = document.getElementById('tpl-content');
+    const gratEl  = document.getElementById('tpl-gratitude');
+    const tagsEl  = document.getElementById('tpl-tags');
+    const moodEl  = document.getElementById('tpl-mood');
+    if (titleEl) titleEl.value = t.title;
+    if (contEl)  contEl.value  = t.content   || '';
+    if (gratEl)  gratEl.value  = t.gratitude  || '';
+    if (tagsEl)  tagsEl.value  = t.tags ? t.tags.split('|').join(', ') : '';
+    if (moodEl)  moodEl.value  = t.default_mood || 5;
+    // Đổi nút thành "Cập nhật" và đánh dấu đang sửa
+    const saveBtn = document.querySelector('#page-templates .btn-primary[onclick="App.createTemplate()"]');
+    if (saveBtn) {
+      saveBtn.textContent = '💾 Cập nhật template';
+      saveBtn.setAttribute('onclick', `App.saveEditTemplate(${id})`);
+    }
+    titleEl?.focus();
+    titleEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  async function saveEditTemplate(id) {
+    const title     = (document.getElementById('tpl-title')?.value     || '').trim();
+    const content   = (document.getElementById('tpl-content')?.value   || '').trim();
+    const gratitude = (document.getElementById('tpl-gratitude')?.value || '').trim();
+    const rawTags   = (document.getElementById('tpl-tags')?.value      || '').trim();
+    const mood      = parseInt(document.getElementById('tpl-mood')?.value) || 5;
+    const msg       = document.getElementById('tpl-msg');
+    // Chuyển dấu phẩy → dấu | để lưu đồng bộ với format tags nhật ký
+    const tags = rawTags ? rawTags.split(',').map(s => s.trim()).filter(Boolean).join('|') : null;
+
+    if (!title) { if (msg) { msg.textContent = 'Tên template không được để trống.'; msg.className = 'settings-msg error'; msg.style.display = ''; } return; }
+    try {
+      await API.updateTemplate(id, { title, content: content || null, gratitude: gratitude || null, tags, default_mood: mood });
+      if (msg) { msg.textContent = '✅ Đã cập nhật!'; msg.className = 'settings-msg success'; msg.style.display = ''; }
+      // Reset form về chế độ tạo mới
+      document.getElementById('tpl-title').value     = '';
+      document.getElementById('tpl-content').value   = '';
+      document.getElementById('tpl-gratitude').value = '';
+      document.getElementById('tpl-tags').value      = '';
+      const saveBtn = document.querySelector('#page-templates .btn-primary[onclick*="saveEditTemplate"]');
+      if (saveBtn) {
+        saveBtn.textContent = '💾 Lưu template';
+        saveBtn.setAttribute('onclick', 'App.createTemplate()');
+      }
+      _cachedTemplates = null;
+      await _loadTemplates();
+    } catch (err) {
+      if (msg) { msg.textContent = '❌ ' + err.message; msg.className = 'settings-msg error'; msg.style.display = ''; }
+    }
   }
 
   async function openTemplatePicker() {
@@ -4164,5 +4234,5 @@ const App = (() => {
     handleAvatarUpload,removeAvatar,_applyWritingHour,renderEmotionRadar,
     shareCurrentEntry,closeShareModal,copyShareLink,revokeCurrentShare,
     sendFriendRequest,acceptFriendRequest,rejectFriendRequest,removeFriend,
-    createTemplate,deleteTemplate,openTemplatePicker,closeTemplatePicker,applyTemplate};
+    createTemplate,deleteTemplate,editTemplate,saveEditTemplate,openTemplatePicker,closeTemplatePicker,applyTemplate};
 })();
