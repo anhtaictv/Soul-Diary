@@ -83,6 +83,8 @@ app.use('/api/courses',    apiLimiter, require('./routes/courses'));
 app.use('/api/goals',      apiLimiter, require('./routes/goals'));
 app.use('/api/letters',    apiLimiter, require('./routes/letters'));
 app.use('/api/user',       apiLimiter, require('./routes/user'));
+app.use('/api/friends',    apiLimiter, require('./routes/friends'));
+app.use('/api/templates',  apiLimiter, require('./routes/templates'));
 
 // Health check
 app.get('/api/health', (req, res) => {

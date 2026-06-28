@@ -184,5 +184,17 @@ const API = (() => {
 
     // v2.0 — Xuất dữ liệu
     exportData: () => request('/user/export'),
+
+    // v2.3 — Streak bạn bè
+    getFriends:         ()         => request('/friends'),
+    getFriendRequests:  ()         => request('/friends/requests'),
+    sendFriendRequest:  (username) => request('/friends/request', { method: 'POST', body: { username } }),
+    acceptFriend:       (id)       => request(`/friends/${id}/accept`, { method: 'PUT' }),
+    removeFriend:       (id)       => request(`/friends/${id}`,        { method: 'DELETE' }),
+
+    // v2.3 — Nhật ký định kỳ (templates)
+    getTemplates:    ()     => request('/templates'),
+    createTemplate:  (body) => request('/templates',       { method: 'POST',   body }),
+    deleteTemplate:  (id)   => request(`/templates/${id}`, { method: 'DELETE' }),
   };
 })();

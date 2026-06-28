@@ -88,6 +88,11 @@ const PAGES = {
               <button class="daily-prompt-refresh" onclick="App.refreshDailyPrompt()" title="Gợi ý khác">🔄</button>
             </div>
 
+            <!-- Nút load template nhanh (ẩn khi chưa có template) -->
+            <div id="diary-template-btn-wrap" style="display:none;margin-bottom:12px">
+              <button class="btn-outline" style="font-size:12px;padding:6px 12px" onclick="App.openTemplatePicker()">📋 Dùng template</button>
+            </div>
+
             <!-- Chọn chế độ viết (ẩn cho đến khi feature cbt_guided_writing được bật) -->
             <div id="diary-mode-toggle" style="display:none;margin-bottom:16px">
               <div style="font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:8px">Chế độ viết nhật ký</div>
@@ -799,6 +804,83 @@ const PAGES = {
         <div style="font-weight:600;color:var(--text);margin-bottom:6px">Xuất toàn bộ dữ liệu</div>
         <div style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Tải về file JSON chứa tất cả nhật ký, check-in và dữ liệu cá nhân.</div>
         <button class="btn-secondary" onclick="App.exportUserData()">⬇️ Xuất dữ liệu (JSON)</button>
+      </div>
+    </div>
+  `,
+
+  friends: () => `
+    <div class="page active" id="page-friends">
+      <div class="page-header">
+        <div class="page-title">👥 Bạn bè</div>
+        <div class="page-sub">So sánh streak và cổ vũ nhau duy trì thói quen</div>
+      </div>
+
+      <!-- Gửi lời mời -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="settings-section-title" style="margin-bottom:12px">➕ Thêm bạn</div>
+        <div style="display:flex;gap:8px">
+          <input class="text-input" id="friend-username-input" placeholder="Nhập username của bạn bè..." style="flex:1" onkeydown="if(event.key==='Enter')App.sendFriendRequest()" />
+          <button class="btn-primary" style="padding:0 18px;white-space:nowrap" onclick="App.sendFriendRequest()">Gửi lời mời</button>
+        </div>
+        <div id="friend-request-msg" style="margin-top:8px;font-size:13px"></div>
+      </div>
+
+      <!-- Lời mời đang chờ -->
+      <div id="friend-requests-section" style="display:none;margin-bottom:20px">
+        <div class="section-label">📬 Lời mời đang chờ</div>
+        <div id="friend-requests-list"></div>
+      </div>
+
+      <!-- Danh sách bạn bè -->
+      <div class="section-label">🔥 Bảng xếp hạng streak bạn bè</div>
+      <div id="friends-list">
+        <div class="loading-text">Đang tải...</div>
+      </div>
+    </div>
+  `,
+
+  templates: () => `
+    <div class="page active" id="page-templates">
+      <div class="page-header">
+        <div class="page-title">📋 Nhật ký định kỳ</div>
+        <div class="page-sub">Lưu template để viết nhanh, áp dụng cho các ngày cố định</div>
+      </div>
+
+      <!-- Tạo template mới -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="settings-section-title" style="margin-bottom:14px">✨ Tạo template mới</div>
+        <div class="form-group">
+          <label class="form-label">Tên template</label>
+          <input class="text-input" id="tpl-title" placeholder="VD: Nhật ký sáng thứ Hai, Nhật ký cuối tuần..." maxlength="200" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nội dung mẫu <span style="color:var(--text-hint);font-size:11px">(tùy chọn)</span></label>
+          <textarea class="text-input" id="tpl-content" rows="3" placeholder="Hôm nay tôi cảm thấy...&#10;Điều tôi muốn tập trung hôm nay là..." style="resize:vertical"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Biết ơn mẫu <span style="color:var(--text-hint);font-size:11px">(tùy chọn)</span></label>
+          <textarea class="text-input" id="tpl-gratitude" rows="2" placeholder="Tôi biết ơn vì..." style="resize:vertical"></textarea>
+        </div>
+        <div class="grid-2" style="gap:10px">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Tags mẫu</label>
+            <input class="text-input" id="tpl-tags" placeholder="VD: sáng tạo, học tập" />
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">Mood mặc định</label>
+            <select class="text-input" id="tpl-mood">
+              ${[1,2,3,4,5,6,7,8,9,10].map(v=>`<option value="${v}"${v===5?' selected':''}>${v}/10</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <button class="btn-primary" style="max-width:200px;margin-top:4px" onclick="App.createTemplate()">💾 Lưu template</button>
+        <div id="tpl-msg" class="settings-msg" style="display:none;margin-top:10px"></div>
+      </div>
+
+      <!-- Danh sách template -->
+      <div class="section-label">📂 Template đã lưu</div>
+      <div id="templates-list">
+        <div class="loading-text">Đang tải...</div>
       </div>
     </div>
   `,
