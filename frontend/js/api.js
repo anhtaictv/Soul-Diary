@@ -193,6 +193,14 @@ const API = (() => {
     removeFriend:       (id)       => request(`/friends/${id}`,        { method: 'DELETE' }),
 
     // v2.3 — Nhật ký định kỳ (templates)
+    // v2.4 — Báo cáo tháng
+    getMonthlyReport: (month) => request(`/diary/monthly-report${month ? '?month='+month : ''}`),
+
+    // v2.4 — Phản tư cuối tuần
+    getReflectionCurrent: ()        => request('/reflections/current'),
+    getReflections:       ()        => request('/reflections'),
+    saveReflection:       (body)    => request('/reflections', { method: 'POST', body }),
+
     getTemplates:    ()          => request('/templates'),
     createTemplate:  (body)      => request('/templates',       { method: 'POST',   body }),
     updateTemplate:  (id, body)  => request(`/templates/${id}`, { method: 'PUT',    body }),

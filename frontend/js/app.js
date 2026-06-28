@@ -90,6 +90,8 @@ const App = (() => {
       case 'missions':      initMissionsPage();        break;
       case 'friends':       initFriendsPage();         break;
       case 'templates':     initTemplatesPage();       break;
+      case 'report':        initReportPage();          break;
+      case 'reflection':    initReflectionPage();      break;
     }
   }
 
@@ -201,6 +203,9 @@ const App = (() => {
 
     if (user && !todayEntry && (user.streak || 0) >= 3)
       setTimeout(() => showToast('⚠️ Chuỗi ' + user.streak + ' ngày sắp hết! Đừng quên ghi nhật ký hôm nay.'), 1500);
+
+    // Quick mood log widget (v2.4)
+    if (window.FEATURES && window.FEATURES.quick_mood_log) renderQuickMoodWidget(todayEntry);
   }
 
   function renderRecommendations(mood) {
@@ -3934,6 +3939,16 @@ const App = (() => {
       const el = document.getElementById('nav-templates');
       if (el) el.style.display = '';
     }
+    // v2.4 — hiện nav sau flag
+    if (window.FEATURES && window.FEATURES.monthly_report) {
+      const el = document.getElementById('nav-report');
+      if (el) el.style.display = '';
+    }
+    if (window.FEATURES && window.FEATURES.weekly_reflection) {
+      const el = document.getElementById('nav-reflection');
+      if (el) el.style.display = '';
+      loadReflectionBadge();
+    }
     nav('dashboard');
   }
 
@@ -4228,11 +4243,209 @@ const App = (() => {
     }, 100);
   }
 
+  // ── v2.4: Báo cáo tháng ──────────────────────────────────────────────────
+  async function initReportPage() {
+    const picker = document.getElementById('report-month-picker');
+    if (picker && !picker.value) {
+      picker.value = new Date().toISOString().slice(0, 7);
+    }
+    loadMonthlyReport();
+  }
+
+  async function loadMonthlyReport() {
+    const picker  = document.getElementById('report-month-picker');
+    const month   = picker ? picker.value : new Date().toISOString().slice(0, 7);
+    const content = document.getElementById('report-content');
+    if (!content) return;
+    content.innerHTML = '<div class="loading-text">Đang tải báo cáo...</div>';
+    try {
+      const d = await API.getMonthlyReport(month);
+      if (!d.totalEntries) {
+        content.innerHTML = `<div class="card" style="text-align:center;padding:32px;color:var(--text-muted)"><div style="font-size:36px;margin-bottom:12px">📭</div><div>Không có nhật ký nào trong tháng ${month}.</div></div>`;
+        return;
+      }
+      const moodColor = m => m >= 8 ? '#16a34a' : m >= 5 ? '#d97706' : '#dc2626';
+      const weekBars  = d.moodByWeek.map(w => {
+        const pct = Math.round((w.avg / 10) * 100);
+        return `<div style="flex:1;text-align:center">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${w.week}</div>
+          <div style="background:var(--border);border-radius:4px;height:80px;display:flex;align-items:flex-end;overflow:hidden">
+            <div style="width:100%;height:${pct}%;background:${moodColor(w.avg)};border-radius:4px 4px 0 0;transition:height .4s"></div>
+          </div>
+          <div style="font-size:12px;font-weight:600;color:${moodColor(w.avg)};margin-top:4px">${w.avg}</div>
+          <div style="font-size:10px;color:var(--text-hint)">${w.count} bài</div>
+        </div>`;
+      }).join('');
+
+      const topTagsHtml = d.topTags.length
+        ? d.topTags.map(t => `<span class="tag" style="cursor:default">#${escapeHtml(t.tag)} <span style="font-size:10px;opacity:.7">${t.count}</span></span>`).join(' ')
+        : '<span style="color:var(--text-muted);font-size:13px">Chưa có tag nào.</span>';
+
+      content.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px">
+          <div class="stat-card"><div class="stat-value">${d.totalEntries}</div><div class="stat-label">Bài viết</div></div>
+          <div class="stat-card"><div class="stat-value" style="color:${moodColor(d.avgMood)}">${d.avgMood}</div><div class="stat-label">Mood trung bình</div></div>
+          <div class="stat-card"><div class="stat-value">${d.entryDays}</div><div class="stat-label">Ngày có nhật ký</div></div>
+        </div>
+
+        ${d.bestDay ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+          <div class="card" style="padding:14px">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">🏆 Ngày tốt nhất</div>
+            <div style="font-weight:700;font-size:18px;color:#16a34a">${d.bestDay.avg}/10</div>
+            <div style="font-size:12px;color:var(--text-muted)">${new Date(d.bestDay.date).toLocaleDateString('vi-VN')}</div>
+          </div>
+          <div class="card" style="padding:14px">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">💪 Ngày khó khăn nhất</div>
+            <div style="font-weight:700;font-size:18px;color:#dc2626">${d.worstDay.avg}/10</div>
+            <div style="font-size:12px;color:var(--text-muted)">${new Date(d.worstDay.date).toLocaleDateString('vi-VN')}</div>
+          </div>
+        </div>` : ''}
+
+        <div class="card" style="margin-bottom:20px">
+          <div class="settings-section-title" style="margin-bottom:12px">📈 Xu hướng theo tuần</div>
+          <div style="display:flex;gap:8px;align-items:flex-end;height:100px">${weekBars || '<span style="color:var(--text-muted);font-size:13px">Không đủ dữ liệu.</span>'}</div>
+        </div>
+
+        <div class="card">
+          <div class="settings-section-title" style="margin-bottom:10px">🏷️ Tags nhiều nhất</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">${topTagsHtml}</div>
+        </div>`;
+    } catch (err) {
+      content.innerHTML = `<div style="color:var(--text-muted);text-align:center;padding:24px">Không tải được báo cáo.</div>`;
+    }
+  }
+
+  // ── v2.4: Phản tư cuối tuần ───────────────────────────────────────────────
+  async function loadReflectionBadge() {
+    try {
+      const d     = await API.getReflectionCurrent();
+      const badge = document.getElementById('reflection-badge');
+      const today = new Date().getDay(); // 0=CN, 6=T7
+      if (badge) badge.style.display = ((today === 0 || today === 6) && !d.reflection) ? '' : 'none';
+    } catch {}
+  }
+
+  function _getMonday(d) {
+    const day  = d.getUTCDay();
+    const diff = (day === 0) ? -6 : 1 - day;
+    const mon  = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + diff));
+    return mon.toISOString().slice(0, 10);
+  }
+
+  async function initReflectionPage() {
+    const weekStart = _getMonday(new Date());
+    const label = document.getElementById('reflection-week-label');
+    if (label) {
+      const from = new Date(weekStart + 'T00:00:00');
+      const to   = new Date(weekStart + 'T00:00:00');
+      to.setDate(to.getDate() + 6);
+      label.textContent = from.toLocaleDateString('vi-VN', { day:'2-digit', month:'2-digit' }) + ' – ' + to.toLocaleDateString('vi-VN', { day:'2-digit', month:'2-digit' });
+    }
+    try {
+      const d = await API.getReflectionCurrent();
+      if (d.reflection) {
+        const r    = d.reflection;
+        const fill = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+        fill('ref-q1', r.q1); fill('ref-q2', r.q2); fill('ref-q3', r.q3); fill('ref-q4', r.q4); fill('ref-q5', r.q5);
+        const banner = document.getElementById('reflection-done-banner');
+        if (banner) banner.style.display = '';
+      }
+    } catch {}
+    _loadReflectionHistory();
+  }
+
+  async function submitReflection() {
+    const get = id => (document.getElementById(id)?.value || '').trim() || null;
+    const msg = document.getElementById('ref-msg');
+    try {
+      await API.saveReflection({ q1: get('ref-q1'), q2: get('ref-q2'), q3: get('ref-q3'), q4: get('ref-q4'), q5: get('ref-q5') });
+      if (msg) { msg.textContent = '✅ Đã lưu phản tư tuần!'; msg.className = 'settings-msg success'; msg.style.display = ''; }
+      const banner = document.getElementById('reflection-done-banner');
+      if (banner) banner.style.display = '';
+      loadReflectionBadge();
+      _loadReflectionHistory();
+    } catch (err) {
+      if (msg) { msg.textContent = '❌ ' + err.message; msg.className = 'settings-msg error'; msg.style.display = ''; }
+    }
+  }
+
+  async function _loadReflectionHistory() {
+    const el = document.getElementById('reflection-history');
+    if (!el) return;
+    try {
+      const d = await API.getReflections();
+      if (!d.reflections.length) {
+        el.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px;font-size:13px">Chưa có phản tư nào được lưu.</div>';
+        return;
+      }
+      const QS = ['Điều tốt nhất', 'Điều khó khăn', 'Biết ơn', 'Tuần tới làm khác', 'Một từ'];
+      el.innerHTML = d.reflections.map(r => {
+        const weekLabel = new Date(r.week_start + 'T00:00:00').toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const answers   = [r.q1, r.q2, r.q3, r.q4, r.q5];
+        const html      = answers.map((a, i) => a
+          ? `<div style="margin-bottom:8px"><div style="font-size:11px;color:var(--text-muted);font-weight:600">${i+1}. ${QS[i]}</div><div style="font-size:13px;white-space:pre-wrap">${escapeHtml(a)}</div></div>`
+          : '').join('');
+        return `<div class="card" style="margin-bottom:12px"><div style="font-weight:600;margin-bottom:10px;color:var(--primary)">📅 Tuần từ ${weekLabel}</div>${html}</div>`;
+      }).join('');
+    } catch {
+      el.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px">Không tải được lịch sử.</div>';
+    }
+  }
+
+  // ── v2.4: Quick Mood Log widget ────────────────────────────────────────────
+  const QUICK_MOODS = [
+    { score: 2, emoji: '😢', label: 'Tệ' },
+    { score: 4, emoji: '😕', label: 'Buồn' },
+    { score: 6, emoji: '😐', label: 'Bình thường' },
+    { score: 8, emoji: '🙂', label: 'Tốt' },
+    { score: 10, emoji: '😄', label: 'Tuyệt!' },
+  ];
+
+  function renderQuickMoodWidget(todayEntry) {
+    const el = document.getElementById('quick-mood-widget');
+    if (!el) return;
+    if (todayEntry) {
+      const m = QUICK_MOODS.reduce((best, cur) => Math.abs(cur.score - todayEntry.mood_score) < Math.abs(best.score - todayEntry.mood_score) ? cur : best);
+      el.innerHTML = `<div class="card" style="text-align:center;padding:16px 12px">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">Mood hôm nay</div>
+        <div style="font-size:32px">${m.emoji}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--primary)">${todayEntry.mood_score}/10 · ${m.label}</div>
+      </div>`;
+    } else {
+      el.innerHTML = `<div class="card" style="padding:16px 12px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px">⚡ Mood hôm nay thế nào?</div>
+        <div style="display:flex;justify-content:space-around;gap:4px">
+          ${QUICK_MOODS.map(m => `
+            <button onclick="App.quickLogMood(${m.score})" style="background:none;border:none;cursor:pointer;text-align:center;padding:8px 4px;border-radius:var(--radius);transition:background .15s" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='none'">
+              <div style="font-size:28px">${m.emoji}</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${m.label}</div>
+            </button>`).join('')}
+        </div>
+      </div>`;
+    }
+    el.style.display = '';
+  }
+
+  async function quickLogMood(score) {
+    const el = document.getElementById('quick-mood-widget');
+    try {
+      await API.createEntry({ mood_score: score, event_text: '', tags: '', gratitude: '' });
+      const m = QUICK_MOODS.find(x => x.score === score);
+      showToast(`${m.emoji} Đã ghi mood ${score}/10!`);
+      if (el) el.innerHTML = `<div class="card" style="text-align:center;padding:16px 12px">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">Mood hôm nay</div>
+        <div style="font-size:32px">${m.emoji}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--primary)">${score}/10 · ${m.label}</div>
+      </div>`;
+    } catch (err) { showToast('❌ ' + err.message); }
+  }
+
   return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,applyTheme,toggleThemePicker,loadMoreDiary,
     pinInput,pinDelete,setPinLock,managePinLock,installPWA,showMemoryCard,createFutureLetter,deleteFutureLetter,exportUserData,
     openPMRModal,openBodyScanModal,openGroundingModal,startGrounding,toggleGroundingItem,nextGroundingStep,openGratitudeModal,gratitudeNext,gratitudeBack,
     handleAvatarUpload,removeAvatar,_applyWritingHour,renderEmotionRadar,
     shareCurrentEntry,closeShareModal,copyShareLink,revokeCurrentShare,
     sendFriendRequest,acceptFriendRequest,rejectFriendRequest,removeFriend,
-    createTemplate,deleteTemplate,editTemplate,saveEditTemplate,openTemplatePicker,closeTemplatePicker,applyTemplate};
+    createTemplate,deleteTemplate,editTemplate,saveEditTemplate,openTemplatePicker,closeTemplatePicker,applyTemplate,
+    loadMonthlyReport,submitReflection,quickLogMood};
 })();

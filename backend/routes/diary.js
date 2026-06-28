@@ -1141,6 +1141,77 @@ router.get('/emotion-radar', async (req, res) => {
   }
 });
 
+// ── GET /api/diary/monthly-report — báo cáo tháng ───────────────────────
+router.get('/monthly-report', async (req, res) => {
+  try {
+    const db    = await getPool();
+    const month = req.query.month || new Date().toISOString().slice(0, 7); // YYYY-MM
+    const [year, mon] = month.split('-').map(Number);
+
+    // Tất cả entries trong tháng
+    const r = await db.request()
+      .input('uid',   sql.Int, req.user.id)
+      .input('year',  sql.Int, year)
+      .input('month', sql.Int, mon)
+      .query(`
+        SELECT
+          CAST(created_at AS DATE) AS day,
+          mood_score,
+          tags,
+          DATEPART(WEEK, created_at) AS week_num
+        FROM DiaryEntries
+        WHERE user_id=@uid
+          AND YEAR(created_at)=@year
+          AND MONTH(created_at)=@month
+        ORDER BY created_at
+      `);
+
+    const rows = r.recordset;
+    if (!rows.length) return res.json({ month, totalEntries: 0, avgMood: null, bestDay: null, worstDay: null, topTags: [], moodByWeek: [], entryDays: 0 });
+
+    // Stats cơ bản
+    const totalEntries = rows.length;
+    const avgMood      = +(rows.reduce((s, e) => s + e.mood_score, 0) / totalEntries).toFixed(1);
+
+    // Ngày tốt nhất/tệ nhất (theo avg mood trong ngày)
+    const byDay = {};
+    rows.forEach(e => {
+      if (!byDay[e.day]) byDay[e.day] = [];
+      byDay[e.day].push(e.mood_score);
+    });
+    const dayAvgs = Object.entries(byDay).map(([date, moods]) => ({
+      date, avg: +(moods.reduce((s,m)=>s+m,0)/moods.length).toFixed(1)
+    }));
+    const bestDay  = dayAvgs.reduce((a,b) => b.avg > a.avg ? b : a);
+    const worstDay = dayAvgs.reduce((a,b) => b.avg < a.avg ? b : a);
+    const entryDays = dayAvgs.length;
+
+    // Top 3 tags
+    const tagCount = {};
+    rows.forEach(e => {
+      if (!e.tags) return;
+      e.tags.split('|').forEach(t => { const s = t.trim(); if (s) tagCount[s] = (tagCount[s]||0)+1; });
+    });
+    const topTags = Object.entries(tagCount).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([tag,count])=>({tag,count}));
+
+    // Mood trung bình theo tuần trong tháng
+    const byWeek = {};
+    rows.forEach(e => {
+      const wk = `W${e.week_num}`;
+      if (!byWeek[wk]) byWeek[wk] = [];
+      byWeek[wk].push(e.mood_score);
+    });
+    const moodByWeek = Object.entries(byWeek).map(([week, moods]) => ({
+      week, avg: +(moods.reduce((s,m)=>s+m,0)/moods.length).toFixed(1), count: moods.length
+    }));
+
+    res.json({ month, totalEntries, avgMood, bestDay, worstDay, topTags, moodByWeek, entryDays });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
 // ── POST /api/diary/:id/share — tạo/lấy share token ──────────────────────
 router.post('/:id/share', async (req, res) => {
   try {
