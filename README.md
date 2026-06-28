@@ -1,316 +1,253 @@
-# 🌱 Nhật Ký Cảm Xúc Số — Full Stack
+<div align="center">
 
-**Stack:** Node.js + Express · Microsoft SQL Server · Vanilla JS Frontend
+# 🌱 Soul Diary — Nhật Ký Cảm Xúc Số
 
-> Ứng dụng nhật ký cảm xúc cho học sinh/sinh viên. Toàn bộ UI string, comment và commit message trong repo dùng **tiếng Việt** — giữ quy ước này khi sửa code. Dự án hiện **không có** test suite, lint config hay build step — đừng tự thêm vào.
+**Không gian riêng tư để lắng nghe tâm hồn mình**
 
----
+[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v2.0-6366f1?style=for-the-badge&logo=github)](https://github.com/anhtaictv/SoulDiary)
+[![Stack](https://img.shields.io/badge/Node.js_+_MSSQL-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)]()
+[![Vanilla JS](https://img.shields.io/badge/Vanilla_JS-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)]()
+[![License](https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge)]()
 
-## Cấu trúc dự án
+<br/>
 
-```
-nhat-ky-fullstack/
-├── backend/
-│   ├── server.js            # Express entry point
-│   ├── package.json
-│   ├── .env.example         # → copy thành .env và điền thông tin
-│   ├── db/
-│   │   └── index.js         # SQL Server pool + auto schema migration
-│   ├── middleware/
-│   │   └── auth.js          # JWT verification
-│   └── routes/
-│       ├── auth.js          # POST /register, POST /login, GET /me
-│       └── diary.js         # CRUD nhật ký + stats
-└── frontend/
-    ├── index.html
-    ├── css/style.css
-    └── js/
-        ├── config.js        # ← ĐỔI API_URL khi deploy
-        ├── data.js          # Dữ liệu tĩnh
-        ├── api.js           # Fetch wrappers
-        ├── auth.js          # Login/register/logout
-        ├── pages.js         # HTML templates
-        └── app.js           # App controller
-```
+*Ứng dụng nhật ký cảm xúc dành cho học sinh — sinh viên Việt Nam.*  
+*Ghi lại cảm xúc mỗi ngày, theo dõi sức khoẻ tinh thần, và lớn lên cùng AI đồng hành.*
+
+</div>
 
 ---
 
-## Cài đặt & chạy local
+## ✨ Tính năng nổi bật
+
+<table>
+<tr>
+<td width="50%">
+
+### 📖 Nhật ký & Cảm xúc
+- Ghi nhật ký với thang cảm xúc 1–10
+- Chế độ viết **tự do** hoặc **hướng dẫn CBT**
+- Phân tích cảm xúc tự động bằng **AI Gemini**
+- Tìm kiếm & bộ lọc nhật ký theo ngày
+- Đính kèm ảnh, ghi âm giọng nói 30s
+- Xuất nhật ký ra PDF
+
+</td>
+<td width="50%">
+
+### 🧠 Sức khoẻ Tinh thần
+- **Check-in hàng tuần** — PHQ-9, GAD-7, PSS-10, WHO-5
+- **Dashboard nâng cao** — xu hướng mood, ngày stress cao
+- **Trợ lý Tâm hồn AI** — phản hồi ấm áp, câu hỏi gợi mở
+- **Bản đồ cảm xúc tháng** — lịch thời tiết tâm hồn ☀️🌤️⛈️
+- Bài tập thở 4-7-8, PMR, Body Scan, 5-4-3-2-1
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 🏆 Gamification
+- **Streak hàng ngày** — mốc 7/14/21/30/50/100 ngày
+- **Huy hiệu & Level** — 9 huy hiệu, 5 cấp độ
+- **Hạt mầm tâm hồn** 🌰→🌱→🌿→🌳→🌳🌺
+- **Nhiệm vụ tuần** — 5 nhiệm vụ, thanh tiến độ
+- **Memory Card** — tạo ảnh kỷ niệm chia sẻ
+
+</td>
+<td width="50%">
+
+### 🚀 Công nghệ & UX
+- **7 theme màu sắc** — Tím Lavender, Hồng Đào, Xanh Rừng...
+- **Dark Mode** — dịu mắt ban đêm
+- **PWA & Offline** — dùng được khi mất mạng
+- **Thư gửi Tương lai** — viết thư gửi cho bản thân
+- **PIN Lock** — bảo vệ nhật ký riêng tư
+- **AI Pattern Insights** — xu hướng mood 90 ngày
+
+</td>
+</tr>
+</table>
+
+---
+
+## 📸 Ảnh chụp màn hình
+
+<div align="center">
+
+> *Giao diện sạch sẽ, tối giản — tập trung vào nội dung*
+
+</div>
+
+<!-- Thêm ảnh chụp màn hình vào đây -->
+
+---
+
+## 🛠️ Tech Stack
+
+| Lớp | Công nghệ |
+|-----|-----------|
+| **Backend** | Node.js 18+, Express 4, JWT, bcryptjs |
+| **Database** | Microsoft SQL Server (schema tự khởi tạo, không cần migration) |
+| **Frontend** | Vanilla JS (IIFE modules), HTML5, CSS3 — không framework, không build step |
+| **AI** | Google Gemini 2.0 Flash (phân tích cảm xúc, trợ lý tâm hồn, recap tuần) |
+| **Push** | Web Push API + VAPID (nhắc nhở thói quen) |
+| **Email** | Nodemailer + SMTP (thư gửi tương lai) |
+| **Process** | PM2 (production), Nodemon (dev) |
+| **Proxy** | IIS (Windows Server) hoặc Nginx (Linux) |
+
+---
+
+## 🚀 Chạy local
 
 ### 1. Backend
 
 ```bash
 cd backend
-cp .env.example .env        # Điền thông tin DB và JWT_SECRET
+cp .env.example .env      # Điền thông tin DB + JWT_SECRET + GEMINI_API_KEY
 npm install
-npm run dev                 # Chạy với nodemon (hot reload)
-# hoặc: npm start
+npm run dev               # http://localhost:3001  (nodemon, hot reload)
 ```
 
-Server khởi động tại `http://localhost:3001`
-
-Khi start lần đầu, schema tự tạo hai bảng:
-- `Users` — tài khoản người dùng
-- `DiaryEntries` — nhật ký cảm xúc
+> Schema DB tự tạo khi khởi động — không cần chạy script SQL tay.
 
 ### 2. Frontend
 
-Mở `frontend/index.html` bằng **VS Code Live Server** hoặc:
-
 ```bash
 cd frontend
-npx serve .         # http://localhost:3000
+npx serve .               # http://localhost:3000
 ```
+
+Hoặc mở `frontend/index.html` bằng **VS Code Live Server**.  
+Đảm bảo `frontend/js/config.js` trỏ đúng `API_URL` về backend đang chạy.
 
 ---
 
-## Cấu hình `.env`
+## ⚙️ Cấu hình `.env`
 
 ```env
 PORT=3001
 NODE_ENV=development
 
-# JWT — THAY BẰNG CHUỖI RANDOM DÀI, bảo mật cao
+# JWT
 JWT_SECRET=your_super_secret_key_change_this
 JWT_EXPIRES_IN=7d
 
 # SQL Server
-DB_HOST=localhost          # hoặc IP VPS
+DB_SERVER=localhost
 DB_PORT=1433
 DB_USER=sa
 DB_PASSWORD=your_password
 DB_NAME=NhatKyCamXuc
-DB_ENCRYPT=false           # true nếu dùng Azure SQL
-DB_TRUST_SERVER_CERT=true  # false nếu production có cert hợp lệ
 
-# CORS — domain frontend
-FRONTEND_URL=http://localhost:5500
+# AI & Push
+GEMINI_API_KEY=your_gemini_key
+VAPID_PUBLIC_KEY=...
+VAPID_PRIVATE_KEY=...
+VAPID_EMAIL=mailto:you@example.com
+
+# Email (thư gửi tương lai)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your@gmail.com
+SMTP_PASS=your_app_password
 ```
 
 ---
 
-## Deploy lên VPS
+## 🏗️ Kiến trúc
 
-### Bước 1: Chuẩn bị VPS
-
-```bash
-# Cài Node.js 18+
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt install -y nodejs
-
-# Cài PM2 (process manager)
-npm install -g pm2
-
-# Cài Nginx
-sudo apt install -y nginx
+```
+nhat-ky-fullstack/
+├── backend/
+│   ├── server.js              # Express entry point — helmet, cors, rate-limit, routes
+│   ├── db/
+│   │   └── index.js           # Pool MSSQL + initSchema() + seedAdmin()
+│   ├── middleware/
+│   │   ├── auth.js            # Verify JWT → req.user
+│   │   └── admin.js           # Re-query role từ DB, 403 nếu không phải admin
+│   ├── routes/
+│   │   ├── auth.js            # Đăng ký / đăng nhập / profile
+│   │   ├── diary.js           # CRUD nhật ký + AI emotion + AI companion + stats
+│   │   ├── articles.js        # Thư viện bài viết
+│   │   ├── admin.js           # Dashboard admin
+│   │   ├── settings.js        # Cài đặt SOS (MERGE upsert)
+│   │   ├── features.js        # Feature flag CRUD + release/schedule
+│   │   ├── checkin.js         # Check-in sức khoẻ tuần
+│   │   ├── letters.js         # Thư gửi tương lai
+│   │   └── user.js            # Export dữ liệu
+│   └── utils/
+│       └── mailer.js          # Nodemailer — gửi thư đến tương lai
+└── frontend/
+    ├── index.html
+    ├── css/style.css          # Toàn bộ styles — theme, dark mode, animations
+    ├── sw.js                  # Service Worker (PWA, offline)
+    ├── manifest.webmanifest
+    └── js/
+        ├── config.js          # API_URL — đổi khi deploy
+        ├── data.js            # Dữ liệu tĩnh (mood, badges, missions...)
+        ├── api.js             # Fetch wrapper — JWT header, 401 handler
+        ├── auth.js            # Login / register / logout
+        ├── pages.js           # HTML templates (PAGES object)
+        ├── admin.js           # Admin module — panel, CRUD, feature flags
+        └── app.js             # App controller — nav, init, theme, dark mode
 ```
 
-### Bước 2: Upload code
-
-```bash
-# Từ máy local
-scp -r nhat-ky-fullstack/ user@YOUR_VPS_IP:/var/www/
-
-# Trên VPS
-cd /var/www/nhat-ky-fullstack/backend
-cp .env.example .env
-nano .env           # Điền thông tin thực
-npm install --production
-```
-
-### Bước 3: Cấu hình SQL Server
-
-```sql
--- Tạo database (nếu chưa có)
-CREATE DATABASE NhatKyCamXuc;
-GO
-
--- Tạo user riêng (khuyến nghị, đừng dùng sa)
-CREATE LOGIN nhatky_user WITH PASSWORD = 'StrongPassword123!';
-USE NhatKyCamXuc;
-CREATE USER nhatky_user FOR LOGIN nhatky_user;
-ALTER ROLE db_owner ADD MEMBER nhatky_user;
-GO
-```
-
-### Bước 4: Chạy backend với PM2
-
-```bash
-cd /var/www/nhat-ky-fullstack/backend
-pm2 start server.js --name nhatky-api
-pm2 startup    # Auto-start khi reboot
-pm2 save
-```
-
-### Bước 5: Cấu hình Nginx
-
-```nginx
-# /etc/nginx/sites-available/nhatky
-server {
-    listen 80;
-    server_name yourdomain.com;
-
-    # Frontend (static files)
-    location / {
-        root /var/www/nhat-ky-fullstack/frontend;
-        index index.html;
-        try_files $uri $uri/ /index.html;
-    }
-
-    # Backend API proxy
-    location /api/ {
-        proxy_pass http://localhost:3001;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
-}
-```
-
-```bash
-sudo ln -s /etc/nginx/sites-available/nhatky /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-### Bước 6: Cập nhật config frontend
-
-```javascript
-// frontend/js/config.js
-const CONFIG = {
-  API_URL: 'https://yourdomain.com/api',  // ← Đổi thành domain thật
-};
-```
-
-### Bước 7: HTTPS với Let's Encrypt (khuyến nghị)
-
-```bash
-sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d yourdomain.com
-```
+**Quy tắc quan trọng:**
+- Schema thay đổi → chỉ sửa `db/index.js`, dùng pattern `IF NOT EXISTS` idempotent
+- Tính năng mới → gate sau feature flag (`window.FEATURES.ten_flag`)
+- Frontend public method mới → phải thêm vào `return {}` của IIFE module
 
 ---
 
-## API Endpoints
+## 🌐 Deploy (production hiện tại)
 
-| Method | Endpoint | Auth | Mô tả |
-|--------|----------|------|-------|
-| POST | `/api/auth/register` | ❌ | Đăng ký tài khoản |
-| POST | `/api/auth/login` | ❌ | Đăng nhập, trả về JWT |
-| GET  | `/api/auth/me` | ✅ | Thông tin user hiện tại |
-| PUT  | `/api/auth/profile` | ✅ | Cập nhật tên |
-| GET  | `/api/diary` | ✅ | Danh sách nhật ký (phân trang) |
-| POST | `/api/diary` | ✅ | Tạo nhật ký mới |
-| PUT  | `/api/diary/:id` | ✅ | Sửa nhật ký |
-| DELETE | `/api/diary/:id` | ✅ | Xóa nhật ký |
-| GET  | `/api/diary/stats` | ✅ | Thống kê cho biểu đồ |
+Production chạy trên **Windows Server** qua **IIS + PM2**. Deployed files là bản copy riêng, không phải working directory này.
 
----
-
-## Bảo mật đã tích hợp
-
-- **bcryptjs** — hash mật khẩu với salt rounds = 12
-- **JWT** — token hết hạn sau 7 ngày
-- **Helmet** — bảo vệ các HTTP headers
-- **Rate limiting** — giới hạn auth 20 req/15 phút, API 100 req/phút
-- **Parameterized queries** — chống SQL injection hoàn toàn
-- **CORS** — chỉ cho phép domain frontend đã cấu hình
-- **Input validation** — kiểm tra phía server cho mọi input
-
----
-
-## Kiến trúc chi tiết
-
-### Backend (`backend/`)
-
-- `server.js` — entry point Express. Mount route dưới `/api/*`, áp dụng `helmet`, `cors`, hai instance `express-rate-limit` (`authLimiter` cho `/api/auth`, `apiLimiter` cho phần còn lại), gọi `initSchema()` + `seedAdmin()` lúc khởi động trước khi listen.
-- `db/index.js` — quản lý connection pool `mssql` (`getPool()`), **toàn bộ schema DB** (`initSchema()`), và `seedAdmin()`. **Config kết nối DB ở đây bị hardcode** (server/user/password/database), không đọc từ `.env` — các biến `DB_*` trong `.env` thực chất không dùng cho kết nối. Sửa `.env` sẽ không làm đổi nơi app kết nối tới.
-- Schema **không có migration tool/file riêng** — `initSchema()` chạy mỗi lần boot và là nguồn sự thật duy nhất. Khi đổi schema, luôn dùng đúng pattern idempotent-guarded SQL:
-  ```sql
-  IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='TableName' AND xtype='U') CREATE TABLE ...
-  IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='X' AND COLUMN_NAME='y') ALTER TABLE X ADD y ...
-  IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_...') CREATE INDEX ...
-  ```
-  (xem ví dụ bảng `Settings` / cột `Articles.type` trong `db/index.js`) — không viết migration script riêng lẻ, không giả định DB sạch.
-- `routes/` — mỗi resource một router (`auth`, `diary`, `articles`, `admin`, `settings`, `features`, `checkin`). Route admin-only chain `authMiddleware, adminMiddleware`. Toàn bộ SQL dùng parameterized `db.request().input(...)`.
-- `middleware/auth.js` — verify JWT, set `req.user = { id, username, email }`.
-- `middleware/admin.js` — query lại `role` của user từ DB (không tin payload JWT), trả 403 nếu không phải admin.
-- Role chỉ là cột string `Users.role` (`'user' | 'admin'`), không có bảng roles/permissions riêng.
-- Với upsert (ví dụ `Settings`), dùng SQL `MERGE` (xem `routes/settings.js`) thay vì select-rồi-insert/update.
-
-### Frontend (`frontend/`)
-
-Vanilla JS, không build step, không framework. Mọi file được load qua `<script>` tag thuần trong `index.html` theo đúng thứ tự phụ thuộc: `config.js → data.js → api.js → auth.js → pages.js → admin.js → app.js`.
-
-- Mỗi file expose đúng 1 global theo pattern IIFE-revealing-module: `const App = (() => { ...; return {...}; })();`. Method public mới phải thêm vào object `return {}`, nếu không sẽ không gọi được từ `onclick="App.xxx()"` trong template.
-- `pages.js` — object `PAGES`: mỗi page một function trả về HTML string template (key trùng tên `data-page` / tham số `App.nav()`).
-- `app.js` — `App.nav(page)` thay `#main-content.innerHTML = PAGES[page]()` rồi gọi hàm `init*`/`render*` riêng của page để gắn listener + fetch data. Khi thêm page mới, phải đăng ký ở cả `PAGES` và `switch` trong `nav()`.
-- `api.js` — fetch wrapper mỏng (`API.xxx`); tập trung JWT bearer header, parse JSON, và xử lý 401 toàn cục → logout + reload.
-- Trang admin chỉ là một page khác (`PAGES.admin`, `App.nav('admin')` → `Admin.initPage()`), không phải site riêng — dùng chung session `nhk_token`/`nhk_user`. Nút sidebar `#nav-admin` ẩn/hiện dựa vào `Auth.getUser()?.role === 'admin'` (route backend vẫn luôn enforce `adminMiddleware`). `admin.js` chứa module `Admin`: chuyển panel (Tổng quan/Bài viết/Người dùng/Cài đặt/🚀 Tính năng), editor CRUD bài viết/bài tập (EasyMDE, `#adm-editor-overlay`), promote/demote role, quản lý feature flag — toàn bộ CSS admin được scope dưới `#page-admin` (hoặc class prefix `adm-` cho editor overlay) để tránh đụng class trùng tên ở nơi khác.
-- Nội dung untrusted/plain-text do admin nhập dùng `textContent` (kèm CSS `white-space:pre-wrap`), không dùng `innerHTML`, để tránh XSS — xem `renderSOSContacts`.
-
-## Deploy (production hiện tại)
-
-> ⚠️ Hướng dẫn "Deploy lên VPS" ở phần trên là tài liệu tham khảo chung (Linux + Nginx). **Trên thực tế, production hiện chạy trên Windows Server qua IIS + PM2**, và bản deploy là **một bản copy vật lý riêng**, không phải working directory này:
-
-| Thành phần | Source (sửa ở đây) | Deploy/serve từ |
+| Thành phần | Source | Serve từ |
 |---|---|---|
-| Frontend | `frontend/` | `C:\inetpub\wwwroot\souldiary` (IIS site `souldiary`, binding `souldiary.work.gd`) |
-| Backend | `backend/` | chạy tại chỗ, nhưng dưới PM2 process tên `souldiary-api` |
+| Frontend | `frontend/` | `C:\inetpub\wwwroot\souldiary` (IIS, domain `souldiary.work.gd`) |
+| Backend | `backend/` | PM2 process `souldiary-api` tại port 3001 |
 
-- **Sau khi sửa file frontend, phải copy file đã đổi vào `C:\inetpub\wwwroot\souldiary`** (đúng subpath, ví dụ `js/app.js`) — IIS sẽ tiếp tục serve file cũ nếu không, browser sẽ không thấy thay đổi dù hard refresh. `web.config` trong dir deploy xử lý rewrite `/api/*` → `http://localhost:3001/api/{R:1}` và SPA fallback về `index.html`.
-- **Sau khi sửa file backend, phải restart PM2** (`pm2 restart souldiary-api`) để code mới có hiệu lực — `nodemon`/`npm run dev` chỉ dùng cho dev local.
-- `app.set('trust proxy', 'loopback')` trong `server.js` là bắt buộc vì IIS đứng trước như reverse proxy và set `X-Forwarded-For`; bỏ dòng này sẽ làm hỏng `express-rate-limit`.
+```bash
+# Sau khi sửa frontend — copy file vào IIS dir
+Copy-Item frontend\js\app.js C:\inetpub\wwwroot\souldiary\js\app.js
 
-## Lịch sử phiên bản & tính năng đã build
-
-### v1.0 — Ra mắt ứng dụng
-- Đăng ký / đăng nhập JWT, nhật ký cảm xúc 1–10, tags, biểu đồ, thư viện bài viết, nhạc Jamendo, bài tập thở 4-7-8, streak hàng ngày, trang SOS.
-
-### v1.01 — Hoàn thiện nền tảng
-- Admin panel (Tổng quan/Bài viết/Người dùng/Cài đặt), CRUD bài viết EasyMDE, quản lý role, cài đặt SOS, ghi âm 30s, đính kèm ảnh, rate limiting.
-
-### v1.2 — Giữ chân & Nâng cấp trải nghiệm
-- **Streak đa mốc** — `streak_freeze` + `max_streak` (Users). Mốc 7/14/21/30/50/100 ngày tặng freeze. Modal celebration.
-- **Weekly Recap** — computed frontend từ `GET /api/diary/stats?days=14`. So sánh 2 tuần.
-- **Huy hiệu & Level** — 9 badges, 5 levels, computed frontend từ `totalEntries` + `max_streak`.
-- **AI Weekly Summary** — Gemini `gemini-2.0-flash`, cache 1 lần/ngày vào `Users.ai_recap_text/ai_recap_date`. Rule-based fallback khi 429.
-- **Web Push Notification** — bảng `PushSubscriptions`, VAPID, cron hourly `node-cron`, nhắc đúng giờ thói quen.
-- 🐛 Sửa lỗi: hộp hướng dẫn cấp quyền microphone khi trình duyệt từ chối — phát hành ngay, không cần flag.
-- UI: huy hiệu cuộn ngang, trang SOS thành cards, textarea tự resize.
-
-### v1.3 — AI Thấu hiểu cảm xúc *(tính năng gate sau feature flags — bật trong admin)*
-- **Feature Flag System** — bảng `FeatureFlags` (`flag_key`, `label`, `description`, `version`, `version_title`, `enabled`, `release_date`, `released_at`, `sort_order`). Route `GET/POST/PUT/DELETE /api/features/admin-list`. Frontend load `window.FEATURES` tại `App.init()`. Cron `5 17 * * *` (00:05 VN) tự bật flags đã hẹn ngày. Admin tab **🚀 Tính năng**: tạo version, thêm/toggle/xóa flag, phát hành ngay hoặc hẹn ngày.
-- **AI Phân tích cảm xúc tự động** (`ai_emotion_analysis`) — cột `DiaryEntries.ai_emotion NVARCHAR(MAX)`. Endpoint `GET /api/diary/:id/emotion`: Gemini phân tích → JSON `{emotions:[{name,percent}], themes:[], intensity, suggestions:[]}`, cache vào DB. Rule-based fallback (`EMOTION_KW`/`THEME_KW`) khi Gemini quota hết. Sau lưu nhật ký, kích hoạt phân tích nền (fire-and-forget) nếu flag bật.
-- **Dashboard sức khỏe tâm thần nâng cao** (`enhanced_mental_dashboard`) — endpoint `GET /api/diary/mental-health` trả 4 chỉ số: `topEmotion` (từ `ai_emotion` JSON hoặc tags), `stressDay` (ngày trong tuần avg mood thấp nhất, ≥2 mẫu), `topTheme` (chủ đề khi mood ≤ 5), `monthTrend` (`{this, last, diff}`). Section ẩn trên dashboard, hiện khi flag bật.
-- **Viết nhật ký theo hướng dẫn CBT** (`cbt_guided_writing`) — cột `DiaryEntries.cbt_data NVARCHAR(MAX)` (JSON `{event, thoughts, feelings, behavior}`). Nút chọn chế độ ✍️ Tự do / 🧠 Hướng dẫn CBT trong diary page (ẩn nếu flag tắt). Entry CBT hiển thị badge `🧠 CBT` trong danh sách.
-
-### v1.4 — Check-in Tâm lý *(tính năng gate sau feature flags — bật trong admin)*
-- **Check-in Sức khỏe Tinh thần hàng tuần** (`weekly_checkin`) — bảng `CheckIns` (PHQ-9/GAD-7/PSS-10/WHO-5, 31 câu, kết quả + `ai_analysis` JSON). Route `routes/checkin.js`. Nhắc nhở mỗi Thứ 7, nav item ẩn cho đến khi flag bật.
-
-### v1.5 — Nuôi dưỡng Tâm hồn *(tính năng gate sau feature flags — bật trong admin)*
-- **Bản đồ thời tiết tâm hồn** (`mood_calendar`) — endpoint `GET /api/diary/calendar?month=YYYY-MM`. Lịch tháng hiển thị icon thời tiết (☀️🌤️⛅🌧️⛈️) suy từ `avg_mood` mỗi ngày. Toggle "📈 Biểu đồ / 📅 Lịch tâm trạng" trong trang Biểu đồ.
-- **Trợ lý Tâm hồn AI** (`soul_companion`) — cột `DiaryEntries.ai_companion_message NVARCHAR(MAX)`. Endpoint `GET /api/diary/:id/companion`: Gemini trả 2-3 câu phản hồi ấm áp + câu hỏi gợi mở, fallback rule-based theo dải mood. Fire-and-forget sau khi lưu nhật ký, hiển thị trong `#companion-message-box` và khi mở lại entry. Kèm `GET /api/diary/daily-prompt` — gợi ý chủ đề viết hàng ngày (25 câu cố định theo ngày-trong-năm, không tốn quota Gemini).
-- **Không gian theo cảm xúc** (`mood_ambience`) — frontend-only: nền `#diary-form-card` đổi gradient theo `MOOD_DATA[score].color` khi đổi mood; nút gợi nhạc map mood→category (`sleep/chill/focus/nature`) rồi tự chuyển sang trang Nhạc và phát đúng mood (tái dùng `GET /api/music/tracks`).
-- **Hạt mầm tâm hồn** (`soul_seed`) — frontend-only: cây ảo trên dashboard, stage suy từ `user.streak` (🌰→🌱→🌿→🌳→🌳🌸→🌳🌺), héo 🥀 nếu `last_entry` cách hôm nay ≥2 ngày.
-
-## Feature Flag — cách dùng
-
-- `window.FEATURES` là object global được load tại `App.init()` → `loadFeatures()` từ `GET /api/features`.
-- Kiểm tra trước khi hiển thị tính năng: `if (window.FEATURES && window.FEATURES.ten_flag) { ... }`
-- **Không** dùng feature flag cho sửa lỗi hoặc cải tiến UI nhỏ — chỉ dùng cho tính năng mới có thể tắt/bật.
-- Tên cột DB là `flag_key` (không phải `key` — `key` là reserved word trong SQL Server). SELECT dùng `flag_key AS [key]` để frontend nhận `f.key`.
-- Thứ tự định nghĩa route trong `routes/features.js`: `/admin-list/release` và `/admin-list/schedule` phải đứng **trước** `/admin-list` (POST) để tránh Express match `release`/`schedule` như `:key` param.
-
-## Lưu ý / Gotchas (đã từng gặp lỗi)
-
-- `seedAdmin()` phải check trùng trên **cả** `email` và `username` (`WHERE email = @email OR username = @username`) — chỉ check email có thể đụng `UNIQUE` constraint trên `username` lúc khởi động, throw, trigger `process.exit(1)` → PM2 restart loop vô hạn → port 3001 không bao giờ mở → IIS trả 502 cho mọi user. Nếu thấy 502 + PM2 restart count cao, kiểm tra `pm2 logs souldiary-api` để tìm lỗi DB lúc khởi động trước.
-- `server.js` log `process.env.DB_HOST` lúc boot, nhưng `db/index.js` không đọc `DB_HOST`/`DB_*` từ env, cũng không dùng key tên `DB_HOST` (key trong `.env` là `DB_SERVER`) — log line đó gây hiểu lầm/không có tác dụng, config kết nối thật chỉ nằm trong `db/index.js`.
-- **SQL Server reserved keyword làm tên cột** — `key`, `value`, `name`, `type`, `order`, `group`, `index` đều là reserved word. Nếu dùng làm tên cột phải bọc `[brackets]` hoặc đặt tên khác (ví dụ `flag_key` thay vì `key`). Lỗi `Incorrect syntax near the keyword 'key'` trong `initSchema()` gây PM2 restart loop ngay khi khởi động.
-- **Gemini 429 quota** — `gemini-2.0-flash` free tier bị giới hạn. Mọi endpoint gọi Gemini đều phải có rule-based fallback (xem `smart-recap` và `analyzeEntry` trong `routes/diary.js`). Không để lỗi Gemini làm crash request.
-- **`window.FEATURES` chỉ load 1 lần** tại `App.init()` — nếu admin bật flag mới trong cùng phiên, user phải reload trang mới thấy tính năng. Đây là intentional để tránh race condition.
+# Sau khi sửa backend — restart PM2
+pm2 restart souldiary-api
+```
 
 ---
 
-> ⚠️ **Tuyên bố miễn trừ trách nhiệm**: Ứng dụng không thay thế liệu pháp tâm lý chuyên môn.
+## 📋 Lịch sử phiên bản
+
+| Phiên bản | Tên | Tính năng chính |
+|-----------|-----|-----------------|
+| v1.0 | Ra mắt | JWT auth, nhật ký cảm xúc, biểu đồ, nhạc, thở 4-7-8, SOS |
+| v1.01 | Nền tảng | Admin panel, CRUD bài viết EasyMDE, ghi âm, đính kèm ảnh |
+| v1.2 | Giữ chân | Streak đa mốc, Weekly Recap, Huy hiệu & Level, AI Recap, Web Push |
+| v1.3 | AI Cảm xúc | Feature Flags, AI phân tích cảm xúc, Dashboard sức khoẻ, CBT |
+| v1.4 | Check-in | PHQ-9 / GAD-7 / PSS-10 / WHO-5 hàng tuần |
+| v1.5 | Tâm hồn | Lịch cảm xúc, AI Trợ lý, Không gian mood, Hạt mầm tâm hồn |
+| v1.9 | Cá nhân hoá | Dark Mode, 6 Themes, Tìm kiếm, Phân trang, Sửa lỗi XSS/timeout |
+| **v2.0** | **Đột phá** | **PWA Offline, Memory Card, Thư Tương Lai, PIN Lock, Xuất dữ liệu, AI Patterns, Nhiệm vụ tuần** |
+
+---
+
+## ⚠️ Lưu ý quan trọng
+
+- **Bảo mật**: Không dùng `sa` trong production — tạo SQL login riêng với quyền tối thiểu
+- **Gemini quota**: Free tier giới hạn — mọi endpoint AI đều có rule-based fallback
+- **PM2 restart loop**: Nếu thấy IIS 502 + restart count cao → `pm2 logs souldiary-api` tìm lỗi DB startup
+- **SQL reserved words**: `key`, `value`, `name`, `type`, `order`... phải bọc `[brackets]` nếu dùng làm tên cột
+
+---
+
+<div align="center">
+
+*Ứng dụng không thay thế liệu pháp tâm lý chuyên môn.*  
+*Nếu bạn đang gặp khó khăn nghiêm trọng, hãy tìm đến chuyên gia.*
+
+**Made with ❤️ for Vietnamese students**
+
+</div>
