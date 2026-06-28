@@ -143,6 +143,22 @@ After editing backend files, restart the PM2 process (`pm2 restart souldiary-api
   **Frontend mới:** `PAGES['future-letter']`, `PAGES['missions']` trong `pages.js`. Nav items `#nav-future-letter`, `#nav-missions` (hidden, reveal by flags).  
   **CSS mới:** `.pin-overlay`, `.pin-card`, `.pin-key`, `.mission-card`, `.offline-banner`, `.btn-sm`, `.btn-secondary` trong `style.css`.
 
+### v2.1 — Sửa lỗi & Cải tiến UX
+
+- **PWA install button** — nút 📲 trong sidebar footer, ẩn cho đến khi `beforeinstallprompt` kích hoạt. `App.installPWA()`.
+- **PIN management trong Settings** — tab Bảo mật > phần Khóa PIN với nút Đặt/Đổi PIN và Xóa PIN. `App.managePinLock(action)`, `App.refreshPinStatus()`.
+- **Canvas font fix** — Memory Card dùng `"Segoe UI", "Noto Sans", system-ui` thay Georgia/Times New Roman để hiển thị tiếng Việt đúng dấu.
+
+### v2.2 — Nâng cấp Cá nhân hoá & Kết nối
+
+- **Avatar & Tiểu sử** (`enabled=1 ngay`) — cột `Users.bio NVARCHAR(300)` + `Users.avatar_url NVARCHAR(MAX)`. Route `PUT /api/auth/profile` cập nhật cả hai. Settings > Hồ sơ có avatar upload (canvas resize 200×200 → base64 JPEG) + bio textarea. Sidebar hiện ảnh thay text khi `avatar_url` tồn tại.
+- **Ghi âm 120s** — `MAX_RECORD_SECONDS` nâng từ 30 → 120 giây.
+- **Nhắc nhở thông minh** — `GET /api/auth/writing-pattern`: tìm giờ hay viết nhất trong 90 ngày (SQL `DATEPART(HOUR, created_at)`). Settings > Thông báo hiện gợi ý + nút "Áp dụng" vào `set-notif-hour`.
+- **Radar chart cảm xúc** (`ai_emotion_analysis` flag) — `GET /api/diary/emotion-radar`: tổng hợp `ai_emotion` JSON từ 30 entry gần nhất, trả `{emotions:[{name,avgPercent}], entryCount}`. Toggle "🕸 Radar cảm xúc" trong trang Biểu đồ. `App.renderEmotionRadar()` dùng Chart.js `type:'radar'`.
+- **Chia sẻ entry** — cột `DiaryEntries.share_token NVARCHAR(64)`. Routes: `POST /api/diary/:id/share` (sinh token bằng `crypto.randomBytes(32).toString('hex')`), `GET /api/diary/share/:token` (public, **đứng trước** `router.use(authMiddleware)` trong diary.js), `DELETE /api/diary/:id/share` (thu hồi). Frontend: nút 🔗 trong entry modal → `shareCurrentEntry()` → share modal với copy link + thu hồi. Public view `/share/<token>` được handle trong `auth.js` `bootstrap()` — detect URL pattern, gọi `API.getSharedEntry(token)`, render inline HTML không cần login.
+
+  **Gotcha share routes**: `GET /api/diary/share/:token` phải đăng ký **trước** `router.use(authMiddleware)` trong `routes/diary.js` vì router đó áp auth cho toàn bộ. `POST /api/diary/:id/share` và `DELETE /api/diary/:id/share` đăng ký sau auth bình thường.
+
 ## Feature Flag — cách dùng
 
 - `window.FEATURES` là object global được load tại `App.init()` → `loadFeatures()` từ `GET /api/features`.
