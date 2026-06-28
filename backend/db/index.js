@@ -946,6 +946,32 @@ async function initSchema() {
     CREATE INDEX IX_DiaryEntries_share_token ON DiaryEntries(share_token)
   `);
 
+  // ── v2.1 → v2.3: Seed feature flags (disabled mặc định) ─────────────────
+  const v22flags = [
+    { key: 'pwa_install',         label: 'Cài đặt PWA',                desc: 'Nút 📲 trong sidebar cho phép cài Soul Diary về màn hình chính',    ver: 'v2.1', title: 'Sửa lỗi & Cải tiến UX', sort: 210 },
+    { key: 'pin_management',      label: 'Quản lý PIN',                 desc: 'Phần Khóa PIN trong Cài đặt > Bảo mật (đặt/đổi/xóa PIN)',           ver: 'v2.1', title: 'Sửa lỗi & Cải tiến UX', sort: 211 },
+    { key: 'avatar_bio',          label: 'Avatar & Tiểu sử',           desc: 'Upload ảnh đại diện và viết bio ngắn trong trang Hồ sơ',             ver: 'v2.2', title: 'Nâng cấp Cá nhân hoá', sort: 220 },
+    { key: 'long_recording',      label: 'Ghi âm 120 giây',            desc: 'Nâng giới hạn ghi âm nhật ký từ 30s lên 120 giây',                   ver: 'v2.2', title: 'Nâng cấp Cá nhân hoá', sort: 221 },
+    { key: 'smart_notification',  label: 'Nhắc nhở thông minh',        desc: 'Gợi ý giờ viết nhật ký dựa trên thói quen 90 ngày qua',              ver: 'v2.2', title: 'Nâng cấp Cá nhân hoá', sort: 222 },
+    { key: 'share_entry',         label: 'Chia sẻ nhật ký',            desc: 'Tạo link public cho từng entry, thu hồi được bất cứ lúc nào',        ver: 'v2.2', title: 'Nâng cấp Cá nhân hoá', sort: 223 },
+    { key: 'friend_streaks',      label: 'Streak bạn bè',              desc: 'Thêm bạn qua username, xem bảng xếp hạng streak',                    ver: 'v2.3', title: 'Streak Bạn bè & Nhật ký Định kỳ', sort: 230 },
+    { key: 'diary_templates',     label: 'Nhật ký định kỳ (Template)', desc: 'Lưu template viết sẵn, áp dụng nhanh vào form nhật ký',              ver: 'v2.3', title: 'Streak Bạn bè & Nhật ký Định kỳ', sort: 231 },
+  ];
+  for (const f of v22flags) {
+    await db.request()
+      .input('k', sql.NVarChar(100), f.key)
+      .input('l', sql.NVarChar(200), f.label)
+      .input('d', sql.NVarChar,      f.desc)
+      .input('v', sql.NVarChar(20),  f.ver)
+      .input('t', sql.NVarChar(200), f.title)
+      .input('s', sql.Int,           f.sort)
+      .query(`
+        IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key=@k)
+        INSERT INTO FeatureFlags(flag_key, label, description, version, version_title, enabled, sort_order)
+        VALUES(@k, @l, @d, @v, @t, 0, @s)
+      `);
+  }
+
   // ── v2.3: Streak bạn bè ──────────────────────────────────────────────────
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Friendships' AND xtype='U')

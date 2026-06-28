@@ -681,8 +681,8 @@ const PAGES = {
       '</div>' +
       '<div id="settings-panel-profile" class="settings-panel card">' +
         '<div class="settings-section-title">Thông tin cá nhân</div>' +
-        // Avatar
-        '<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">' +
+        // Avatar (hidden by default, shown when avatar_bio flag on)
+        '<div id="settings-avatar-wrap" style="display:none;align-items:center;gap:16px;margin-bottom:20px">' +
           '<div id="set-avatar-preview" class="avatar-upload-circle" onclick="document.getElementById(\'set-avatar-file\').click()" title="Nhấp để đổi ảnh">' +
             '<span id="set-avatar-text">SD</span>' +
             '<img id="set-avatar-img" src="" style="display:none;width:100%;height:100%;border-radius:50%;object-fit:cover" />' +
@@ -700,7 +700,7 @@ const PAGES = {
         '<div class="form-group"><label class="form-label">Tên đăng nhập</label><input class="text-input" id="set-username" disabled style="opacity:.6;cursor:not-allowed" /></div>' +
         '<div class="form-group"><label class="form-label">Email</label><input class="text-input" id="set-email" disabled style="opacity:.6;cursor:not-allowed" /></div>' +
         '<div class="form-group"><label class="form-label">Tên hiển thị</label><input class="text-input" id="set-fullname" placeholder="Tên hiển thị của bạn" /></div>' +
-        '<div class="form-group">' +
+        '<div class="form-group" id="settings-bio-group" style="display:none">' +
           '<label class="form-label">Tiểu sử <span style="color:var(--text-hint);font-size:11px">(tối đa 300 ký tự)</span></label>' +
           '<textarea class="text-input" id="set-bio" rows="3" placeholder="Giới thiệu ngắn về bản thân..." style="resize:vertical" maxlength="300" oninput="document.getElementById(\'set-bio-count\').textContent=this.value.length"></textarea>' +
           '<div style="text-align:right;font-size:11px;color:var(--text-hint);margin-top:3px"><span id="set-bio-count">0</span>/300</div>' +
@@ -715,13 +715,15 @@ const PAGES = {
         '<div class="form-group"><label class="form-label">Xác nhận mật khẩu mới</label><input class="text-input" type="password" id="set-confirm-pw" placeholder="Nhập lại mật khẩu mới" autocomplete="new-password" /></div>' +
         '<button class="btn-primary" style="max-width:220px" onclick="App.changePasswordSettings()">&#128272; Đổi mật khẩu</button>' +
         '<div id="set-security-msg" class="settings-msg" style="display:none"></div>' +
-        '<hr style="border:none;border-top:1px solid var(--border);margin:24px 0"/>' +
-        '<div class="settings-section-title">&#128274; Khóa PIN</div>' +
-        '<p style="color:var(--text-muted);font-size:13px;margin-bottom:12px">Bảo vệ nhật ký bằng mã PIN 4 chữ số. Yêu cầu nhập PIN mỗi khi mở lại ứng dụng.</p>' +
-        '<div id="set-pin-status" style="margin-bottom:14px;font-size:14px"></div>' +
-        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-          '<button class="btn-primary" style="max-width:180px" onclick="App.managePinLock(\'set\')">&#128274; Đặt / Đổi PIN</button>' +
-          '<button id="set-pin-remove-btn" class="btn-danger" style="max-width:160px;display:none" onclick="App.managePinLock(\'remove\')">&#128275; Xóa PIN</button>' +
+        '<div id="settings-pin-wrap" style="display:none">' +
+          '<hr style="border:none;border-top:1px solid var(--border);margin:24px 0"/>' +
+          '<div class="settings-section-title">&#128274; Khóa PIN</div>' +
+          '<p style="color:var(--text-muted);font-size:13px;margin-bottom:12px">Bảo vệ nhật ký bằng mã PIN 4 chữ số. Yêu cầu nhập PIN mỗi khi mở lại ứng dụng.</p>' +
+          '<div id="set-pin-status" style="margin-bottom:14px;font-size:14px"></div>' +
+          '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+            '<button class="btn-primary" style="max-width:180px" onclick="App.managePinLock(\'set\')">&#128274; Đặt / Đổi PIN</button>' +
+            '<button id="set-pin-remove-btn" class="btn-danger" style="max-width:160px;display:none" onclick="App.managePinLock(\'remove\')">&#128275; Xóa PIN</button>' +
+          '</div>' +
         '</div>' +
       '</div>' +
       '<div id="settings-panel-notifications" class="settings-panel card" style="display:none">' +
@@ -734,10 +736,12 @@ const PAGES = {
         '<div class="form-group"><label class="form-label">Ngày trong tuần</label><div class="notif-day-row" id="set-notif-days">' + dayBtns + '</div><div style="font-size:12px;color:var(--text-hint);margin-top:6px">Không chọn = nhắc tất cả các ngày</div></div>' +
         '<button class="btn-primary" style="max-width:200px" onclick="App.saveNotifSettings()">&#128190; Lưu cài đặt</button>' +
         '<div id="set-notif-msg" class="settings-msg" style="display:none"></div>' +
-        '<hr style="border:none;border-top:1px solid var(--border);margin:20px 0"/>' +
-        '<div class="settings-section-title">&#129302; Gợi ý giờ viết nhật ký</div>' +
-        '<p style="color:var(--text-muted);font-size:13px;margin-bottom:12px">Dựa trên thói quen viết của bạn trong 90 ngày qua.</p>' +
-        '<div id="set-writing-pattern"></div>' +
+        '<div id="settings-writing-pattern-wrap" style="display:none">' +
+          '<hr style="border:none;border-top:1px solid var(--border);margin:20px 0"/>' +
+          '<div class="settings-section-title">&#129302; Gợi ý giờ viết nhật ký</div>' +
+          '<p style="color:var(--text-muted);font-size:13px;margin-bottom:12px">Dựa trên thói quen viết của bạn trong 90 ngày qua.</p>' +
+          '<div id="set-writing-pattern"></div>' +
+        '</div>' +
       '</div>' +
       '<div id="settings-panel-account" class="settings-panel card" style="display:none">' +
         '<div class="settings-section-title">Thông tin tài khoản</div>' +

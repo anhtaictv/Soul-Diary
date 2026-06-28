@@ -19,7 +19,7 @@ const App = (() => {
   let recordInterval= null;
   let recordSeconds = 0;
   let recordedAudioData = null;   // data URI base64 của bản ghi âm hiện tại — gửi kèm khi lưu nhật ký
-  const MAX_RECORD_SECONDS = 120;  // v2.2: nâng giới hạn ghi âm lên 2 phút
+  let MAX_RECORD_SECONDS = 30;  // được cập nhật theo flag long_recording khi init
   let uploadedPhotos= [];
   let lastWeeklySummary = null; // { thisDays, thisAvg, diff, topTags } — dữ liệu tuần gần nhất, dùng để vẽ thẻ Mood Wrapped
   let musicTracks     = [];
@@ -317,6 +317,8 @@ const App = (() => {
     document.getElementById('entry-modal-title').innerHTML = `${MOOD_DATA[e.mood_score].emoji} ${MOOD_DATA[e.mood_score].label}`;
     document.getElementById('entry-modal-date').textContent = formatDate(e.created_at);
     document.getElementById('entry-modal-body').innerHTML = bodyHtml;
+    const shareBtn = document.getElementById('entry-share-btn');
+    if (shareBtn) shareBtn.style.display = (window.FEATURES && window.FEATURES.share_entry) ? '' : 'none';
     document.getElementById('entry-modal').classList.add('open');
   }
 
@@ -410,12 +412,14 @@ const App = (() => {
       this.style.height = 'auto';
       this.style.height = Math.min(this.scrollHeight, 380) + 'px';
     });
-    // Hiện nút template nếu user đã có template
-    API.getTemplates().then(d => {
-      _cachedTemplates = d.templates;
-      const btnWrap = document.getElementById('diary-template-btn-wrap');
-      if (btnWrap) btnWrap.style.display = d.templates.length ? '' : 'none';
-    }).catch(() => {});
+    // Hiện nút template nếu flag bật và user đã có template
+    if (window.FEATURES && window.FEATURES.diary_templates) {
+      API.getTemplates().then(d => {
+        _cachedTemplates = d.templates;
+        const btnWrap = document.getElementById('diary-template-btn-wrap');
+        if (btnWrap) btnWrap.style.display = d.templates.length ? '' : 'none';
+      }).catch(() => {});
+    }
     // Hiện nút chọn chế độ nếu tính năng CBT đã được bật
     if (window.FEATURES && window.FEATURES.cbt_guided_writing) {
       const toggle = document.getElementById('diary-mode-toggle');
@@ -2791,14 +2795,21 @@ const App = (() => {
     if (em) em.value = user.email     || '';
     if (fn) fn.value = user.full_name || '';
 
-    // Bio + avatar
-    const bioEl = document.getElementById('set-bio');
-    if (bioEl) {
-      bioEl.value = user.bio || '';
-      const cntEl = document.getElementById('set-bio-count');
-      if (cntEl) cntEl.textContent = bioEl.value.length;
+    // Bio + avatar (gated)
+    const hasAvatarBio = !!(window.FEATURES && window.FEATURES.avatar_bio);
+    const avatarWrap = document.getElementById('settings-avatar-wrap');
+    if (avatarWrap) avatarWrap.style.display = hasAvatarBio ? '' : 'none';
+    const bioGroup = document.getElementById('settings-bio-group');
+    if (bioGroup) bioGroup.style.display = hasAvatarBio ? '' : 'none';
+    if (hasAvatarBio) {
+      const bioEl = document.getElementById('set-bio');
+      if (bioEl) {
+        bioEl.value = user.bio || '';
+        const cntEl = document.getElementById('set-bio-count');
+        if (cntEl) cntEl.textContent = bioEl.value.length;
+      }
+      _renderAvatarPreview(user.avatar_url, user.avatar_text);
     }
-    _renderAvatarPreview(user.avatar_url, user.avatar_text);
 
     // Tài khoản info
     const ai = document.getElementById('set-account-info');
@@ -2810,8 +2821,11 @@ const App = (() => {
         <div>Tổng nhật ký: <strong>${user.totalEntries || '—'}</strong></div>`;
     }
 
-    // PIN status
-    refreshPinStatus();
+    // PIN (gated)
+    const pinWrap = document.getElementById('settings-pin-wrap');
+    const hasPinMgmt = !!(window.FEATURES && window.FEATURES.pin_management);
+    if (pinWrap) pinWrap.style.display = hasPinMgmt ? '' : 'none';
+    if (hasPinMgmt) refreshPinStatus();
 
     // Đồng bộ notif prefs từ DB
     try {
@@ -2821,8 +2835,10 @@ const App = (() => {
       if (hourSel) hourSel.value = fresh.user.notif_hour !== null && fresh.user.notif_hour !== undefined ? fresh.user.notif_hour : '';
     } catch {}
 
-    // Gợi ý giờ viết (writing pattern)
-    _loadWritingPattern();
+    // Gợi ý giờ viết (gated)
+    const wpSection = document.getElementById('settings-writing-pattern-wrap');
+    if (wpSection) wpSection.style.display = (window.FEATURES && window.FEATURES.smart_notification) ? '' : 'none';
+    if (window.FEATURES && window.FEATURES.smart_notification) _loadWritingPattern();
   }
 
   function _renderAvatarPreview(url, text) {
@@ -2935,8 +2951,9 @@ const App = (() => {
     const msgEl    = document.getElementById('set-profile-msg');
     if (!fullName) { showSettingsMsg(msgEl, 'Tên không được để trống.', false); return; }
     try {
-      const payload = { full_name: fullName, bio };
-      if (_pendingAvatarUrl !== null) payload.avatar_url = _pendingAvatarUrl;
+      const hasAvatarBio = !!(window.FEATURES && window.FEATURES.avatar_bio);
+      const payload = { full_name: fullName, bio: hasAvatarBio ? bio : undefined };
+      if (hasAvatarBio && _pendingAvatarUrl !== null) payload.avatar_url = _pendingAvatarUrl;
       const d    = await API.updateProfile(payload);
       const user = Auth.getUser();
       if (user) {
@@ -3796,8 +3813,11 @@ const App = (() => {
   window.addEventListener('beforeinstallprompt', e => {
     e.preventDefault();
     _pwaPrompt = e;
-    const btn = document.getElementById('pwa-install-btn');
-    if (btn) btn.style.display = '';
+    // Chỉ hiện nút khi flag pwa_install đã bật
+    if (window.FEATURES && window.FEATURES.pwa_install) {
+      const btn = document.getElementById('pwa-install-btn');
+      if (btn) btn.style.display = '';
+    }
   });
   window.addEventListener('appinstalled', () => {
     _pwaPrompt = null;
@@ -3897,11 +3917,22 @@ const App = (() => {
     // v2.0 init
     initOfflineDetection();
     _checkPinRequired();
-    // v2.3 — luôn hiện nav friends + templates (không cần flag)
-    const navFriends   = document.getElementById('nav-friends');
-    const navTemplates = document.getElementById('nav-templates');
-    if (navFriends)   navFriends.style.display   = '';
-    if (navTemplates) navTemplates.style.display = '';
+    // v2.1 — PWA install button (chỉ hiện nếu flag bật VÀ trình duyệt đã ghi nhận beforeinstallprompt)
+    if (window.FEATURES && window.FEATURES.pwa_install && _pwaPrompt) {
+      const pwaBtn = document.getElementById('pwa-install-btn');
+      if (pwaBtn) pwaBtn.style.display = '';
+    }
+    // v2.2 — cập nhật giới hạn ghi âm theo flag
+    if (window.FEATURES && window.FEATURES.long_recording) MAX_RECORD_SECONDS = 120;
+    // v2.3 — hiện nav sau flag
+    if (window.FEATURES && window.FEATURES.friend_streaks) {
+      const el = document.getElementById('nav-friends');
+      if (el) el.style.display = '';
+    }
+    if (window.FEATURES && window.FEATURES.diary_templates) {
+      const el = document.getElementById('nav-templates');
+      if (el) el.style.display = '';
+    }
     nav('dashboard');
   }
 
