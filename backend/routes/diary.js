@@ -452,15 +452,45 @@ router.get('/mental-health', async (req, res) => {
   try {
     const db = await getPool();
 
-    // 1. Cảm xúc xuất hiện nhiều nhất (từ ai_emotion JSON, fallback sang tags)
-    const emotionRes = await db.request()
-      .input('user_id', sql.Int, req.user.id)
-      .query(`
+    // Chạy 4 query song song thay vì tuần tự — tiết kiệm ~3/4 thời gian chờ DB
+    const uid = req.user.id;
+    const [emotionRes, dayRes, themeRes, trendRes] = await Promise.all([
+      db.request().input('user_id', sql.Int, uid).query(`
         SELECT TOP 30 ai_emotion, tags
         FROM DiaryEntries
         WHERE user_id = @user_id AND created_at >= DATEADD(DAY, -30, GETDATE())
         ORDER BY created_at DESC
-      `);
+      `),
+      db.request().input('user_id', sql.Int, uid).query(`
+        SELECT DATEPART(WEEKDAY, created_at) AS dow,
+               AVG(CAST(mood_score AS FLOAT)) AS avg_mood,
+               COUNT(*) AS cnt
+        FROM DiaryEntries
+        WHERE user_id = @user_id AND created_at >= DATEADD(DAY, -60, GETDATE())
+        GROUP BY DATEPART(WEEKDAY, created_at)
+        HAVING COUNT(*) >= 2
+        ORDER BY avg_mood ASC
+      `),
+      db.request().input('user_id', sql.Int, uid).query(`
+        SELECT TOP 20 ai_emotion, tags
+        FROM DiaryEntries
+        WHERE user_id = @user_id AND mood_score <= 5
+          AND created_at >= DATEADD(DAY, -30, GETDATE())
+        ORDER BY created_at DESC
+      `),
+      db.request().input('user_id', sql.Int, uid).query(`
+        SELECT
+          SUM(CASE WHEN created_at >= DATEADD(MONTH,DATEDIFF(MONTH,0,GETDATE()),0) THEN CAST(mood_score AS FLOAT) ELSE 0 END) AS this_sum,
+          SUM(CASE WHEN created_at >= DATEADD(MONTH,DATEDIFF(MONTH,0,GETDATE()),0) THEN 1 ELSE 0 END) AS this_cnt,
+          SUM(CASE WHEN created_at < DATEADD(MONTH,DATEDIFF(MONTH,0,GETDATE()),0)
+                    AND created_at >= DATEADD(MONTH,DATEDIFF(MONTH,0,GETDATE())-1,0) THEN CAST(mood_score AS FLOAT) ELSE 0 END) AS last_sum,
+          SUM(CASE WHEN created_at < DATEADD(MONTH,DATEDIFF(MONTH,0,GETDATE()),0)
+                    AND created_at >= DATEADD(MONTH,DATEDIFF(MONTH,0,GETDATE())-1,0) THEN 1 ELSE 0 END) AS last_cnt
+        FROM DiaryEntries WHERE user_id = @user_id
+      `),
+    ]);
+
+    // 1. Cảm xúc chủ đạo
     const emotionCount = {};
     for (const row of emotionRes.recordset) {
       if (row.ai_emotion) {
@@ -478,32 +508,11 @@ router.get('/mental-health', async (req, res) => {
     }
     const topEmotion = Object.entries(emotionCount).sort((a,b)=>b[1]-a[1])[0]?.[0] || null;
 
-    // 2. Ngày trong tuần căng thẳng nhất (avg mood thấp nhất, cần ít nhất 2 mẫu)
-    const dayRes = await db.request()
-      .input('user_id', sql.Int, req.user.id)
-      .query(`
-        SELECT DATEPART(WEEKDAY, created_at) AS dow,
-               AVG(CAST(mood_score AS FLOAT)) AS avg_mood,
-               COUNT(*) AS cnt
-        FROM DiaryEntries
-        WHERE user_id = @user_id AND created_at >= DATEADD(DAY, -60, GETDATE())
-        GROUP BY DATEPART(WEEKDAY, created_at)
-        HAVING COUNT(*) >= 2
-        ORDER BY avg_mood ASC
-      `);
+    // 2. Ngày trong tuần căng thẳng nhất
     const DOW = ['','Chủ nhật','Thứ hai','Thứ ba','Thứ tư','Thứ năm','Thứ sáu','Thứ bảy'];
     const stressDay = dayRes.recordset[0] ? DOW[dayRes.recordset[0].dow] : null;
 
-    // 3. Chủ đề áp lực (theme thường gặp khi mood thấp)
-    const themeRes = await db.request()
-      .input('user_id', sql.Int, req.user.id)
-      .query(`
-        SELECT TOP 20 ai_emotion, tags
-        FROM DiaryEntries
-        WHERE user_id = @user_id AND mood_score <= 5
-          AND created_at >= DATEADD(DAY, -30, GETDATE())
-        ORDER BY created_at DESC
-      `);
+    // 3. Chủ đề áp lực
     const themeCount = {};
     for (const row of themeRes.recordset) {
       if (row.ai_emotion) {
@@ -518,19 +527,7 @@ router.get('/mental-health', async (req, res) => {
     }
     const topTheme = Object.entries(themeCount).sort((a,b)=>b[1]-a[1])[0]?.[0] || null;
 
-    // 4. Xu hướng tháng này vs tháng trước
-    const trendRes = await db.request()
-      .input('user_id', sql.Int, req.user.id)
-      .query(`
-        SELECT
-          SUM(CASE WHEN created_at >= DATEADD(MONTH,DATEDIFF(MONTH,0,GETDATE()),0) THEN CAST(mood_score AS FLOAT) ELSE 0 END) AS this_sum,
-          SUM(CASE WHEN created_at >= DATEADD(MONTH,DATEDIFF(MONTH,0,GETDATE()),0) THEN 1 ELSE 0 END) AS this_cnt,
-          SUM(CASE WHEN created_at < DATEADD(MONTH,DATEDIFF(MONTH,0,GETDATE()),0)
-                    AND created_at >= DATEADD(MONTH,DATEDIFF(MONTH,0,GETDATE())-1,0) THEN CAST(mood_score AS FLOAT) ELSE 0 END) AS last_sum,
-          SUM(CASE WHEN created_at < DATEADD(MONTH,DATEDIFF(MONTH,0,GETDATE()),0)
-                    AND created_at >= DATEADD(MONTH,DATEDIFF(MONTH,0,GETDATE())-1,0) THEN 1 ELSE 0 END) AS last_cnt
-        FROM DiaryEntries WHERE user_id = @user_id
-      `);
+    // 4. Xu hướng tháng
     const tr = trendRes.recordset[0];
     const thisAvg = tr.this_cnt > 0 ? tr.this_sum / tr.this_cnt : null;
     const lastAvg = tr.last_cnt > 0 ? tr.last_sum / tr.last_cnt : null;
@@ -1444,20 +1441,15 @@ router.get('/year-stats', authMiddleware, async (req, res) => {
     const uid  = req.user.id;
     const year = parseInt(req.query.year) || new Date().getFullYear();
 
-    const overallR = await db.request()
-      .input('uid', sql.Int, uid).input('year', sql.Int, year)
-      .query(`
+    // Chạy 4 query song song
+    const [overallR, monthlyR, tagsR, userR] = await Promise.all([
+      db.request().input('uid', sql.Int, uid).input('year', sql.Int, year).query(`
         SELECT COUNT(*) as totalEntries,
                ROUND(AVG(CAST(mood_score AS FLOAT)), 1) as avgMood
         FROM DiaryEntries
         WHERE user_id = @uid AND DATEPART(YEAR, created_at) = @year
-      `);
-    const overall = overallR.recordset[0];
-    if (!overall.totalEntries) return res.json({ year, totalEntries: 0 });
-
-    const monthlyR = await db.request()
-      .input('uid', sql.Int, uid).input('year', sql.Int, year)
-      .query(`
+      `),
+      db.request().input('uid', sql.Int, uid).input('year', sql.Int, year).query(`
         SELECT DATEPART(MONTH, created_at) as month,
                COUNT(*) as count,
                ROUND(AVG(CAST(mood_score AS FLOAT)), 1) as avg
@@ -1465,11 +1457,8 @@ router.get('/year-stats', authMiddleware, async (req, res) => {
         WHERE user_id = @uid AND DATEPART(YEAR, created_at) = @year
         GROUP BY DATEPART(MONTH, created_at)
         ORDER BY month
-      `);
-
-    const tagsR = await db.request()
-      .input('uid', sql.Int, uid).input('year', sql.Int, year)
-      .query(`
+      `),
+      db.request().input('uid', sql.Int, uid).input('year', sql.Int, year).query(`
         SELECT TOP 5 value as tag, COUNT(*) as count
         FROM DiaryEntries
         CROSS APPLY STRING_SPLIT(tags, '|')
@@ -1477,11 +1466,12 @@ router.get('/year-stats', authMiddleware, async (req, res) => {
           AND tags IS NOT NULL AND tags != '' AND value != ''
         GROUP BY value
         ORDER BY count DESC
-      `);
+      `),
+      db.request().input('uid', sql.Int, uid).query(`SELECT max_streak FROM Users WHERE id = @uid`),
+    ]);
 
-    const userR = await db.request()
-      .input('uid', sql.Int, uid)
-      .query(`SELECT max_streak FROM Users WHERE id = @uid`);
+    const overall = overallR.recordset[0];
+    if (!overall.totalEntries) return res.json({ year, totalEntries: 0 });
 
     const moodByMonth = Array.from({ length: 12 }, (_, i) => {
       const m = monthlyR.recordset.find(r => r.month === i + 1);

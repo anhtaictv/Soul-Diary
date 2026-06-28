@@ -53,10 +53,17 @@ router.get('/users', async (req, res) => {
       SELECT u.id, u.username, u.email, u.full_name, u.role,
              u.streak, u.created_at,
              COUNT(d.id) AS diary_count,
-             (SELECT TOP 1 mood_score FROM DiaryEntries WHERE user_id=u.id ORDER BY created_at DESC) AS last_mood
+             lm.mood_score AS last_mood
       FROM Users u
       LEFT JOIN DiaryEntries d ON d.user_id = u.id
-      GROUP BY u.id, u.username, u.email, u.full_name, u.role, u.streak, u.created_at
+      OUTER APPLY (
+        SELECT TOP 1 mood_score
+        FROM DiaryEntries
+        WHERE user_id = u.id
+        ORDER BY created_at DESC
+      ) lm
+      GROUP BY u.id, u.username, u.email, u.full_name, u.role,
+               u.streak, u.created_at, lm.mood_score
       ORDER BY u.created_at DESC
     `);
     res.json({ users: result.recordset });

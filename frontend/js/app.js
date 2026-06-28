@@ -2373,7 +2373,19 @@ const App = (() => {
     const cardsEl = document.getElementById('mental-health-cards');
     if (cardsEl) cardsEl.innerHTML = '<div class="skeleton" style="height:80px;grid-column:1/-1;border-radius:12px"></div>';
     try {
-      const data = await API.getMentalHealth();
+      // Cache 30 phút trong session — endpoint này chạy 4 DB query song song
+      const CACHE_KEY = 'nhk_mh_cache';
+      const CACHE_TTL = 30 * 60 * 1000;
+      let data;
+      const cached = sessionStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { ts, payload } = JSON.parse(cached);
+        if (Date.now() - ts < CACHE_TTL) data = payload;
+      }
+      if (!data) {
+        data = await API.getMentalHealth();
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), payload: data }));
+      }
       let trendHtml = '—';
       if (data.monthTrend) {
         const diff = data.monthTrend.diff;
@@ -2399,7 +2411,19 @@ const App = (() => {
     if (!box) return;
     box.innerHTML = '<div style="font-size:11px;color:#166534;margin-top:8px;opacity:.6">✨ Đang phân tích...</div>';
     try {
-      const data = await API.getSmartRecap();
+      // Server đã cache theo ngày — client cache trong session để tránh re-fetch khi nav qua lại
+      const CACHE_KEY = 'nhk_recap_cache';
+      const todayKey  = new Date().toISOString().slice(0, 10);
+      let data;
+      const cached = sessionStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { date, payload } = JSON.parse(cached);
+        if (date === todayKey) data = payload;
+      }
+      if (!data) {
+        data = await API.getSmartRecap();
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ date: todayKey, payload: data }));
+      }
       if (data.insight) {
         box.innerHTML = `
           <div class="ai-insight-card">
@@ -4877,7 +4901,17 @@ const App = (() => {
     const el = document.getElementById('daily-quote-card');
     if (!el) return;
     try {
-      const d = await API.getQuoteToday();
+      // Quote chỉ thay đổi 1 lần/ngày — cache trong sessionStorage theo ngày
+      const todayKey  = new Date().toISOString().slice(0, 10);
+      const CACHE_KEY = 'nhk_quote_' + todayKey;
+      let d;
+      const cached = sessionStorage.getItem(CACHE_KEY);
+      if (cached) {
+        d = JSON.parse(cached);
+      } else {
+        d = await API.getQuoteToday();
+        if (d.quote) sessionStorage.setItem(CACHE_KEY, JSON.stringify(d));
+      }
       if (!d.quote) return;
       el.innerHTML = `<div class="card" style="padding:16px;border-left:4px solid var(--primary);background:linear-gradient(135deg,var(--surface),var(--bg))">
         <div style="font-size:13px;color:var(--text);font-style:italic;line-height:1.6;margin-bottom:8px">"${escapeHtml(d.quote.text)}"</div>

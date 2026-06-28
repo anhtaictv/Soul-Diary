@@ -13,7 +13,7 @@ const config = {
     enableArithAbort: true,
   },
   pool: {
-    max: 10, min: 0, idleTimeoutMillis: 30000,
+    max: 15, min: 2, idleTimeoutMillis: 30000,
   },
 };
 
@@ -1163,6 +1163,30 @@ async function initSchema() {
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_CheckIns_user_created')
     CREATE INDEX IX_CheckIns_user_created ON CheckIns(user_id, created_at DESC)
+  `);
+
+  // ── v2.9: Indexes bổ sung cho hiệu năng ──────────────────────────────────
+  // Covering index cho mood queries — tránh key lookup vào clustered index
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_DiaryEntries_user_mood')
+    CREATE INDEX IX_DiaryEntries_user_mood
+      ON DiaryEntries(user_id, created_at DESC)
+      INCLUDE (mood_score)
+  `);
+  // HabitLogs(user_id) — cron + habits list query filter theo user_id
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_HabitLogs_user_date')
+    CREATE INDEX IX_HabitLogs_user_date ON HabitLogs(user_id, log_date DESC)
+  `);
+  // PushSubscriptions(user_id) — cron JOIN + outreach lookup
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_PushSubs_user')
+    CREATE INDEX IX_PushSubs_user ON PushSubscriptions(user_id)
+  `);
+  // Users(last_entry) — cron filter "chưa viết hôm nay"
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_Users_last_entry')
+    CREATE INDEX IX_Users_last_entry ON Users(last_entry)
   `);
 
   // ── v2.8: Dọn dẹp dữ liệu cũ ────────────────────────────────────────────
