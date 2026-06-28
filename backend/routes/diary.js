@@ -364,7 +364,7 @@ router.get('/', async (req, res) => {
         .input('limit',   sql.Int, limit)
         .input('offset',  sql.Int, offset)
         .query(`
-          SELECT id, mood_score, event_text, thoughts, gratitude, tags, ai_emotion, ai_companion_message, cbt_data, created_at
+          SELECT id, mood_score, event_text, thoughts, gratitude, tags, ai_emotion, ai_companion_message, cbt_data, is_pinned, created_at
           FROM DiaryEntries
           WHERE user_id = @user_id
           ORDER BY created_at DESC
@@ -1014,6 +1014,40 @@ router.get('/:id/companion', async (req, res) => {
     res.json({ message, cached: false });
   } catch (err) {
     console.error('Companion message error:', err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+// ── PATCH /api/diary/:id/pin — toggle ghim nhật ký (v2.5) ───────────────
+router.patch('/:id/pin', async (req, res) => {
+  try {
+    const db = await getPool();
+
+    const entry = await db.request()
+      .input('id',  sql.Int, req.params.id)
+      .input('uid', sql.Int, req.user.id)
+      .query(`SELECT id, is_pinned FROM DiaryEntries WHERE id=@id AND user_id=@uid`);
+    if (!entry.recordset.length) return res.status(404).json({ message: 'Không tìm thấy nhật ký.' });
+
+    const current = entry.recordset[0].is_pinned;
+    if (!current) {
+      // Kiểm tra giới hạn 5 entry ghim
+      const cnt = await db.request()
+        .input('uid', sql.Int, req.user.id)
+        .query(`SELECT COUNT(*) AS c FROM DiaryEntries WHERE user_id=@uid AND is_pinned=1`);
+      if (cnt.recordset[0].c >= 5) return res.status(400).json({ message: 'Tối đa 5 nhật ký được ghim.' });
+    }
+
+    const newVal = current ? 0 : 1;
+    await db.request()
+      .input('id',  sql.Int, req.params.id)
+      .input('uid', sql.Int, req.user.id)
+      .input('val', sql.Bit, newVal)
+      .query(`UPDATE DiaryEntries SET is_pinned=@val WHERE id=@id AND user_id=@uid`);
+
+    res.json({ pinned: !!newVal });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Lỗi server.' });
   }
 });

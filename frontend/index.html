@@ -163,6 +163,7 @@
           <button class="nav-item" data-page="missions"      id="nav-missions"      style="display:none"><span class="nav-icon">🎯</span> Nhiệm vụ</button>
           <button class="nav-item" data-page="friends"       id="nav-friends"       style="display:none"><span class="nav-icon">👥</span> Bạn bè<span id="friends-badge" class="nav-badge-dot" style="display:none"></span></button>
           <button class="nav-item" data-page="templates"     id="nav-templates"     style="display:none"><span class="nav-icon">📋</span> Nhật ký định kỳ</button>
+          <button class="nav-item" data-page="habits"         id="nav-habits"        style="display:none"><span class="nav-icon">🌱</span> Thói quen</button>
           <button class="nav-item" data-page="report"        id="nav-report"        style="display:none"><span class="nav-icon">📊</span> Báo cáo tháng</button>
           <button class="nav-item" data-page="reflection"    id="nav-reflection"    style="display:none"><span class="nav-icon">🪞</span> Phản tư tuần<span id="reflection-badge" class="nav-badge-dot" style="display:none"></span></button>
           <button class="nav-item" data-page="settings"><span class="nav-icon">⚙️</span> Cài đặt</button>
@@ -492,7 +493,8 @@
         <button class="modal-close" onclick="App.closeEntryModal()">✕</button>
       </div>
       <div id="entry-modal-body" style="color:var(--text-muted);line-height:1.7"></div>
-      <div style="display:flex;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+        <button id="entry-pin-btn"   class="btn-outline" style="font-size:13px;padding:7px 14px;display:none" onclick="App.togglePinEntry()">📌 Ghim</button>
         <button id="entry-share-btn" class="btn-outline" style="font-size:13px;padding:7px 14px" onclick="App.shareCurrentEntry()">🔗 Chia sẻ</button>
       </div>
     </div>
