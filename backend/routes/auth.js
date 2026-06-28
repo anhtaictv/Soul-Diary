@@ -165,7 +165,7 @@ router.get('/me', authMiddleware, async (req, res) => {
       .query(`
         SELECT id, username, email, full_name, avatar_text, role,
                streak, streak_freeze, max_streak, last_entry, created_at,
-               notif_hour, notif_days
+               notif_hour, notif_days, bio, avatar_url
         FROM Users WHERE id = @id
       `);
 
@@ -183,8 +183,9 @@ router.get('/me', authMiddleware, async (req, res) => {
 // ── PUT /api/auth/profile — cập nhật profile ────────────────────────────
 router.put('/profile', authMiddleware, async (req, res) => {
   try {
-    const { full_name } = req.body;
+    const { full_name, bio, avatar_url } = req.body;
     if (!full_name) return res.status(400).json({ message: 'Tên không được để trống.' });
+    if (bio && bio.length > 300) return res.status(400).json({ message: 'Bio tối đa 300 ký tự.' });
 
     const avatarText = full_name.substring(0, 2).toUpperCase();
     const db = await getPool();
@@ -193,15 +194,40 @@ router.put('/profile', authMiddleware, async (req, res) => {
       .input('id',          sql.Int,      req.user.id)
       .input('full_name',   sql.NVarChar, full_name)
       .input('avatar_text', sql.NVarChar, avatarText)
+      .input('bio',         sql.NVarChar, bio || null)
+      .input('avatar_url',  sql.NVarChar, avatar_url || null)
       .query(`
         UPDATE Users
-        SET full_name = @full_name, avatar_text = @avatar_text, updated_at = GETDATE()
+        SET full_name = @full_name, avatar_text = @avatar_text,
+            bio = @bio, avatar_url = @avatar_url, updated_at = GETDATE()
         WHERE id = @id
       `);
 
-    res.json({ message: 'Cập nhật thành công.', avatar_text: avatarText, full_name });
+    res.json({ message: 'Cập nhật thành công.', avatar_text: avatarText, full_name, bio, avatar_url });
   } catch (err) {
     console.error('Update profile error:', err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+// ── GET /api/auth/writing-pattern — gợi ý giờ viết tối ưu (v2.2) ───────
+router.get('/writing-pattern', authMiddleware, async (req, res) => {
+  try {
+    const db = await getPool();
+    const r = await db.request()
+      .input('uid', sql.Int, req.user.id)
+      .query(`
+        SELECT TOP 1 DATEPART(HOUR, created_at) AS hour, COUNT(*) AS cnt
+        FROM DiaryEntries
+        WHERE user_id = @uid AND created_at >= DATEADD(day, -90, GETDATE())
+        GROUP BY DATEPART(HOUR, created_at)
+        ORDER BY cnt DESC
+      `);
+    if (!r.recordset.length) return res.json({ suggestion: null });
+    const { hour, cnt } = r.recordset[0];
+    res.json({ suggestion: hour, count: cnt });
+  } catch (e) {
+    console.error(e);
     res.status(500).json({ message: 'Lỗi server.' });
   }
 });

@@ -926,6 +926,26 @@ async function initSchema() {
             'v2.0',N'Đột phá v2.0',1,30)
   `);
 
+  // ── v2.2: Custom Avatar & Bio ────────────────────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Users' AND COLUMN_NAME='bio')
+    ALTER TABLE Users ADD bio NVARCHAR(300) NULL
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Users' AND COLUMN_NAME='avatar_url')
+    ALTER TABLE Users ADD avatar_url NVARCHAR(MAX) NULL
+  `);
+
+  // ── v2.2: Chia sẻ Entry ──────────────────────────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='DiaryEntries' AND COLUMN_NAME='share_token')
+    ALTER TABLE DiaryEntries ADD share_token NVARCHAR(64) NULL
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_DiaryEntries_share_token')
+    CREATE INDEX IX_DiaryEntries_share_token ON DiaryEntries(share_token)
+  `);
+
   // Index
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_DiaryEntries_user_created')

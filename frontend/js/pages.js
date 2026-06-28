@@ -210,6 +210,7 @@ const PAGES = {
         <button class="tag sel" id="chart-view-btn-chart"    onclick="App.switchChartView('chart',this)">📈 Biểu đồ</button>
         <button class="tag"     id="chart-view-btn-calendar" onclick="App.switchChartView('calendar',this)" style="display:none">📅 Lịch tâm trạng</button>
         <button class="tag"     id="chart-view-btn-heatmap"  onclick="App.switchChartView('heatmap',this)"  style="display:none">🗓 Heatmap năm</button>
+        <button class="tag"     id="chart-view-btn-radar"    onclick="App.switchChartView('radar',this)"    style="display:none">🕸 Radar cảm xúc</button>
       </div>
 
       <div id="chart-line-section">
@@ -277,6 +278,20 @@ const PAGES = {
             <span style="font-size:11px;color:var(--text-muted)">7–8</span>
             <span class="hm-cell hm-9-10"></span>
             <span style="font-size:11px;color:var(--text-muted)">9–10</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Radar chart cảm xúc (ẩn cho đến khi chọn view "Radar cảm xúc") -->
+      <div id="emotion-radar-section" style="display:none">
+        <div class="card">
+          <div style="font-size:15px;font-weight:600;margin-bottom:4px">Radar cảm xúc 🕸</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Tỉ lệ trung bình các cảm xúc trong 30 nhật ký gần nhất có AI phân tích</div>
+          <div style="position:relative;max-width:340px;margin:0 auto">
+            <canvas id="emotionRadarChart" style="display:block"></canvas>
+          </div>
+          <div id="emotion-radar-empty" style="display:none;text-align:center;padding:32px 0;color:var(--text-muted);font-size:14px">
+            Chưa đủ dữ liệu — hãy bật tính năng <strong>AI Phân tích cảm xúc</strong> và viết thêm nhật ký.
           </div>
         </div>
       </div>
@@ -661,9 +676,30 @@ const PAGES = {
       '</div>' +
       '<div id="settings-panel-profile" class="settings-panel card">' +
         '<div class="settings-section-title">Thông tin cá nhân</div>' +
+        // Avatar
+        '<div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">' +
+          '<div id="set-avatar-preview" class="avatar-upload-circle" onclick="document.getElementById(\'set-avatar-file\').click()" title="Nhấp để đổi ảnh">' +
+            '<span id="set-avatar-text">SD</span>' +
+            '<img id="set-avatar-img" src="" style="display:none;width:100%;height:100%;border-radius:50%;object-fit:cover" />' +
+          '</div>' +
+          '<div>' +
+            '<div style="font-size:14px;font-weight:600;margin-bottom:6px">Ảnh đại diện</div>' +
+            '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+              '<button class="btn-outline" style="font-size:12px;padding:6px 12px" onclick="document.getElementById(\'set-avatar-file\').click()">📷 Đổi ảnh</button>' +
+              '<button id="set-avatar-remove-btn" class="btn-danger" style="font-size:12px;padding:6px 10px;display:none" onclick="App.removeAvatar()">✕ Xóa</button>' +
+            '</div>' +
+            '<div style="font-size:11px;color:var(--text-hint);margin-top:5px">Ảnh vuông, tối đa 2MB</div>' +
+          '</div>' +
+          '<input type="file" id="set-avatar-file" accept="image/*" style="display:none" onchange="App.handleAvatarUpload(this)">' +
+        '</div>' +
         '<div class="form-group"><label class="form-label">Tên đăng nhập</label><input class="text-input" id="set-username" disabled style="opacity:.6;cursor:not-allowed" /></div>' +
         '<div class="form-group"><label class="form-label">Email</label><input class="text-input" id="set-email" disabled style="opacity:.6;cursor:not-allowed" /></div>' +
         '<div class="form-group"><label class="form-label">Tên hiển thị</label><input class="text-input" id="set-fullname" placeholder="Tên hiển thị của bạn" /></div>' +
+        '<div class="form-group">' +
+          '<label class="form-label">Tiểu sử <span style="color:var(--text-hint);font-size:11px">(tối đa 300 ký tự)</span></label>' +
+          '<textarea class="text-input" id="set-bio" rows="3" placeholder="Giới thiệu ngắn về bản thân..." style="resize:vertical" maxlength="300" oninput="document.getElementById(\'set-bio-count\').textContent=this.value.length"></textarea>' +
+          '<div style="text-align:right;font-size:11px;color:var(--text-hint);margin-top:3px"><span id="set-bio-count">0</span>/300</div>' +
+        '</div>' +
         '<button class="btn-primary" style="max-width:200px" onclick="App.saveProfileSettings()">&#128190; Lưu thay đổi</button>' +
         '<div id="set-profile-msg" class="settings-msg" style="display:none"></div>' +
       '</div>' +
@@ -693,6 +729,10 @@ const PAGES = {
         '<div class="form-group"><label class="form-label">Ngày trong tuần</label><div class="notif-day-row" id="set-notif-days">' + dayBtns + '</div><div style="font-size:12px;color:var(--text-hint);margin-top:6px">Không chọn = nhắc tất cả các ngày</div></div>' +
         '<button class="btn-primary" style="max-width:200px" onclick="App.saveNotifSettings()">&#128190; Lưu cài đặt</button>' +
         '<div id="set-notif-msg" class="settings-msg" style="display:none"></div>' +
+        '<hr style="border:none;border-top:1px solid var(--border);margin:20px 0"/>' +
+        '<div class="settings-section-title">&#129302; Gợi ý giờ viết nhật ký</div>' +
+        '<p style="color:var(--text-muted);font-size:13px;margin-bottom:12px">Dựa trên thói quen viết của bạn trong 90 ngày qua.</p>' +
+        '<div id="set-writing-pattern"></div>' +
       '</div>' +
       '<div id="settings-panel-account" class="settings-panel card" style="display:none">' +
         '<div class="settings-section-title">Thông tin tài khoản</div>' +
