@@ -269,7 +269,6 @@ const App = (() => {
   function entryHTML(e, withDelete=false) {
     const tags = Array.isArray(e.tags) ? e.tags : (e.tags ? e.tags.split('|') : []);
     const hasCbt = !!e.cbt_data;
-    const photos = Array.isArray(e.photos) ? e.photos : [];
     let cbtPreview = '';
     if (hasCbt) {
       try {
@@ -277,6 +276,13 @@ const App = (() => {
         if (cbt.event) cbtPreview = cbt.event;
       } catch {}
     }
+    // v2.8: dùng has_photos/photo_count/has_audio thay vì binary
+    const mediaHints = [];
+    if (e.has_photos || (Array.isArray(e.photos) && e.photos.length)) {
+      const cnt = e.photo_count || (Array.isArray(e.photos) ? e.photos.length : 0);
+      mediaHints.push(`📷 ${cnt > 1 ? cnt + ' ảnh' : '1 ảnh'}`);
+    }
+    if (e.has_audio || e.audio_data) mediaHints.push('🎙 Ghi âm');
     return `<div class="entry-item" onclick="App.openEntry(${e.id})">
       <div class="entry-meta">
         <div class="mood-dot" style="background:${MOOD_DATA[e.mood_score].color}">${MOOD_DATA[e.mood_score].emoji}</div>
@@ -288,17 +294,15 @@ const App = (() => {
       </div>
       ${(cbtPreview || e.event_text) ? `<div class="entry-preview">${cbtPreview || e.event_text}</div>` : ''}
       ${tags.length ? `<div class="entry-tags">${tags.map(t=>`<span class="entry-tag">${t}</span>`).join('')}</div>` : ''}
-      ${photos.length ? `<div class="entry-card-photos">${photos.slice(0,3).map((p,i)=>`<img src="${p}" class="entry-card-photo" />`).join('')}${photos.length>3?`<div class="entry-card-photo-more">+${photos.length-3}</div>`:''}</div>` : ''}
-      ${e.audio_data ? `<audio controls src="${e.audio_data}" style="width:100%;margin-top:8px;height:32px" onclick="event.stopPropagation()"></audio>` : ''}
+      ${mediaHints.length ? `<div style="font-size:12px;color:var(--text-hint);margin-top:6px">${mediaHints.join(' · ')}</div>` : ''}
     </div>`;
   }
 
   // ── Xem chi tiết nhật ký đã lưu ──────────────────────────────────────
-  function openEntry(id) {
+  async function openEntry(id) {
     const e = cachedEntries.find(x => x.id === id);
     if (!e) return;
-    const tags   = Array.isArray(e.tags) ? e.tags : (e.tags ? e.tags.split('|') : []);
-    const photos = Array.isArray(e.photos) ? e.photos : [];
+    const tags = Array.isArray(e.tags) ? e.tags : (e.tags ? e.tags.split('|') : []);
     let cbt = null;
     if (e.cbt_data) {
       try { cbt = typeof e.cbt_data === 'string' ? JSON.parse(e.cbt_data) : e.cbt_data; } catch {}
@@ -326,12 +330,23 @@ const App = (() => {
     if (tags.length) {
       bodyHtml += `<div class="entry-tags" style="margin-bottom:12px">${tags.map(t=>`<span class="entry-tag">${escapeHtml(t)}</span>`).join('')}</div>`;
     }
-    if (e.audio_data) {
-      bodyHtml += `<audio controls src="${e.audio_data}" style="width:100%;margin-bottom:12px;height:36px"></audio>`;
+
+    // v2.8 — lazy load media: nếu entry cũ đã có binary thì render luôn;
+    // nếu entry mới chỉ có cờ has_photos/has_audio thì chèn placeholder và fetch sau
+    const cachedPhotos = Array.isArray(e.photos) && e.photos.length > 0 ? e.photos : null;
+    const cachedAudio  = e.audio_data || null;
+    const needsLazy    = !cachedPhotos && !cachedAudio && (e.has_photos || e.has_audio);
+
+    if (cachedAudio) {
+      bodyHtml += `<audio controls src="${cachedAudio}" style="width:100%;margin-bottom:12px;height:36px"></audio>`;
     }
-    if (photos.length) {
-      bodyHtml += `<div class="entry-photo-gallery">${photos.map(p=>`<img src="${p}" class="entry-gallery-photo" onclick="App.openLightbox(this.src)" />`).join('')}</div>`;
+    if (cachedPhotos) {
+      bodyHtml += `<div class="entry-photo-gallery">${cachedPhotos.map(p=>`<img src="${p}" class="entry-gallery-photo" onclick="App.openLightbox(this.src)" />`).join('')}</div>`;
     }
+    if (needsLazy) {
+      bodyHtml += `<div id="entry-media-placeholder" style="text-align:center;color:var(--text-hint);padding:12px;font-size:13px">⏳ Đang tải media…</div>`;
+    }
+
     if (!bodyHtml) bodyHtml = '<div style="color:var(--text-hint)">Không có nội dung.</div>';
 
     _shareEntryId = e.id;
@@ -340,7 +355,6 @@ const App = (() => {
     document.getElementById('entry-modal-body').innerHTML = bodyHtml;
     const shareBtn = document.getElementById('entry-share-btn');
     if (shareBtn) shareBtn.style.display = (window.FEATURES && window.FEATURES.share_entry) ? '' : 'none';
-    // Nút ghim (v2.5)
     const pinBtn = document.getElementById('entry-pin-btn');
     if (pinBtn) {
       if (window.FEATURES && window.FEATURES.pinned_entries) {
@@ -352,6 +366,28 @@ const App = (() => {
       }
     }
     document.getElementById('entry-modal').classList.add('open');
+
+    // Tải binary media sau khi modal đã hiển thị
+    if (needsLazy) {
+      try {
+        const full     = await API.getDiaryEntry(id);
+        const fe       = full.entry;
+        const photos   = Array.isArray(fe.photos) ? fe.photos : [];
+        let mediaHtml  = '';
+        if (fe.audio_data) {
+          mediaHtml += `<audio controls src="${fe.audio_data}" style="width:100%;margin-bottom:12px;height:36px"></audio>`;
+        }
+        if (photos.length) {
+          mediaHtml += `<div class="entry-photo-gallery">${photos.map(p=>`<img src="${p}" class="entry-gallery-photo" onclick="App.openLightbox(this.src)" />`).join('')}</div>`;
+        }
+        if (!mediaHtml) mediaHtml = '';
+        const ph = document.getElementById('entry-media-placeholder');
+        if (ph) ph.outerHTML = mediaHtml;
+      } catch {
+        const ph = document.getElementById('entry-media-placeholder');
+        if (ph) ph.textContent = '⚠️ Không tải được media.';
+      }
+    }
   }
 
   function closeEntryModal(e) {

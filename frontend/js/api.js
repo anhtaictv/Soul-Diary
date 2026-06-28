@@ -225,5 +225,8 @@ const API = (() => {
     getNotes:        ()           => request('/notes'),
     createNote:      (body)       => request('/notes',       { method: 'POST',   body }),
     deleteNote:      (id)         => request(`/notes/${id}`, { method: 'DELETE' }),
+
+    // v2.8 — Tải đầy đủ 1 entry kèm ảnh/âm thanh (lazy load)
+    getDiaryEntry:   (id)         => request('/diary/' + id),
   };
 })();
