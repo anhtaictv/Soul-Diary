@@ -214,5 +214,9 @@ const API = (() => {
     createTemplate:  (body)      => request('/templates',       { method: 'POST',   body }),
     updateTemplate:  (id, body)  => request(`/templates/${id}`, { method: 'PUT',    body }),
     deleteTemplate:  (id)        => request(`/templates/${id}`, { method: 'DELETE' }),
+
+    // v2.6
+    getQuoteToday: ()      => request('/quotes/today'),
+    getYearStats:  (year)  => request(`/diary/year-stats${year ? '?year='+year : ''}`),
   };
 })();
