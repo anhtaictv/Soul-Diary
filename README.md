@@ -248,6 +248,6 @@ pm2 restart souldiary-api
 *Ứng dụng không thay thế liệu pháp tâm lý chuyên môn.*  
 *Nếu bạn đang gặp khó khăn nghiêm trọng, hãy tìm đến chuyên gia.*
 
-**Made with ❤️ by Tài Đậu Bạc**
+**Made with ❤️ by Tài Đầu Bạc**
 
 </div>
