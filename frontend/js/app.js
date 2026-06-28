@@ -19,7 +19,7 @@ const App = (() => {
   let recordInterval= null;
   let recordSeconds = 0;
   let recordedAudioData = null;   // data URI base64 của bản ghi âm hiện tại — gửi kèm khi lưu nhật ký
-  const MAX_RECORD_SECONDS = 30;  // giới hạn ghi âm cảm xúc tối đa 30 giây
+  const MAX_RECORD_SECONDS = 120;  // v2.2: nâng giới hạn ghi âm lên 2 phút
   let uploadedPhotos= [];
   let lastWeeklySummary = null; // { thisDays, thisAvg, diff, topTags } — dữ liệu tuần gần nhất, dùng để vẽ thẻ Mood Wrapped
   let musicTracks     = [];
@@ -60,12 +60,15 @@ const App = (() => {
           renderChart(14);
           const hasCal     = !!(window.FEATURES && window.FEATURES.mood_calendar);
           const hasHeatmap = !!(window.FEATURES && window.FEATURES.mood_heatmap);
+          const hasRadar   = !!(window.FEATURES && window.FEATURES.ai_emotion_analysis);
           const toggle     = document.getElementById('chart-view-toggle');
-          if (toggle) toggle.style.display = (hasCal || hasHeatmap) ? '' : 'none';
-          const calBtn  = document.getElementById('chart-view-btn-calendar');
-          const hmBtn   = document.getElementById('chart-view-btn-heatmap');
-          if (calBtn)  calBtn.style.display  = hasCal     ? '' : 'none';
-          if (hmBtn)   hmBtn.style.display   = hasHeatmap ? '' : 'none';
+          if (toggle) toggle.style.display = (hasCal || hasHeatmap || hasRadar) ? '' : 'none';
+          const calBtn    = document.getElementById('chart-view-btn-calendar');
+          const hmBtn     = document.getElementById('chart-view-btn-heatmap');
+          const radarBtn  = document.getElementById('chart-view-btn-radar');
+          if (calBtn)   calBtn.style.display   = hasCal     ? '' : 'none';
+          if (hmBtn)    hmBtn.style.display    = hasHeatmap ? '' : 'none';
+          if (radarBtn) radarBtn.style.display = hasRadar   ? '' : 'none';
         }, 80);
         break;
       case 'library':   initLibrary(); break;
@@ -308,6 +311,7 @@ const App = (() => {
     }
     if (!bodyHtml) bodyHtml = '<div style="color:var(--text-hint)">Không có nội dung.</div>';
 
+    _shareEntryId = e.id;
     document.getElementById('entry-modal-title').innerHTML = `${MOOD_DATA[e.mood_score].emoji} ${MOOD_DATA[e.mood_score].label}`;
     document.getElementById('entry-modal-date').textContent = formatDate(e.created_at);
     document.getElementById('entry-modal-body').innerHTML = bodyHtml;
@@ -335,6 +339,52 @@ const App = (() => {
     document.getElementById('about-modal').classList.add('open');
   }
   function closeAboutModal() { document.getElementById('about-modal').classList.remove('open'); }
+
+  // ── Share Entry ──────────────────────────────────────────────────────
+  let _shareEntryId = null;
+
+  async function shareCurrentEntry() {
+    if (!_shareEntryId) return;
+    const btn = document.getElementById('entry-share-btn');
+    if (btn) { btn.textContent = '...'; btn.disabled = true; }
+    try {
+      const d = await API.shareEntry(_shareEntryId);
+      const origin = window.location.origin;
+      const link = `${origin}/share/${d.token}`;
+      document.getElementById('share-link-input').value = link;
+      document.getElementById('share-modal').classList.add('open');
+    } catch (err) {
+      showToast('❌ ' + err.message);
+    } finally {
+      if (btn) { btn.textContent = '🔗 Chia sẻ'; btn.disabled = false; }
+    }
+  }
+
+  function closeShareModal() {
+    document.getElementById('share-modal').classList.remove('open');
+  }
+
+  function copyShareLink() {
+    const inp = document.getElementById('share-link-input');
+    if (!inp) return;
+    navigator.clipboard.writeText(inp.value).then(() => showToast('✅ Đã sao chép liên kết!')).catch(() => {
+      inp.select();
+      document.execCommand('copy');
+      showToast('✅ Đã sao chép!');
+    });
+  }
+
+  async function revokeCurrentShare() {
+    if (!_shareEntryId) return;
+    if (!confirm('Thu hồi chia sẻ? Liên kết cũ sẽ không còn hoạt động.')) return;
+    try {
+      await API.revokeShare(_shareEntryId);
+      closeShareModal();
+      showToast('🔒 Đã thu hồi chia sẻ.');
+    } catch (err) {
+      showToast('❌ ' + err.message);
+    }
+  }
 
   // ── Diary ────────────────────────────────────────────────────────────
 
@@ -894,11 +944,57 @@ const App = (() => {
     const lineEl    = document.getElementById('chart-line-section');
     const calEl     = document.getElementById('mood-calendar-section');
     const heatmapEl = document.getElementById('mood-heatmap-section');
+    const radarEl   = document.getElementById('emotion-radar-section');
     if (lineEl)    lineEl.style.display    = view === 'chart'    ? '' : 'none';
     if (calEl)     calEl.style.display     = view === 'calendar' ? '' : 'none';
     if (heatmapEl) heatmapEl.style.display = view === 'heatmap'  ? '' : 'none';
+    if (radarEl)   radarEl.style.display   = view === 'radar'    ? '' : 'none';
     if (view === 'calendar') renderMoodCalendar();
     if (view === 'heatmap')  renderHeatmap();
+    if (view === 'radar')    renderEmotionRadar();
+  }
+
+  let _radarChart = null;
+  async function renderEmotionRadar() {
+    const canvas   = document.getElementById('emotionRadarChart');
+    const emptyEl  = document.getElementById('emotion-radar-empty');
+    if (!canvas) return;
+    try {
+      const { emotions, entryCount } = await API.getEmotionRadar();
+      if (!emotions || !emotions.length) {
+        canvas.style.display  = 'none';
+        if (emptyEl) emptyEl.style.display = '';
+        return;
+      }
+      canvas.style.display  = '';
+      if (emptyEl) emptyEl.style.display = 'none';
+      if (_radarChart) { _radarChart.destroy(); _radarChart = null; }
+      const labels = emotions.map(e => e.name);
+      const data   = emotions.map(e => e.avgPercent);
+      const primary = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#2563eb';
+      _radarChart = new Chart(canvas, {
+        type: 'radar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Tỉ lệ cảm xúc (%)',
+            data,
+            backgroundColor: primary + '33',
+            borderColor:     primary,
+            borderWidth: 2,
+            pointBackgroundColor: primary,
+            pointRadius: 4,
+          }],
+        },
+        options: {
+          responsive: true,
+          scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 20, font: { size: 11 } } } },
+          plugins: { legend: { display: false } },
+        },
+      });
+    } catch (err) {
+      if (emptyEl) { emptyEl.style.display = ''; canvas.style.display = 'none'; }
+    }
   }
 
   function moodWeatherIcon(avg) {
@@ -2673,16 +2769,29 @@ const App = (() => {
     if (tab === 'notifications') renderSettingsNotif();
   }
 
+  let _pendingAvatarUrl = null;
+
   async function initSettingsPage() {
     const user = Auth.getUser();
     if (!user) return;
-    // Điền thông tin vào form
+    _pendingAvatarUrl = null;
+
     const un = document.getElementById('set-username');
     const em = document.getElementById('set-email');
     const fn = document.getElementById('set-fullname');
-    if (un) un.value = user.username || '';
-    if (em) em.value = user.email    || '';
+    if (un) un.value = user.username  || '';
+    if (em) em.value = user.email     || '';
     if (fn) fn.value = user.full_name || '';
+
+    // Bio + avatar
+    const bioEl = document.getElementById('set-bio');
+    if (bioEl) {
+      bioEl.value = user.bio || '';
+      const cntEl = document.getElementById('set-bio-count');
+      if (cntEl) cntEl.textContent = bioEl.value.length;
+    }
+    _renderAvatarPreview(user.avatar_url, user.avatar_text);
+
     // Tài khoản info
     const ai = document.getElementById('set-account-info');
     if (ai) {
@@ -2692,8 +2801,10 @@ const App = (() => {
         <div>Ngày tham gia: <strong>${joined}</strong></div>
         <div>Tổng nhật ký: <strong>${user.totalEntries || '—'}</strong></div>`;
     }
+
     // PIN status
     refreshPinStatus();
+
     // Đồng bộ notif prefs từ DB
     try {
       const fresh = await API.getMe();
@@ -2701,6 +2812,87 @@ const App = (() => {
       const hourSel = document.getElementById('set-notif-hour');
       if (hourSel) hourSel.value = fresh.user.notif_hour !== null && fresh.user.notif_hour !== undefined ? fresh.user.notif_hour : '';
     } catch {}
+
+    // Gợi ý giờ viết (writing pattern)
+    _loadWritingPattern();
+  }
+
+  function _renderAvatarPreview(url, text) {
+    const textEl   = document.getElementById('set-avatar-text');
+    const imgEl    = document.getElementById('set-avatar-img');
+    const removeBtn = document.getElementById('set-avatar-remove-btn');
+    if (!textEl || !imgEl) return;
+    if (url) {
+      imgEl.src         = url;
+      imgEl.style.display = '';
+      textEl.style.display = 'none';
+      if (removeBtn) removeBtn.style.display = '';
+    } else {
+      imgEl.style.display = 'none';
+      textEl.style.display = '';
+      textEl.textContent = text || 'SV';
+      if (removeBtn) removeBtn.style.display = 'none';
+    }
+  }
+
+  function handleAvatarUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { showToast('Ảnh quá lớn — tối đa 2MB'); input.value = ''; return; }
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      const img = new Image();
+      img.onload = function() {
+        const SIZE = 200;
+        const canvas = document.createElement('canvas');
+        canvas.width  = SIZE;
+        canvas.height = SIZE;
+        const ctx = canvas.getContext('2d');
+        const side = Math.min(img.width, img.height);
+        const sx   = (img.width  - side) / 2;
+        const sy   = (img.height - side) / 2;
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, SIZE, SIZE);
+        _pendingAvatarUrl = canvas.toDataURL('image/jpeg', 0.82);
+        _renderAvatarPreview(_pendingAvatarUrl, null);
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeAvatar() {
+    _pendingAvatarUrl = '';
+    const user = Auth.getUser();
+    _renderAvatarPreview(null, user ? user.avatar_text : null);
+  }
+
+  async function _loadWritingPattern() {
+    const el = document.getElementById('set-writing-pattern');
+    if (!el) return;
+    try {
+      const d = await API.getWritingPattern();
+      if (!d.suggestion && d.suggestion !== 0) {
+        el.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Chưa đủ dữ liệu — hãy viết thêm nhật ký để xem gợi ý.</p>';
+        return;
+      }
+      const h    = d.suggestion;
+      const ampm = h < 12 ? 'sáng' : h < 18 ? 'chiều' : 'tối';
+      const h12  = h === 0 ? 12 : h > 12 ? h - 12 : h;
+      el.innerHTML = `
+        <div style="display:flex;align-items:center;gap:12px;background:var(--bg);border-radius:var(--radius);padding:12px 16px">
+          <div style="font-size:28px">⏰</div>
+          <div>
+            <div style="font-weight:600;font-size:15px">${h12}:00 ${ampm}</div>
+            <div style="font-size:12px;color:var(--text-muted)">Bạn hay viết nhất vào khung giờ này (dựa trên ${d.count || ''} lần ghi gần đây)</div>
+          </div>
+          <button class="btn-outline" style="margin-left:auto;font-size:12px;padding:6px 10px;white-space:nowrap" onclick="App._applyWritingHour(${h})">Áp dụng</button>
+        </div>`;
+    } catch {}
+  }
+
+  function _applyWritingHour(h) {
+    const sel = document.getElementById('set-notif-hour');
+    if (sel) { sel.value = h; showToast('Đã chọn ' + h + ':00 — nhớ bấm Lưu cài đặt!'); }
   }
 
   function renderSettingsNotif() {
@@ -2731,14 +2923,24 @@ const App = (() => {
 
   async function saveProfileSettings() {
     const fullName = (document.getElementById('set-fullname').value || '').trim();
+    const bio      = (document.getElementById('set-bio')?.value || '').trim();
     const msgEl    = document.getElementById('set-profile-msg');
     if (!fullName) { showSettingsMsg(msgEl, 'Tên không được để trống.', false); return; }
     try {
-      const d = await API.updateProfile({ full_name: fullName });
+      const payload = { full_name: fullName, bio };
+      if (_pendingAvatarUrl !== null) payload.avatar_url = _pendingAvatarUrl;
+      const d    = await API.updateProfile(payload);
       const user = Auth.getUser();
-      if (user) { user.full_name = fullName; user.avatar_text = d.avatar_text; localStorage.setItem('nhk_user', JSON.stringify(user)); }
+      if (user) {
+        user.full_name  = fullName;
+        user.bio        = bio;
+        user.avatar_text = d.avatar_text;
+        if (_pendingAvatarUrl !== null) user.avatar_url = _pendingAvatarUrl;
+        localStorage.setItem('nhk_user', JSON.stringify(user));
+        _pendingAvatarUrl = null;
+      }
       Auth.updateSidebarUser(user);
-      showSettingsMsg(msgEl, '✅ Đã cập nhật tên hiển thị!', true);
+      showSettingsMsg(msgEl, '✅ Đã cập nhật hồ sơ!', true);
     } catch (err) { showSettingsMsg(msgEl, '❌ ' + err.message, false); }
   }
 
@@ -3645,6 +3847,7 @@ const App = (() => {
     document.getElementById('gratitude-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeGratitudeModal();});
     document.getElementById('article-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeArticleModal();});
     document.getElementById('entry-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeEntryModal();});
+    document.getElementById('share-modal')?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeShareModal();});
     document.getElementById('photo-lightbox').addEventListener('click',e=>{if(e.target===e.currentTarget)closeLightbox();});
     await loadFeatures();
     const navInbox = document.getElementById('nav-inbox');
@@ -3690,5 +3893,7 @@ const App = (() => {
 
   return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,applyTheme,toggleThemePicker,loadMoreDiary,
     pinInput,pinDelete,setPinLock,managePinLock,installPWA,showMemoryCard,createFutureLetter,deleteFutureLetter,exportUserData,
-    openPMRModal,openBodyScanModal,openGroundingModal,startGrounding,toggleGroundingItem,nextGroundingStep,openGratitudeModal,gratitudeNext,gratitudeBack};
+    openPMRModal,openBodyScanModal,openGroundingModal,startGrounding,toggleGroundingItem,nextGroundingStep,openGratitudeModal,gratitudeNext,gratitudeBack,
+    handleAvatarUpload,removeAvatar,_applyWritingHour,renderEmotionRadar,
+    shareCurrentEntry,closeShareModal,copyShareLink,revokeCurrentShare};
 })();

@@ -48,7 +48,8 @@ const API = (() => {
     register: (body) => request('/auth/register', { method: 'POST', body }),
     login:    (body) => request('/auth/login',    { method: 'POST', body }),
     getMe:    ()     => request('/auth/me'),
-    updateProfile: (body) => request('/auth/profile', { method: 'PUT', body }),
+    updateProfile:      (body) => request('/auth/profile',        { method: 'PUT', body }),
+    getWritingPattern:  ()     => request('/auth/writing-pattern'),
 
     // Articles
     getArticles:    (cat='', search='', type='') => request(`/articles?category=${cat}&search=${encodeURIComponent(search)}&type=${type}`),
@@ -84,6 +85,10 @@ const API = (() => {
     getSmartRecap:    ()                     => request('/diary/smart-recap'),
     getMentalHealth:  ()                     => request('/diary/mental-health'),
     getEntryEmotion:  (id)                   => request(`/diary/${id}/emotion`),
+    getEmotionRadar:  ()                     => request('/diary/emotion-radar'),
+    shareEntry:       (id)                   => request(`/diary/${id}/share`, { method: 'POST' }),
+    revokeShare:      (id)                   => request(`/diary/${id}/share`, { method: 'DELETE' }),
+    getSharedEntry:   (token)                => request(`/diary/share/${token}`),
     createEntry:      (body)                 => request('/diary',       { method: 'POST',   body }),
     updateEntry:      (id, body)             => request(`/diary/${id}`,  { method: 'PUT',    body }),
     deleteEntry:      (id)                   => request(`/diary/${id}`,  { method: 'DELETE' }),

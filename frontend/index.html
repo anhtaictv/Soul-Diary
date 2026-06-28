@@ -488,6 +488,25 @@
         <button class="modal-close" onclick="App.closeEntryModal()">✕</button>
       </div>
       <div id="entry-modal-body" style="color:var(--text-muted);line-height:1.7"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+        <button id="entry-share-btn" class="btn-outline" style="font-size:13px;padding:7px 14px" onclick="App.shareCurrentEntry()">🔗 Chia sẻ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Share Link Modal -->
+  <div class="modal-overlay" id="share-modal">
+    <div class="modal" style="max-width:460px">
+      <div class="modal-header">
+        <div class="modal-title">🔗 Chia sẻ nhật ký</div>
+        <button class="modal-close" onclick="App.closeShareModal()">✕</button>
+      </div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Bất kỳ ai có liên kết này đều có thể xem nhật ký của bạn (chỉ nội dung văn bản).</p>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <input id="share-link-input" class="text-input" readonly style="flex:1;font-size:12px" />
+        <button class="btn-primary" style="padding:0 16px;white-space:nowrap;font-size:13px" onclick="App.copyShareLink()">📋 Sao chép</button>
+      </div>
+      <button class="btn-danger" style="font-size:13px;width:100%" onclick="App.revokeCurrentShare()">🚫 Thu hồi chia sẻ</button>
     </div>
   </div>
 

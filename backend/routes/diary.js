@@ -1,5 +1,6 @@
 // routes/diary.js — CRUD nhật ký cảm xúc
 const express        = require('express');
+const crypto         = require('crypto');
 const { getPool, sql } = require('../db');
 const authMiddleware   = require('../middleware/auth');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
@@ -10,7 +11,30 @@ const genai = process.env.GEMINI_API_KEY
   : null;
 
 const router = express.Router();
-router.use(authMiddleware);   // Tất cả diary routes đều cần auth
+
+// ── Public route: xem nhật ký được chia sẻ (không cần auth) ─────────────
+router.get('/share/:token', async (req, res) => {
+  try {
+    const db = await getPool();
+    const r  = await db.request()
+      .input('token', sql.NVarChar(64), req.params.token)
+      .query(`
+        SELECT e.id, e.mood_score, e.event_text, e.gratitude, e.created_at, e.tags,
+               u.username, u.full_name, u.avatar_text
+        FROM DiaryEntries e
+        JOIN Users u ON e.user_id = u.id
+        WHERE e.share_token = @token
+      `);
+    if (!r.recordset.length)
+      return res.status(404).json({ message: 'Liên kết không hợp lệ hoặc đã bị thu hồi.' });
+    res.json({ entry: r.recordset[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+router.use(authMiddleware);   // Tất cả diary routes tiếp theo đều cần auth
 
 const MAX_PHOTOS = 4;
 const MAX_PHOTO_SIZE = 3_000_000; // ~2MB ảnh gốc sau khi base64 hóa
@@ -1073,6 +1097,89 @@ router.get('/year-review', authMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error('Year review error:', err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+// ── GET /api/diary/emotion-radar — tổng hợp cảm xúc cho radar chart ─────
+router.get('/emotion-radar', async (req, res) => {
+  try {
+    const db = await getPool();
+    const r  = await db.request()
+      .input('uid', sql.Int, req.user.id)
+      .query(`
+        SELECT TOP 30 ai_emotion
+        FROM DiaryEntries
+        WHERE user_id=@uid AND ai_emotion IS NOT NULL
+        ORDER BY created_at DESC
+      `);
+
+    const totals = {};
+    let entryCount = 0;
+    for (const row of r.recordset) {
+      try {
+        const data = JSON.parse(row.ai_emotion);
+        if (Array.isArray(data.emotions)) {
+          entryCount++;
+          for (const em of data.emotions) {
+            if (em.name && em.percent > 0)
+              totals[em.name] = (totals[em.name] || 0) + em.percent;
+          }
+        }
+      } catch {}
+    }
+
+    const emotions = Object.entries(totals)
+      .map(([name, total]) => ({ name, avgPercent: Math.round(total / entryCount) }))
+      .sort((a, b) => b.avgPercent - a.avgPercent)
+      .slice(0, 8);
+
+    res.json({ emotions, entryCount });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+// ── POST /api/diary/:id/share — tạo/lấy share token ──────────────────────
+router.post('/:id/share', async (req, res) => {
+  try {
+    const db    = await getPool();
+    const check = await db.request()
+      .input('id',  sql.Int, req.params.id)
+      .input('uid', sql.Int, req.user.id)
+      .query(`SELECT id, share_token FROM DiaryEntries WHERE id=@id AND user_id=@uid`);
+    if (!check.recordset.length)
+      return res.status(404).json({ message: 'Không tìm thấy nhật ký.' });
+
+    let token = check.recordset[0].share_token;
+    if (!token) {
+      token = crypto.randomBytes(32).toString('hex');
+      await db.request()
+        .input('id',    sql.Int,         req.params.id)
+        .input('token', sql.NVarChar(64), token)
+        .query(`UPDATE DiaryEntries SET share_token=@token WHERE id=@id`);
+    }
+    res.json({ token });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+// ── DELETE /api/diary/:id/share — thu hồi share ───────────────────────────
+router.delete('/:id/share', async (req, res) => {
+  try {
+    const db = await getPool();
+    const r  = await db.request()
+      .input('id',  sql.Int, req.params.id)
+      .input('uid', sql.Int, req.user.id)
+      .query(`UPDATE DiaryEntries SET share_token=NULL WHERE id=@id AND user_id=@uid`);
+    if (!r.rowsAffected[0])
+      return res.status(404).json({ message: 'Không tìm thấy nhật ký.' });
+    res.json({ message: 'Đã thu hồi chia sẻ.' });
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Lỗi server.' });
   }
 });
