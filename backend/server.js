@@ -11,6 +11,8 @@ const { initSchema, seedAdmin, getPool, sql } = require('./db');
 const { webpush } = require('./routes/push');
 const { getCheckinWeek } = require('./utils/checkinWeek');
 
+const compression = require('compression');
+
 const app  = express();
 const PORT = process.env.PORT || 3001;
 
@@ -33,7 +35,9 @@ process.on('unhandledRejection', (err) => {
   console.error('⚠️  Unhandled rejection (đã chặn để server không crash):', err);
 });
 
-// ── Security middleware ───────────────────────────────────────────────────
+// ── Security + Performance middleware ────────────────────────────────────
+// Nén gzip/brotli — giảm ~70% bandwidth JSON response
+app.use(compression());
 app.use(helmet());
 
 app.use(cors({
@@ -146,6 +150,8 @@ cron.schedule('0 * * * *', async () => {
       return hourOk && dayOk;
     });
 
+    const sentIds      = [];
+    const expiredEps   = [];
     for (const u of toNotify) {
       let body;
       const m = u.last_mood;
@@ -153,25 +159,29 @@ cron.schedule('0 * * * *', async () => {
       else if (m !== null && m >= 8)  body = `Hôm qua bạn đang rất tốt (${m}/10)! Tiếp tục duy trì nhé 😊`;
       else if (u.streak > 0)          body = `Chuỗi ${u.streak} ngày 🔥 đang chờ bạn — đừng để streak bị mất nhé!`;
       else                            body = 'Hãy ghi một điều bạn cảm nhận hôm nay. Chỉ cần một câu thôi 🌱';
-
       try {
         await webpush.sendNotification(
           { endpoint: u.endpoint, keys: { p256dh: u.p256dh, auth: u.auth } },
           JSON.stringify({ title: 'Soul Diary 📖', body }),
         );
-        await db.request()
-          .input('id', sql.Int, u.id)
-          .query('UPDATE Users SET last_notif_at = GETDATE() WHERE id = @id');
+        sentIds.push(u.id);
       } catch (pushErr) {
-        // Subscription hết hạn → xóa tự động
-        if (pushErr.statusCode === 410 || pushErr.statusCode === 404) {
-          await db.request()
-            .input('ep', sql.NVarChar, u.endpoint)
-            .query('DELETE FROM PushSubscriptions WHERE endpoint = @ep');
-        }
+        if (pushErr.statusCode === 410 || pushErr.statusCode === 404) expiredEps.push(u.endpoint);
       }
     }
-    if (toNotify.length > 0) console.log(`📬 Đã gửi push cho ${toNotify.length} người dùng`);
+    // Batch UPDATE/DELETE thay vì N round trips
+    if (sentIds.length) {
+      await db.request().query(
+        `UPDATE Users SET last_notif_at = GETDATE() WHERE id IN (${sentIds.join(',')})`
+      );
+    }
+    if (expiredEps.length) {
+      const r2 = db.request();
+      expiredEps.forEach((ep, i) => r2.input('ep' + i, sql.NVarChar, ep));
+      const inClause = expiredEps.map((_, i) => '@ep' + i).join(',');
+      await r2.query(`DELETE FROM PushSubscriptions WHERE endpoint IN (${inClause})`);
+    }
+    if (sentIds.length > 0) console.log(`📬 Đã gửi push cho ${sentIds.length} người dùng`);
   } catch (err) {
     console.error('Push cron error:', err.message);
   }
@@ -206,26 +216,30 @@ cron.schedule('0 * * * *', async () => {
         AND (u.last_checkin_notif_at IS NULL OR CAST(u.last_checkin_notif_at AS DATE) < CAST(GETDATE() AS DATE))
       `);
 
-    let sentCount = 0;
+    const sentIds2    = [];
+    const expiredEps2 = [];
     for (const u of result.recordset) {
       try {
         await webpush.sendNotification(
           { endpoint: u.endpoint, keys: { p256dh: u.p256dh, auth: u.auth } },
           JSON.stringify({ title: 'Soul Diary 📖', body: 'Đến lúc check-in sức khỏe tinh thần tuần này rồi — chỉ mất khoảng 5 phút 🧪' }),
         );
-        await db.request()
-          .input('id', sql.Int, u.id)
-          .query('UPDATE Users SET last_checkin_notif_at = GETDATE() WHERE id = @id');
-        sentCount++;
+        sentIds2.push(u.id);
       } catch (pushErr) {
-        if (pushErr.statusCode === 410 || pushErr.statusCode === 404) {
-          await db.request()
-            .input('ep', sql.NVarChar, u.endpoint)
-            .query('DELETE FROM PushSubscriptions WHERE endpoint = @ep');
-        }
+        if (pushErr.statusCode === 410 || pushErr.statusCode === 404) expiredEps2.push(u.endpoint);
       }
     }
-    if (sentCount > 0) console.log(`📬 Đã gửi nhắc check-in cho ${sentCount} người dùng`);
+    if (sentIds2.length) {
+      await db.request().query(
+        `UPDATE Users SET last_checkin_notif_at = GETDATE() WHERE id IN (${sentIds2.join(',')})`
+      );
+    }
+    if (expiredEps2.length) {
+      const r2 = db.request();
+      expiredEps2.forEach((ep, i) => r2.input('ep' + i, sql.NVarChar, ep));
+      await r2.query(`DELETE FROM PushSubscriptions WHERE endpoint IN (${expiredEps2.map((_, i) => '@ep' + i).join(',')})`);
+    }
+    if (sentIds2.length > 0) console.log(`📬 Đã gửi nhắc check-in cho ${sentIds2.length} người dùng`);
   } catch (err) {
     console.error('Check-in reminder cron error:', err.message);
   }
@@ -255,7 +269,8 @@ cron.schedule('0 1 * * *', async () => {
           HAVING COUNT(*) = 7 AND SUM(CASE WHEN avg_m <= 4 THEN 1 ELSE 0 END) = 7
         )
     `);
-    let sentCount = 0;
+    const sentIds3    = [];
+    const expiredEps3 = [];
     for (const u of result.recordset) {
       try {
         await webpush.sendNotification(
@@ -266,19 +281,22 @@ cron.schedule('0 1 * * *', async () => {
             url: '/sos',
           }),
         );
-        await db.request()
-          .input('id', sql.Int, u.id)
-          .query('UPDATE Users SET last_lowmood_notif_at = GETDATE() WHERE id = @id');
-        sentCount++;
+        sentIds3.push(u.id);
       } catch (pushErr) {
-        if (pushErr.statusCode === 410 || pushErr.statusCode === 404) {
-          await db.request()
-            .input('ep', sql.NVarChar, u.endpoint)
-            .query('DELETE FROM PushSubscriptions WHERE endpoint = @ep');
-        }
+        if (pushErr.statusCode === 410 || pushErr.statusCode === 404) expiredEps3.push(u.endpoint);
       }
     }
-    if (sentCount > 0) console.log(`💙 Đã gửi cảnh báo tâm trạng tiêu cực cho ${sentCount} người dùng`);
+    if (sentIds3.length) {
+      await db.request().query(
+        `UPDATE Users SET last_lowmood_notif_at = GETDATE() WHERE id IN (${sentIds3.join(',')})`
+      );
+    }
+    if (expiredEps3.length) {
+      const r3 = db.request();
+      expiredEps3.forEach((ep, i) => r3.input('ep' + i, sql.NVarChar, ep));
+      await r3.query(`DELETE FROM PushSubscriptions WHERE endpoint IN (${expiredEps3.map((_, i) => '@ep' + i).join(',')})`);
+    }
+    if (sentIds3.length > 0) console.log(`💙 Đã gửi cảnh báo tâm trạng tiêu cực cho ${sentIds3.length} người dùng`);
   } catch (err) {
     console.error('Low mood cron error:', err.message);
   }
