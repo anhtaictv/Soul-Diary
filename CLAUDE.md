@@ -159,11 +159,51 @@ After editing backend files, restart the PM2 process (`pm2 restart souldiary-api
 
   **Gotcha share routes**: `GET /api/diary/share/:token` phải đăng ký **trước** `router.use(authMiddleware)` trong `routes/diary.js` vì router đó áp auth cho toàn bộ. `POST /api/diary/:id/share` và `DELETE /api/diary/:id/share` đăng ký sau auth bình thường.
 
-## Feature Flag — cách dùng
+## Feature Flag — quy tắc bắt buộc
+
+### Nguyên tắc cốt lõi (QUAN TRỌNG — áp dụng cho mọi lần nâng cấp sau này)
+
+> **Mọi tính năng mới đều phải nằm sau feature flag, tắt mặc định (`enabled=0`), chỉ bật được qua admin panel. Không bao giờ áp dụng tính năng mới trực tiếp lên production.**
+>
+> **Ngoại lệ duy nhất: sửa lỗi (bug fix) — áp dụng ngay, không cần flag.**
+
+Lý do: user cần kiểm soát hoàn toàn những gì được kích hoạt trên production. Tính năng mới được code sẵn nhưng ở trạng thái "chờ" — khi nào sẵn sàng mới bật từ admin panel (🚀 Tính năng).
+
+### Checklist cho mỗi tính năng mới
+
+1. **DB seed** — thêm vào mảng seed trong `initSchema()` của `db/index.js`:
+   ```js
+   { key: 'ten_flag', label: 'Tên hiển thị', desc: 'Mô tả ngắn', ver: 'vX.Y', title: 'Tên version', sort: XYZ }
+   // enabled=0 mặc định — KHÔNG đặt enabled=1
+   ```
+   Pattern: `IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key=@k) INSERT INTO FeatureFlags(..., enabled, ...) VALUES(..., 0, ...)`
+
+2. **Backend** — viết đầy đủ route/logic nhưng không cần thêm guard server-side (flag chỉ ẩn UI; nếu cần bảo vệ cả API thì kiểm tra flag từ DB).
+
+3. **Frontend gate** — bọc mọi UI của tính năng trong điều kiện:
+   ```js
+   if (window.FEATURES && window.FEATURES.ten_flag) { /* hiện UI */ }
+   ```
+   Các phần tử HTML ẩn mặc định bằng `style="display:none"`, JS show/hide sau khi check flag.
+
+4. **Nav item** — nếu tính năng có trang riêng, thêm nav item với `display:none` trong `index.html`, chỉ hiện trong `App.init()` khi flag bật.
+
+5. **Không tự bật flag** — không đặt `enabled=1` trong seed, không hardcode `true`, không bỏ qua gate. Tất cả đều chờ admin bật.
+
+### Phân loại
+
+| Loại | Xử lý |
+|---|---|
+| Tính năng mới (trang, chức năng, AI) | Flag bắt buộc, `enabled=0` |
+| Cải thiện UX đáng kể (thay đổi flow, UI lớn) | Flag bắt buộc, `enabled=0` |
+| Sửa lỗi (bug fix, crash, security) | Áp dụng ngay, **không cần flag** |
+| Cải tiến UI nhỏ (style, wording, spacing) | Áp dụng ngay, **không cần flag** |
+
+### Kỹ thuật
 
 - `window.FEATURES` là object global được load tại `App.init()` → `loadFeatures()` từ `GET /api/features`.
 - Kiểm tra trước khi hiển thị tính năng: `if (window.FEATURES && window.FEATURES.ten_flag) { ... }`
-- **Không** dùng feature flag cho sửa lỗi hoặc cải tiến UI nhỏ — chỉ dùng cho tính năng mới có thể tắt/bật.
+- **`window.FEATURES` chỉ load 1 lần** khi khởi động — user phải reload trang nếu admin bật flag mới trong cùng phiên.
 - Tên cột DB là `flag_key` (không phải `key` — `key` là reserved word trong SQL Server). SELECT dùng `flag_key AS [key]` để frontend nhận `f.key`.
 - Thứ tự định nghĩa route trong `routes/features.js`: `/admin-list/release` và `/admin-list/schedule` phải đứng **trước** `/admin-list` (POST) để tránh Express match `release`/`schedule` như `:key` param.
 
