@@ -1165,6 +1165,17 @@ async function initSchema() {
     CREATE INDEX IX_CheckIns_user_created ON CheckIns(user_id, created_at DESC)
   `);
 
+  // ── v2.8: Dọn dẹp dữ liệu cũ ────────────────────────────────────────────
+  // Xóa HabitLogs cũ hơn 90 ngày (không cần giữ lịch sử dài hơn)
+  await db.request().query(`
+    DELETE FROM HabitLogs WHERE log_date < CAST(DATEADD(DAY, -90, GETDATE()) AS DATE)
+  `);
+  // Xóa push subscriptions không hoạt động > 30 ngày
+  await db.request().query(`
+    IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PushSubscriptions' AND COLUMN_NAME='updated_at')
+      DELETE FROM PushSubscriptions WHERE updated_at < DATEADD(DAY, -30, GETDATE())
+  `);
+
   console.log('✅ Schema đã sẵn sàng');
 }
 

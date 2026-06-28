@@ -209,6 +209,33 @@ After editing backend files, restart the PM2 process (`pm2 restart souldiary-api
   **Backend mới:** `backend/routes/quotes.js`.  
   **Frontend mới:** `PAGES.pomodoro`, `PAGES['year-stats']` trong `pages.js`. Nav items `#nav-pomodoro`, `#nav-year-stats` (hidden, reveal by flag). Dashboard: `#daily-quote-card`.
 
+### v2.7 — Gallery & Ghi chú *(gate sau feature flags — bật trong admin)*
+
+- **Gallery ảnh** (`photo_gallery`) — Trang `gallery`: `GET /api/diary/gallery` trả TOP 50 entry có ảnh (1 ảnh + metadata/entry). Grid ảnh click → `openEntry()`. `App.initGalleryPage()`.
+
+- **Ghi chú nhanh** (`quick_notes`) — Bảng `QuickNotes` (id, user_id, content NVARCHAR(500), color, created_at). Route `GET/POST/DELETE /api/notes` (max 10 note/user, 5 màu). Frontend: trang `notes` + widget `#notes-dashboard-widget` trên dashboard (3 note mới nhất). `App.initNotesPage()`, `App.selectNoteColor()`, `App.createNote()`, `App.deleteNote()`.
+
+- **So sánh tâm trạng** (`mood_compare`) — Route `GET /api/diary/compare?from1=&to1=&from2=&to2=` trả stats (count, avgMood, topTags) cho 2 khoảng ngày. Frontend: trang `mood-compare` với 2 date-range picker + bảng so sánh. `App.initMoodComparePage()`, `App.loadMoodCompare()`.
+
+- **Cảnh báo sức khỏe** (`wellness_alert`) — Frontend-only. Banner `#wellness-alert-banner` trên dashboard hiện khi avg mood 7 ngày ≤ 4. `_checkWellnessAlert()` gọi `GET /api/diary/stats?days=7`.
+
+  **Backend mới:** `backend/routes/notes.js`.  
+  **Frontend mới:** `PAGES.gallery`, `PAGES.notes`, `PAGES['mood-compare']` trong `pages.js`. Nav items `#nav-gallery`, `#nav-notes`, `#nav-mood-compare` (hidden). Dashboard: `#notes-dashboard-widget`, `#wellness-alert-banner`.
+
+### v2.8 — Tối ưu Hiệu năng & Bảo mật *(không có feature flags — sửa lỗi và cải tiến nền)*
+
+- **Tối ưu payload diary list**: `GET /api/diary` không còn trả binary ảnh/âm thanh. Thay vào đó trả `has_photos` (bool), `photo_count` (int), `has_audio` (bool). Giảm ~90% payload khi có ảnh.
+
+- **Lazy-load media on-demand**: Thêm `GET /api/diary/:id` (trả entry đầy đủ kèm `photos[]` + `audio_data`). `openEntry()` trong app.js giờ là async — render text ngay từ cache, nếu `has_photos || has_audio` thì chèn placeholder "Đang tải media…" và fetch binary sau khi modal đã hiển thị. Tương thích ngược: nếu cache entry cũ đã có `photos[]`/`audio_data` (ví dụ từ search), render luôn không fetch thêm.
+
+- **Input validation diary POST**: `mood_score` phải là số nguyên 1–10; `event_text` tối đa 5000 ký tự; `gratitude` 2000; `thoughts` 3000; `tags` 500. Trả 400 khi vi phạm.
+
+- **Dọn dẹp DB tự động khi khởi động**: `HabitLogs` > 90 ngày bị xóa; `PushSubscriptions` > 30 ngày bị xóa (có kiểm tra `updated_at` column tồn tại).
+
+- **Cache quote ngày**: `routes/quotes.js` giờ cache kết quả trong bộ nhớ theo key `YYYY-MM-DD`, tránh query DB mỗi request; cache cũ tự xóa khi ngày thay đổi.
+
+  **API mới:** `API.getDiaryEntry(id)` trong `api.js`. Card entry dùng chỉ báo text (`📷 2 ảnh · 🎙 Ghi âm`) thay vì thumbnail binary.
+
 ## Feature Flag — quy tắc bắt buộc
 
 ### Nguyên tắc cốt lõi (QUAN TRỌNG — áp dụng cho mọi lần nâng cấp sau này)

@@ -349,11 +349,11 @@ router.get('/search', async (req, res) => {
   }
 });
 
-// ── GET /api/diary — danh sách nhật ký (có phân trang) ──────────────────
+// ── GET /api/diary — danh sách nhật ký (có phân trang, không trả binary media) ─
 router.get('/', async (req, res) => {
   try {
-    const page  = Math.max(1, parseInt(req.query.page)  || 1);
-    const limit = Math.min(50, parseInt(req.query.limit) || 20);
+    const page   = Math.max(1, parseInt(req.query.page)  || 1);
+    const limit  = Math.min(50, parseInt(req.query.limit) || 20);
     const offset = (page - 1) * limit;
 
     const db = await getPool();
@@ -364,7 +364,8 @@ router.get('/', async (req, res) => {
         .input('limit',   sql.Int, limit)
         .input('offset',  sql.Int, offset)
         .query(`
-          SELECT id, mood_score, event_text, thoughts, gratitude, tags, ai_emotion, ai_companion_message, cbt_data, is_pinned, created_at
+          SELECT id, mood_score, event_text, thoughts, gratitude, tags,
+                 ai_emotion, ai_companion_message, cbt_data, is_pinned, created_at
           FROM DiaryEntries
           WHERE user_id = @user_id
           ORDER BY created_at DESC
@@ -375,23 +376,73 @@ router.get('/', async (req, res) => {
         .query('SELECT COUNT(*) AS total FROM DiaryEntries WHERE user_id = @user_id'),
     ]);
 
-    const total = countResult.recordset[0].total;
-    const mediaMap = await loadMediaForEntries(db, dataResult.recordset.map(e => e.id));
+    const total    = countResult.recordset[0].total;
+    const entryIds = dataResult.recordset.map(e => e.id);
+
+    // Chỉ lấy số lượng media, không load binary — giảm payload ~90%
+    const mediaCountMap = new Map();
+    if (entryIds.length > 0) {
+      const mR = await db.request().query(`
+        SELECT entry_id,
+          SUM(CASE WHEN kind='photo' THEN 1 ELSE 0 END) AS photo_count,
+          MAX(CASE WHEN kind='audio' THEN 1 ELSE 0 END)  AS has_audio
+        FROM DiaryMedia
+        WHERE entry_id IN (${entryIds.join(',')})
+        GROUP BY entry_id
+      `);
+      mR.recordset.forEach(r => mediaCountMap.set(r.entry_id, {
+        photo_count: r.photo_count,
+        has_audio:   r.has_audio === 1,
+      }));
+    }
 
     res.json({
-      entries: dataResult.recordset.map(e => ({
-        ...e,
-        tags: e.tags ? e.tags.split('|') : [],
-        photos: mediaMap.get(e.id)?.photos || [],
-        audio_data: mediaMap.get(e.id)?.audio_data || null,
-      })),
-      pagination: {
-        page, limit, total,
-        totalPages: Math.ceil(total / limit),
-      },
+      entries: dataResult.recordset.map(e => {
+        const mc = mediaCountMap.get(e.id) || { photo_count: 0, has_audio: false };
+        return {
+          ...e,
+          tags:        e.tags ? e.tags.split('|') : [],
+          has_photos:  mc.photo_count > 0,
+          photo_count: mc.photo_count,
+          has_audio:   mc.has_audio,
+        };
+      }),
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (err) {
     console.error('Get diary error:', err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+// ── GET /api/diary/:id — entry đầy đủ (có media binary) ─────────────────
+router.get('/:id', authMiddleware, async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (!id) return res.status(400).json({ message: 'ID không hợp lệ.' });
+  try {
+    const db = await getPool();
+    const r  = await db.request()
+      .input('id',  sql.Int, id)
+      .input('uid', sql.Int, req.user.id)
+      .query(`
+        SELECT id, mood_score, event_text, thoughts, gratitude, tags,
+               ai_emotion, ai_companion_message, cbt_data, is_pinned, share_token, created_at
+        FROM DiaryEntries WHERE id = @id AND user_id = @uid
+      `);
+    if (!r.recordset.length)
+      return res.status(404).json({ message: 'Không tìm thấy nhật ký.' });
+    const entry    = r.recordset[0];
+    const mediaMap = await loadMediaForEntries(db, [entry.id]);
+    res.json({
+      entry: {
+        ...entry,
+        tags:       entry.tags ? entry.tags.split('|') : [],
+        photos:     mediaMap.get(entry.id)?.photos     || [],
+        audio_data: mediaMap.get(entry.id)?.audio_data || null,
+      },
+    });
+  } catch (err) {
+    console.error('Get diary entry error:', err);
     res.status(500).json({ message: 'Lỗi server.' });
   }
 });
@@ -753,13 +804,31 @@ router.get('/heatmap', async (req, res) => {
 // ── POST /api/diary — tạo nhật ký mới ───────────────────────────────────
 router.post('/', async (req, res) => {
   try {
-    const { mood_score, event_text, thoughts, gratitude, tags, audio_data, cbt_data, photos } = req.body;
+    let { mood_score, event_text, thoughts, gratitude, tags, audio_data, cbt_data, photos } = req.body;
 
-    if (!mood_score || mood_score < 1 || mood_score > 10) {
+    // ── Validation ────────────────────────────────────────────────────────
+    const moodInt = parseInt(mood_score);
+    if (!moodInt || moodInt < 1 || moodInt > 10) {
       return res.status(400).json({ message: 'Điểm tâm trạng phải từ 1 đến 10.' });
     }
+    mood_score = moodInt;
     if (!event_text && !thoughts && !cbt_data) {
       return res.status(400).json({ message: 'Vui lòng viết ít nhất một dòng nhật ký.' });
+    }
+    if (event_text) {
+      event_text = String(event_text).trim();
+      if (event_text.length > 5000) return res.status(400).json({ message: 'Nội dung quá dài (tối đa 5000 ký tự).' });
+    }
+    if (gratitude) {
+      gratitude = String(gratitude).trim();
+      if (gratitude.length > 2000) return res.status(400).json({ message: 'Phần biết ơn quá dài (tối đa 2000 ký tự).' });
+    }
+    if (thoughts) {
+      thoughts = String(thoughts).trim();
+      if (thoughts.length > 3000) return res.status(400).json({ message: 'Suy nghĩ quá dài (tối đa 3000 ký tự).' });
+    }
+    if (tags && String(tags).length > 500) {
+      return res.status(400).json({ message: 'Tags quá dài.' });
     }
 
     let cbtJson = null;
