@@ -674,6 +674,14 @@ const PAGES = {
         '<div class="form-group"><label class="form-label">Xác nhận mật khẩu mới</label><input class="text-input" type="password" id="set-confirm-pw" placeholder="Nhập lại mật khẩu mới" autocomplete="new-password" /></div>' +
         '<button class="btn-primary" style="max-width:220px" onclick="App.changePasswordSettings()">&#128272; Đổi mật khẩu</button>' +
         '<div id="set-security-msg" class="settings-msg" style="display:none"></div>' +
+        '<hr style="border:none;border-top:1px solid var(--border);margin:24px 0"/>' +
+        '<div class="settings-section-title">&#128274; Khóa PIN</div>' +
+        '<p style="color:var(--text-muted);font-size:13px;margin-bottom:12px">Bảo vệ nhật ký bằng mã PIN 4 chữ số. Yêu cầu nhập PIN mỗi khi mở lại ứng dụng.</p>' +
+        '<div id="set-pin-status" style="margin-bottom:14px;font-size:14px"></div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+          '<button class="btn-primary" style="max-width:180px" onclick="App.managePinLock(\'set\')">&#128274; Đặt / Đổi PIN</button>' +
+          '<button id="set-pin-remove-btn" class="btn-danger" style="max-width:160px;display:none" onclick="App.managePinLock(\'remove\')">&#128275; Xóa PIN</button>' +
+        '</div>' +
       '</div>' +
       '<div id="settings-panel-notifications" class="settings-panel card" style="display:none">' +
         '<div class="settings-section-title">Push Notification</div>' +
