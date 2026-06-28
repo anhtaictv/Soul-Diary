@@ -31,6 +31,9 @@ const PAGES = {
         <div class="mood-label-row"><span>😔 Rất tệ</span><span>😊 Rất tốt</span></div>
         <button class="btn-primary" style="margin-top:12px;max-width:200px" onclick="App.nav('diary')">✍️ Viết nhật ký</button>
       </div>
+      <!-- Quick Mood Log widget (v2.4, ẩn cho đến khi quick_mood_log flag bật) -->
+      <div id="quick-mood-widget" style="display:none;margin-bottom:16px"></div>
+
       <div class="section-label">Gợi ý dành cho bạn</div>
       <div id="recommendations"></div>
 
@@ -884,6 +887,73 @@ const PAGES = {
       <!-- Danh sách template -->
       <div class="section-label">📂 Template đã lưu</div>
       <div id="templates-list">
+        <div class="loading-text">Đang tải...</div>
+      </div>
+    </div>
+  `,
+
+  report: () => `
+    <div class="page active" id="page-report">
+      <div class="page-header">
+        <div class="page-title">📊 Báo cáo tháng</div>
+        <div class="page-sub">Nhìn lại hành trình cảm xúc của bạn trong tháng</div>
+      </div>
+
+      <!-- Chọn tháng -->
+      <div class="card" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+        <label class="form-label" style="margin:0;white-space:nowrap">Xem tháng:</label>
+        <input type="month" id="report-month-picker" class="text-input" style="max-width:180px" />
+        <button class="btn-primary" style="padding:8px 18px;white-space:nowrap" onclick="App.loadMonthlyReport()">📊 Xem báo cáo</button>
+      </div>
+
+      <div id="report-content">
+        <div class="loading-text">Chọn tháng và nhấn Xem báo cáo...</div>
+      </div>
+    </div>
+  `,
+
+  reflection: () => `
+    <div class="page active" id="page-reflection">
+      <div class="page-header">
+        <div class="page-title">🪞 Phản tư tuần</div>
+        <div class="page-sub">5 câu hỏi giúp bạn nhìn lại và phát triển mỗi tuần</div>
+      </div>
+
+      <!-- Form phản tư tuần này -->
+      <div class="card" id="reflection-form-card" style="margin-bottom:24px">
+        <div class="settings-section-title" style="margin-bottom:4px">✍️ Tuần này (<span id="reflection-week-label">...</span>)</div>
+        <div id="reflection-done-banner" style="display:none;background:var(--primary-light,#dbeafe);color:var(--primary);border-radius:var(--radius);padding:10px 14px;font-size:13px;margin-bottom:14px">
+          ✅ Bạn đã phản tư tuần này rồi. Chỉnh sửa bên dưới nếu muốn cập nhật.
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">1. Điều tốt nhất tuần này là gì?</label>
+          <textarea class="text-input" id="ref-q1" rows="2" placeholder="Kể một khoảnh khắc, sự kiện hoặc cảm xúc tích cực..." style="resize:vertical"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">2. Điều gì khiến bạn khó khăn hoặc mệt mỏi?</label>
+          <textarea class="text-input" id="ref-q2" rows="2" placeholder="Thách thức, lo lắng, hoặc điều chưa giải quyết được..." style="resize:vertical"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">3. Bạn biết ơn điều gì trong tuần này?</label>
+          <textarea class="text-input" id="ref-q3" rows="2" placeholder="Có thể là người, sự vật, khoảnh khắc nhỏ..." style="resize:vertical"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">4. Tuần tới bạn muốn làm khác điều gì?</label>
+          <textarea class="text-input" id="ref-q4" rows="2" placeholder="Một thay đổi nhỏ cụ thể là đủ..." style="resize:vertical"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">5. Nếu dùng 1 từ để mô tả tuần này, đó là từ gì?</label>
+          <input class="text-input" id="ref-q5" placeholder="VD: bận rộn, ấm áp, trưởng thành, mệt mỏi..." maxlength="50" />
+        </div>
+
+        <button class="btn-primary" style="max-width:220px" onclick="App.submitReflection()">💾 Lưu phản tư tuần</button>
+        <div id="ref-msg" class="settings-msg" style="display:none;margin-top:10px"></div>
+      </div>
+
+      <!-- Lịch sử phản tư -->
+      <div class="section-label">📚 Phản tư các tuần trước</div>
+      <div id="reflection-history">
         <div class="loading-text">Đang tải...</div>
       </div>
     </div>

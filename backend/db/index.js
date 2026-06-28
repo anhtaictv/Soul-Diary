@@ -946,7 +946,24 @@ async function initSchema() {
     CREATE INDEX IX_DiaryEntries_share_token ON DiaryEntries(share_token)
   `);
 
-  // ── v2.1 → v2.3: Seed feature flags (disabled mặc định) ─────────────────
+  // ── v2.4: Phản tư cuối tuần ──────────────────────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='WeeklyReflections' AND xtype='U')
+    CREATE TABLE WeeklyReflections (
+      id           INT IDENTITY PRIMARY KEY,
+      user_id      INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      week_start   DATE NOT NULL,
+      q1           NVARCHAR(MAX),
+      q2           NVARCHAR(MAX),
+      q3           NVARCHAR(MAX),
+      q4           NVARCHAR(MAX),
+      q5           NVARCHAR(MAX),
+      created_at   DATETIME2 DEFAULT GETDATE(),
+      CONSTRAINT UQ_Reflection_user_week UNIQUE (user_id, week_start)
+    )
+  `);
+
+  // ── v2.1 → v2.4: Seed feature flags (disabled mặc định) ─────────────────
   const v22flags = [
     { key: 'pwa_install',         label: 'Cài đặt PWA',                desc: 'Nút 📲 trong sidebar cho phép cài Soul Diary về màn hình chính',    ver: 'v2.1', title: 'Sửa lỗi & Cải tiến UX', sort: 210 },
     { key: 'pin_management',      label: 'Quản lý PIN',                 desc: 'Phần Khóa PIN trong Cài đặt > Bảo mật (đặt/đổi/xóa PIN)',           ver: 'v2.1', title: 'Sửa lỗi & Cải tiến UX', sort: 211 },
@@ -956,6 +973,9 @@ async function initSchema() {
     { key: 'share_entry',         label: 'Chia sẻ nhật ký',            desc: 'Tạo link public cho từng entry, thu hồi được bất cứ lúc nào',        ver: 'v2.2', title: 'Nâng cấp Cá nhân hoá', sort: 223 },
     { key: 'friend_streaks',      label: 'Streak bạn bè',              desc: 'Thêm bạn qua username, xem bảng xếp hạng streak',                    ver: 'v2.3', title: 'Streak Bạn bè & Nhật ký Định kỳ', sort: 230 },
     { key: 'diary_templates',     label: 'Nhật ký định kỳ (Template)', desc: 'Lưu template viết sẵn, áp dụng nhanh vào form nhật ký',              ver: 'v2.3', title: 'Streak Bạn bè & Nhật ký Định kỳ', sort: 231 },
+    { key: 'monthly_report',      label: 'Báo cáo tháng',              desc: 'Thống kê tháng: avg mood, top tags, ngày tốt nhất, xu hướng theo tuần', ver: 'v2.4', title: 'Báo cáo Cá nhân & Phản tư Tuần', sort: 240 },
+    { key: 'weekly_reflection',   label: 'Phản tư cuối tuần',          desc: '5 câu hỏi hướng dẫn mỗi Chủ nhật, lưu lại để xem lại sau',            ver: 'v2.4', title: 'Báo cáo Cá nhân & Phản tư Tuần', sort: 241 },
+    { key: 'quick_mood_log',      label: 'Quick Mood Log',              desc: 'Widget 5 emoji trên dashboard, ghi mood 1 chạm không cần mở form',    ver: 'v2.4', title: 'Báo cáo Cá nhân & Phản tư Tuần', sort: 242 },
   ];
   for (const f of v22flags) {
     await db.request()

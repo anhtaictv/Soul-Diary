@@ -177,6 +177,14 @@ After editing backend files, restart the PM2 process (`pm2 restart souldiary-api
   - `DELETE /api/templates/:id` — xóa template
   - Frontend: trang `templates` với form tạo/sửa template (title, content, gratitude, tags bằng dấu phẩy → lưu `|`, mood 1-10). Nút ✏️ Sửa điền lại form + đổi nút thành "Cập nhật". Nút 📋 Dùng template trong diary form (ẩn khi user chưa có template) → modal picker chọn và áp vào form nhật ký. `App.createTemplate()`, `App.editTemplate(id)`, `App.saveEditTemplate(id)`, `App.openTemplatePicker()`, `App.applyTemplate(id)`.
 
+### v2.4 — Báo cáo Cá nhân & Phản tư Tuần *(gate sau feature flags — bật trong admin)*
+
+- **Báo cáo tháng** (`monthly_report`) — endpoint `GET /api/diary/monthly-report?month=YYYY-MM` trả: `totalEntries`, `avgMood`, `entryDays`, `bestDay/worstDay` (date + avg), `topTags[5]` (sort by count), `moodByWeek[]` (avg + count per DATEPART week). Frontend: trang `report` với month picker, stats cards, biểu đồ bar tuần (CSS div), top tags. `App.loadMonthlyReport()`.
+
+- **Phản tư cuối tuần** (`weekly_reflection`) — bảng `WeeklyReflections` (user_id, week_start DATE UNIQUE, q1..q5 NVARCHAR(MAX)). Route `routes/reflections.js`: `GET /current` (tuần hiện tại), `GET /` (10 tuần gần nhất), `POST /` (upsert qua SQL MERGE). Week start = Thứ Hai (ISO). Badge `#reflection-badge` trên nav-reflection hiện vào Thứ 7/CN nếu chưa phản tư tuần này. Trang `reflection`: form 5 câu hỏi, banner "đã làm rồi" khi reload, lịch sử xếp theo tuần. `App.submitReflection()`, `App.loadReflectionBadge()`.
+
+- **Quick Mood Log** (`quick_mood_log`) — frontend-only widget `#quick-mood-widget` trên dashboard. 5 emoji (😢😕😐🙂😄 → mood 2/4/6/8/10). Click → `App.quickLogMood(score)` gọi `POST /api/diary` với entry minimal (mood_score, event_text rỗng). Nếu đã viết nhật ký hôm nay, hiện mood hiện tại thay vì emoji picker. Widget ẩn mặc định (`display:none`), chỉ render khi flag bật.
+
 ## Feature Flag — quy tắc bắt buộc
 
 ### Nguyên tắc cốt lõi (QUAN TRỌNG — áp dụng cho mọi lần nâng cấp sau này)
