@@ -946,6 +946,38 @@ async function initSchema() {
     CREATE INDEX IX_DiaryEntries_share_token ON DiaryEntries(share_token)
   `);
 
+  // ── v2.3: Streak bạn bè ──────────────────────────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Friendships' AND xtype='U')
+    CREATE TABLE Friendships (
+      id           INT IDENTITY PRIMARY KEY,
+      user_id      INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      friend_id    INT NOT NULL REFERENCES Users(id),
+      [status]     NVARCHAR(20) NOT NULL DEFAULT 'pending',
+      created_at   DATETIME2 DEFAULT GETDATE(),
+      CONSTRAINT UQ_Friendship UNIQUE (user_id, friend_id)
+    )
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_Friendships_friend')
+    CREATE INDEX IX_Friendships_friend ON Friendships(friend_id, [status])
+  `);
+
+  // ── v2.3: Nhật ký định kỳ (templates) ───────────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='DiaryTemplates' AND xtype='U')
+    CREATE TABLE DiaryTemplates (
+      id               INT IDENTITY PRIMARY KEY,
+      user_id          INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      title            NVARCHAR(200) NOT NULL,
+      content          NVARCHAR(MAX),
+      gratitude        NVARCHAR(MAX),
+      tags             NVARCHAR(500),
+      default_mood     INT DEFAULT 5,
+      created_at       DATETIME2 DEFAULT GETDATE()
+    )
+  `);
+
   // Index
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_DiaryEntries_user_created')

@@ -88,6 +88,8 @@ const App = (() => {
       case 'year-review':   initYearReviewPage();     break;
       case 'future-letter': initFutureLetterPage();   break;
       case 'missions':      initMissionsPage();        break;
+      case 'friends':       initFriendsPage();         break;
+      case 'templates':     initTemplatesPage();       break;
     }
   }
 
@@ -408,6 +410,12 @@ const App = (() => {
       this.style.height = 'auto';
       this.style.height = Math.min(this.scrollHeight, 380) + 'px';
     });
+    // Hiện nút template nếu user đã có template
+    API.getTemplates().then(d => {
+      _cachedTemplates = d.templates;
+      const btnWrap = document.getElementById('diary-template-btn-wrap');
+      if (btnWrap) btnWrap.style.display = d.templates.length ? '' : 'none';
+    }).catch(() => {});
     // Hiện nút chọn chế độ nếu tính năng CBT đã được bật
     if (window.FEATURES && window.FEATURES.cbt_guided_writing) {
       const toggle = document.getElementById('diary-mode-toggle');
@@ -3848,6 +3856,7 @@ const App = (() => {
     document.getElementById('article-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeArticleModal();});
     document.getElementById('entry-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeEntryModal();});
     document.getElementById('share-modal')?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeShareModal();});
+    document.getElementById('template-picker-modal')?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeTemplatePicker();});
     document.getElementById('photo-lightbox').addEventListener('click',e=>{if(e.target===e.currentTarget)closeLightbox();});
     await loadFeatures();
     const navInbox = document.getElementById('nav-inbox');
@@ -3888,12 +3897,241 @@ const App = (() => {
     // v2.0 init
     initOfflineDetection();
     _checkPinRequired();
+    // v2.3 — luôn hiện nav friends + templates (không cần flag)
+    const navFriends   = document.getElementById('nav-friends');
+    const navTemplates = document.getElementById('nav-templates');
+    if (navFriends)   navFriends.style.display   = '';
+    if (navTemplates) navTemplates.style.display = '';
     nav('dashboard');
+  }
+
+  // ── Streak bạn bè ─────────────────────────────────────────────────────
+  async function initFriendsPage() {
+    _loadFriendRequests();
+    _loadFriendsList();
+  }
+
+  async function _loadFriendRequests() {
+    try {
+      const d   = await API.getFriendRequests();
+      const sec = document.getElementById('friend-requests-section');
+      const lst = document.getElementById('friend-requests-list');
+      if (!sec || !lst) return;
+      if (!d.requests.length) { sec.style.display = 'none'; return; }
+      sec.style.display = '';
+      lst.innerHTML = d.requests.map(r => `
+        <div class="friend-card" style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:8px">
+          <div class="user-avatar" style="width:40px;height:40px;font-size:16px;flex-shrink:0">${r.avatar_text || r.username[0].toUpperCase()}</div>
+          <div style="flex:1">
+            <div style="font-weight:600">${escapeHtml(r.full_name || r.username)}</div>
+            <div style="font-size:12px;color:var(--text-muted)">@${escapeHtml(r.username)}</div>
+          </div>
+          <button class="btn-primary" style="font-size:12px;padding:6px 12px" onclick="App.acceptFriendRequest(${r.friendship_id})">✓ Chấp nhận</button>
+          <button class="btn-outline" style="font-size:12px;padding:6px 10px" onclick="App.rejectFriendRequest(${r.friendship_id})">✕</button>
+        </div>`).join('');
+    } catch {}
+  }
+
+  async function _loadFriendsList() {
+    const el = document.getElementById('friends-list');
+    if (!el) return;
+    try {
+      const d = await API.getFriends();
+      if (!d.friends.length) {
+        el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text-muted)"><div style="font-size:36px;margin-bottom:12px">👥</div><div>Chưa có bạn bè nào. Thêm bạn bằng username của họ!</div></div>';
+        return;
+      }
+      const me = Auth.getUser();
+      el.innerHTML = d.friends.map((f, i) => {
+        const avatarHtml = f.avatar_url
+          ? `<img src="${f.avatar_url}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0">`
+          : `<div class="user-avatar" style="width:44px;height:44px;font-size:18px;flex-shrink:0">${f.avatar_text || f.username[0].toUpperCase()}</div>`;
+        const wroteToday = f.wrote_today ? '✅ Đã viết hôm nay' : '⏳ Chưa viết hôm nay';
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
+        return `
+          <div style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:8px">
+            <div style="font-size:20px;min-width:28px;text-align:center">${medal}</div>
+            ${avatarHtml}
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(f.full_name || f.username)}</div>
+              <div style="font-size:12px;color:var(--text-muted)">@${escapeHtml(f.username)} · ${wroteToday}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0">
+              <div style="font-size:18px;font-weight:700;color:var(--primary)">🔥 ${f.streak}</div>
+              <div style="font-size:11px;color:var(--text-muted)">ngày</div>
+            </div>
+            <button onclick="App.removeFriend(${f.friendship_id},this)" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-hint);padding:4px" title="Xóa bạn">🗑</button>
+          </div>`;
+      }).join('');
+    } catch (err) {
+      el.innerHTML = `<div style="color:var(--text-muted);text-align:center;padding:20px">Không tải được danh sách.</div>`;
+    }
+  }
+
+  async function sendFriendRequest() {
+    const inp = document.getElementById('friend-username-input');
+    const msg = document.getElementById('friend-request-msg');
+    const username = (inp?.value || '').trim();
+    if (!username) return;
+    try {
+      const d = await API.sendFriendRequest(username);
+      if (msg) { msg.textContent = '✅ ' + d.message; msg.style.color = 'var(--primary)'; }
+      if (inp) inp.value = '';
+    } catch (err) {
+      if (msg) { msg.textContent = '❌ ' + err.message; msg.style.color = '#dc2626'; }
+    }
+  }
+
+  async function acceptFriendRequest(id) {
+    try {
+      await API.acceptFriend(id);
+      showToast('✅ Đã chấp nhận lời mời!');
+      _loadFriendRequests();
+      _loadFriendsList();
+    } catch (err) { showToast('❌ ' + err.message); }
+  }
+
+  async function rejectFriendRequest(id) {
+    try {
+      await API.removeFriend(id);
+      _loadFriendRequests();
+    } catch {}
+  }
+
+  async function removeFriend(id, btn) {
+    if (!confirm('Xóa bạn bè này?')) return;
+    if (btn) btn.disabled = true;
+    try {
+      await API.removeFriend(id);
+      _loadFriendsList();
+    } catch (err) { showToast('❌ ' + err.message); if (btn) btn.disabled = false; }
+  }
+
+  // ── Nhật ký định kỳ (Templates) ──────────────────────────────────────
+  let _cachedTemplates = null;
+
+  async function initTemplatesPage() {
+    _cachedTemplates = null;
+    await _loadTemplates();
+  }
+
+  async function _loadTemplates() {
+    const lst = document.getElementById('templates-list');
+    try {
+      const d = await API.getTemplates();
+      _cachedTemplates = d.templates;
+
+      // Cập nhật nút load template trong diary form
+      const btnWrap = document.getElementById('diary-template-btn-wrap');
+      if (btnWrap) btnWrap.style.display = d.templates.length ? '' : 'none';
+
+      if (!lst) return;
+      if (!d.templates.length) {
+        lst.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted)">Chưa có template nào. Tạo template đầu tiên ngay!</div>';
+        return;
+      }
+      lst.innerHTML = d.templates.map(t => `
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:8px">
+          <div style="display:flex;align-items:flex-start;gap:8px">
+            <div style="flex:1">
+              <div style="font-weight:600;margin-bottom:4px">${escapeHtml(t.title)}</div>
+              ${t.content ? `<div style="font-size:12px;color:var(--text-muted);white-space:pre-wrap;max-height:48px;overflow:hidden">${escapeHtml(t.content)}</div>` : ''}
+              <div style="font-size:11px;color:var(--text-hint);margin-top:4px">Mood mặc định: ${t.default_mood}/10${t.tags ? ' · #' + t.tags.split('|').join(' #') : ''}</div>
+            </div>
+            <button onclick="App.applyTemplate(${t.id})" class="btn-outline" style="font-size:12px;padding:6px 10px;white-space:nowrap">📝 Dùng ngay</button>
+            <button onclick="App.deleteTemplate(${t.id},this)" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-hint);padding:4px">🗑</button>
+          </div>
+        </div>`).join('');
+    } catch (err) {
+      if (lst) lst.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center">Không tải được template.</div>';
+    }
+  }
+
+  async function createTemplate() {
+    const title     = (document.getElementById('tpl-title')?.value     || '').trim();
+    const content   = (document.getElementById('tpl-content')?.value   || '').trim();
+    const gratitude = (document.getElementById('tpl-gratitude')?.value || '').trim();
+    const tags      = (document.getElementById('tpl-tags')?.value      || '').trim();
+    const mood      = parseInt(document.getElementById('tpl-mood')?.value) || 5;
+    const msg       = document.getElementById('tpl-msg');
+
+    if (!title) { if (msg) { msg.textContent = 'Tên template không được để trống.'; msg.className = 'settings-msg error'; msg.style.display = ''; } return; }
+    try {
+      await API.createTemplate({ title, content: content || null, gratitude: gratitude || null, tags: tags || null, default_mood: mood });
+      if (msg) { msg.textContent = '✅ Đã lưu template!'; msg.className = 'settings-msg success'; msg.style.display = ''; }
+      document.getElementById('tpl-title').value     = '';
+      document.getElementById('tpl-content').value   = '';
+      document.getElementById('tpl-gratitude').value = '';
+      document.getElementById('tpl-tags').value      = '';
+      _cachedTemplates = null;
+      await _loadTemplates();
+    } catch (err) {
+      if (msg) { msg.textContent = '❌ ' + err.message; msg.className = 'settings-msg error'; msg.style.display = ''; }
+    }
+  }
+
+  async function deleteTemplate(id, btn) {
+    if (!confirm('Xóa template này?')) return;
+    if (btn) btn.disabled = true;
+    try {
+      await API.deleteTemplate(id);
+      _cachedTemplates = null;
+      await _loadTemplates();
+    } catch (err) { showToast('❌ ' + err.message); if (btn) btn.disabled = false; }
+  }
+
+  async function openTemplatePicker() {
+    if (!_cachedTemplates) {
+      try { const d = await API.getTemplates(); _cachedTemplates = d.templates; } catch { return; }
+    }
+    const lst = document.getElementById('template-picker-list');
+    if (!lst) return;
+    if (!_cachedTemplates.length) { showToast('Chưa có template — hãy tạo trong trang Nhật ký định kỳ.'); return; }
+    lst.innerHTML = _cachedTemplates.map(t => `
+      <button onclick="App.applyTemplate(${t.id})" style="text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;cursor:pointer;width:100%">
+        <div style="font-weight:600;margin-bottom:2px">${escapeHtml(t.title)}</div>
+        ${t.content ? `<div style="font-size:12px;color:var(--text-muted);white-space:pre-wrap;max-height:36px;overflow:hidden">${escapeHtml(t.content)}</div>` : ''}
+        <div style="font-size:11px;color:var(--text-hint);margin-top:3px">Mood: ${t.default_mood}/10</div>
+      </button>`).join('');
+    document.getElementById('template-picker-modal').classList.add('open');
+  }
+
+  function closeTemplatePicker() {
+    document.getElementById('template-picker-modal').classList.remove('open');
+  }
+
+  async function applyTemplate(id) {
+    closeTemplatePicker();
+    if (!_cachedTemplates) { try { const d = await API.getTemplates(); _cachedTemplates = d.templates; } catch { return; } }
+    const t = _cachedTemplates.find(x => x.id === id);
+    if (!t) return;
+
+    // Áp dụng vào diary form
+    nav('diary');
+    setTimeout(() => {
+      if (t.content) {
+        const el = document.getElementById('diary-event');
+        if (el) el.value = t.content;
+      }
+      if (t.gratitude) {
+        const el = document.getElementById('diary-gratitude');
+        if (el) el.value = t.gratitude;
+      }
+      if (t.default_mood && t.default_mood >= 1 && t.default_mood <= 10) {
+        selectedMood = t.default_mood;
+        document.querySelectorAll('#diary-mood-scale .mood-btn').forEach(b => {
+          b.classList.toggle('selected', parseInt(b.dataset.val) === t.default_mood);
+        });
+      }
+      showToast('📋 Đã áp dụng template: ' + t.title);
+    }, 100);
   }
 
   return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,applyTheme,toggleThemePicker,loadMoreDiary,
     pinInput,pinDelete,setPinLock,managePinLock,installPWA,showMemoryCard,createFutureLetter,deleteFutureLetter,exportUserData,
     openPMRModal,openBodyScanModal,openGroundingModal,startGrounding,toggleGroundingItem,nextGroundingStep,openGratitudeModal,gratitudeNext,gratitudeBack,
     handleAvatarUpload,removeAvatar,_applyWritingHour,renderEmotionRadar,
-    shareCurrentEntry,closeShareModal,copyShareLink,revokeCurrentShare};
+    shareCurrentEntry,closeShareModal,copyShareLink,revokeCurrentShare,
+    sendFriendRequest,acceptFriendRequest,rejectFriendRequest,removeFriend,
+    createTemplate,deleteTemplate,openTemplatePicker,closeTemplatePicker,applyTemplate};
 })();
