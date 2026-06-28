@@ -87,6 +87,7 @@ app.use('/api/friends',     apiLimiter, require('./routes/friends'));
 app.use('/api/templates',   apiLimiter, require('./routes/templates'));
 app.use('/api/reflections', apiLimiter, require('./routes/reflections'));
 app.use('/api/habits',      apiLimiter, require('./routes/habits'));
+app.use('/api/quotes',      apiLimiter, require('./routes/quotes'));
 
 // Health check
 app.get('/api/health', (req, res) => {

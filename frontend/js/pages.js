@@ -40,6 +40,9 @@ const PAGES = {
       <!-- Nhật ký đã ghim (v2.5, ẩn cho đến khi pinned_entries flag bật) -->
       <div id="pinned-entries-section" style="display:none"></div>
 
+      <!-- Câu truyền cảm hứng (v2.6, ẩn cho đến khi daily_quote flag bật) -->
+      <div id="daily-quote-card" style="display:none;margin-bottom:16px"></div>
+
       <div class="section-label">Gợi ý dành cho bạn</div>
       <div id="recommendations"></div>
 
@@ -77,6 +80,8 @@ const PAGES = {
         <div class="page-title">Hôm nay của bạn thế nào? 📖</div>
         <div class="page-sub">Không gian riêng tư — an toàn — chỉ dành cho bạn</div>
       </div>
+      <!-- Banner khôi phục nháp (v2.6 auto_draft, ẩn mặc định) -->
+      <div id="draft-restore-banner" style="display:none"></div>
       <div class="grid-2">
         <div>
           <div class="card" id="diary-form-card">
@@ -993,6 +998,84 @@ const PAGES = {
       <!-- Danh sách habit + lịch 7 ngày -->
       <div class="section-label">📅 Theo dõi 7 ngày gần nhất</div>
       <div id="habits-list">
+        <div class="loading-text">Đang tải...</div>
+      </div>
+    </div>
+  `,
+
+  // ── v2.6: Pomodoro Timer ─────────────────────────────────────────────────
+  pomodoro: () => `
+    <div class="page active" id="page-pomodoro">
+      <div class="page-header">
+        <div class="page-title">⏱ Pomodoro</div>
+        <div class="page-subtitle">Tập trung học tập · Nghỉ ngơi đúng lúc</div>
+      </div>
+
+      <div class="card" style="text-align:center;padding:28px 24px;margin-bottom:16px">
+        <!-- Mode buttons -->
+        <div style="display:flex;gap:8px;justify-content:center;margin-bottom:28px;flex-wrap:wrap">
+          <button id="pm-mode-pomo"  onclick="App.setPomodoroMode('pomodoro')" class="btn-primary" style="padding:8px 18px;font-size:13px">🍅 Pomodoro</button>
+          <button id="pm-mode-short" onclick="App.setPomodoroMode('short')"    class="btn-outline" style="padding:8px 18px;font-size:13px">☕ Nghỉ ngắn</button>
+          <button id="pm-mode-long"  onclick="App.setPomodoroMode('long')"     class="btn-outline" style="padding:8px 18px;font-size:13px">🌿 Nghỉ dài</button>
+        </div>
+
+        <!-- Timer display -->
+        <div id="pm-display" style="font-size:88px;font-weight:800;font-variant-numeric:tabular-nums;
+          letter-spacing:-3px;color:var(--primary);line-height:1;margin-bottom:24px;
+          transition:color .3s">25:00</div>
+
+        <!-- Controls -->
+        <div style="display:flex;gap:12px;justify-content:center;margin-bottom:20px">
+          <button id="pm-start-btn" onclick="App.togglePomodoro()" class="btn-primary"
+            style="padding:12px 36px;font-size:16px;font-weight:700">▶ Bắt đầu</button>
+          <button onclick="App.resetPomodoro()" class="btn-outline"
+            style="padding:12px 20px;font-size:16px">↺</button>
+        </div>
+
+        <!-- Session count -->
+        <div style="color:var(--text-muted);font-size:13px">
+          🍅 Phiên hôm nay: <span id="pm-sessions" style="font-weight:700;color:var(--primary)">0</span>
+        </div>
+      </div>
+
+      <!-- Custom time settings -->
+      <div class="card">
+        <div class="settings-section-title" style="margin-bottom:14px">⚙️ Thời gian tùy chỉnh (phút)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+          <div>
+            <label class="form-label">🍅 Pomodoro</label>
+            <input class="text-input" id="pm-custom-pomo"  type="number" min="1" max="90"  value="25" onchange="App.updatePomodoroTimes()" />
+          </div>
+          <div>
+            <label class="form-label">☕ Nghỉ ngắn</label>
+            <input class="text-input" id="pm-custom-short" type="number" min="1" max="30"  value="5"  onchange="App.updatePomodoroTimes()" />
+          </div>
+          <div>
+            <label class="form-label">🌿 Nghỉ dài</label>
+            <input class="text-input" id="pm-custom-long"  type="number" min="1" max="60"  value="15" onchange="App.updatePomodoroTimes()" />
+          </div>
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:var(--text-hint)">
+          💡 Sau 4 phiên Pomodoro liên tiếp nên nghỉ dài 15 phút để não bộ phục hồi.
+        </div>
+      </div>
+    </div>
+  `,
+
+  // ── v2.6: Thống kê năm ────────────────────────────────────────────────────
+  'year-stats': () => `
+    <div class="page active" id="page-year-stats">
+      <div class="page-header">
+        <div class="page-title">📆 Thống kê năm</div>
+        <div class="page-subtitle">Nhìn lại hành trình cả năm của bạn</div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+        <select class="text-input" id="year-stats-picker" onchange="App.loadYearStats()" style="width:110px;flex-shrink:0"></select>
+        <span style="color:var(--text-muted);font-size:13px">Chọn năm để xem thống kê tổng quan</span>
+      </div>
+
+      <div id="year-stats-content">
         <div class="loading-text">Đang tải...</div>
       </div>
     </div>

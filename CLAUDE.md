@@ -196,6 +196,19 @@ After editing backend files, restart the PM2 process (`pm2 restart souldiary-api
   **Backend mới:** `backend/routes/habits.js`.  
   **Frontend mới:** `PAGES['habits']` trong `pages.js`. Nav item `#nav-habits` (hidden, reveal by flag). Dashboard: `#habit-dashboard-widget`, `#pinned-entries-section`.
 
+### v2.6 — Năng lượng & Sáng tạo *(gate sau feature flags — bật trong admin)*
+
+- **Pomodoro Timer** (`pomodoro_timer`) — Frontend-only: trang `pomodoro` với 3 chế độ (Pomodoro 25', Nghỉ ngắn 5', Nghỉ dài 15'), thời gian tùy chỉnh, đếm phiên hôm nay lưu `localStorage('nhk_pomo_YYYY-MM-DD')`, tự chuyển chế độ sau khi hết giờ, âm thanh beep 3 nốt qua Web Audio API. Sau 4 phiên tự đề xuất nghỉ dài. `App.initPomodoroPage()`, `App.togglePomodoro()`, `App.resetPomodoro()`, `App.setPomodoroMode(mode)`, `App.updatePomodoroTimes()`.
+
+- **Câu truyền cảm hứng hàng ngày** (`daily_quote`) — Bảng `Quotes` (id, text, author, category). Seed 30 câu tiếng Việt. Route `GET /api/quotes/today` (auth, trả câu theo `dayOfYear % totalCount`). Card `#daily-quote-card` trên dashboard, hiện khi flag bật. `loadDailyQuote()` (internal).
+
+- **Thống kê năm** (`year_stats`) — Route `GET /api/diary/year-stats?year=YYYY` trả: `totalEntries`, `avgMood`, `maxStreak` (từ `Users.max_streak`), `bestMonth/busyMonth`, `moodByMonth[12]` (avg + count per tháng), `topTags[5]`. Frontend: trang `year-stats` với year picker (5 năm gần nhất), stats cards, biểu đồ bar 12 tháng (chiều cao = số bài, màu = mood), top tags. `App.initYearStatsPage()`, `App.loadYearStats()`.
+
+- **Tự động lưu nháp** (`auto_draft`) — Frontend-only. Khi vào trang Nhật ký: check `localStorage('nhk_draft')`, nếu có hiện banner "Khôi phục / Bỏ qua" (`#draft-restore-banner`). setInterval 30s tự lưu form state (mood, event_text, gratitude, tags). Xóa nháp khi lưu thành công hoặc user bỏ qua. Draft hết hạn sau 24h. `App.restoreDraft()`, `App.discardDraft()`.
+
+  **Backend mới:** `backend/routes/quotes.js`.  
+  **Frontend mới:** `PAGES.pomodoro`, `PAGES['year-stats']` trong `pages.js`. Nav items `#nav-pomodoro`, `#nav-year-stats` (hidden, reveal by flag). Dashboard: `#daily-quote-card`.
+
 ## Feature Flag — quy tắc bắt buộc
 
 ### Nguyên tắc cốt lõi (QUAN TRỌNG — áp dụng cho mọi lần nâng cấp sau này)

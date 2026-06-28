@@ -1289,6 +1289,77 @@ router.delete('/:id/share', async (req, res) => {
   }
 });
 
+// ── GET /api/diary/year-stats — thống kê cả năm ─────────────────────────
+router.get('/year-stats', authMiddleware, async (req, res) => {
+  try {
+    const db   = await getPool();
+    const uid  = req.user.id;
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+
+    const overallR = await db.request()
+      .input('uid', sql.Int, uid).input('year', sql.Int, year)
+      .query(`
+        SELECT COUNT(*) as totalEntries,
+               ROUND(AVG(CAST(mood_score AS FLOAT)), 1) as avgMood
+        FROM DiaryEntries
+        WHERE user_id = @uid AND DATEPART(YEAR, created_at) = @year
+      `);
+    const overall = overallR.recordset[0];
+    if (!overall.totalEntries) return res.json({ year, totalEntries: 0 });
+
+    const monthlyR = await db.request()
+      .input('uid', sql.Int, uid).input('year', sql.Int, year)
+      .query(`
+        SELECT DATEPART(MONTH, created_at) as month,
+               COUNT(*) as count,
+               ROUND(AVG(CAST(mood_score AS FLOAT)), 1) as avg
+        FROM DiaryEntries
+        WHERE user_id = @uid AND DATEPART(YEAR, created_at) = @year
+        GROUP BY DATEPART(MONTH, created_at)
+        ORDER BY month
+      `);
+
+    const tagsR = await db.request()
+      .input('uid', sql.Int, uid).input('year', sql.Int, year)
+      .query(`
+        SELECT TOP 5 value as tag, COUNT(*) as count
+        FROM DiaryEntries
+        CROSS APPLY STRING_SPLIT(tags, '|')
+        WHERE user_id = @uid AND DATEPART(YEAR, created_at) = @year
+          AND tags IS NOT NULL AND tags != '' AND value != ''
+        GROUP BY value
+        ORDER BY count DESC
+      `);
+
+    const userR = await db.request()
+      .input('uid', sql.Int, uid)
+      .query(`SELECT max_streak FROM Users WHERE id = @uid`);
+
+    const moodByMonth = Array.from({ length: 12 }, (_, i) => {
+      const m = monthlyR.recordset.find(r => r.month === i + 1);
+      return m ? { month: i + 1, count: m.count, avg: m.avg } : { month: i + 1, count: 0, avg: null };
+    });
+
+    const withData    = monthlyR.recordset;
+    const bestMonth   = withData.length ? [...withData].sort((a, b) => b.avg - a.avg)[0]   : null;
+    const busyMonth   = withData.length ? [...withData].sort((a, b) => b.count - a.count)[0] : null;
+
+    res.json({
+      year,
+      totalEntries: overall.totalEntries,
+      avgMood:      overall.avgMood,
+      maxStreak:    userR.recordset[0]?.max_streak || 0,
+      bestMonth:    bestMonth  ? { month: bestMonth.month,  avg:   bestMonth.avg   } : null,
+      busyMonth:    busyMonth  ? { month: busyMonth.month,  count: busyMonth.count } : null,
+      moodByMonth,
+      topTags:      tagsR.recordset,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
 // ── GET /api/diary/sleep-stats — tương quan mood-giấc ngủ ────────────────
 router.get('/sleep-stats', authMiddleware, async (req, res) => {
   try {

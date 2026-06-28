@@ -93,6 +93,8 @@ const App = (() => {
       case 'report':        initReportPage();          break;
       case 'reflection':    initReflectionPage();      break;
       case 'habits':        initHabitsPage();          break;
+      case 'pomodoro':      initPomodoroPage();        break;
+      case 'year-stats':    initYearStatsPage();       break;
     }
   }
 
@@ -211,6 +213,8 @@ const App = (() => {
     if (window.FEATURES && window.FEATURES.habit_tracker) renderHabitDashboardWidget();
     // Pinned entries (v2.5)
     if (window.FEATURES && window.FEATURES.pinned_entries) renderPinnedEntries(cachedEntries);
+    // Daily quote (v2.6)
+    if (window.FEATURES && window.FEATURES.daily_quote) loadDailyQuote();
   }
 
   function renderRecommendations(mood) {
@@ -466,6 +470,9 @@ const App = (() => {
       }
     }
     await loadDiaryEntries();
+    // Auto-draft (v2.6)
+    _checkDraft();
+    _startAutoDraft();
   }
 
   function setDiaryMode(mode, btn) {
@@ -808,6 +815,7 @@ const App = (() => {
       if (selectedMood <= 6 && window.FEATURES && window.FEATURES.exercise_suggest) {
         setTimeout(() => _showExerciseSuggest(selectedMood), 1000);
       }
+      _clearDraft();
       await loadDiaryEntries();
       showToast('✅ Đã lưu nhật ký!');
     } catch(err) { showToast('❌ Lỗi lưu nhật ký: '+err.message); }
@@ -3973,6 +3981,15 @@ const App = (() => {
       const el = document.getElementById('nav-habits');
       if (el) el.style.display = '';
     }
+    // v2.6 — hiện nav sau flag
+    if (window.FEATURES && window.FEATURES.pomodoro_timer) {
+      const el = document.getElementById('nav-pomodoro');
+      if (el) el.style.display = '';
+    }
+    if (window.FEATURES && window.FEATURES.year_stats) {
+      const el = document.getElementById('nav-year-stats');
+      if (el) el.style.display = '';
+    }
     nav('dashboard');
   }
 
@@ -4467,6 +4484,309 @@ const App = (() => {
     } catch (err) { showToast('❌ ' + err.message); }
   }
 
+  // ── v2.6: Pomodoro Timer ─────────────────────────────────────────────────
+  let _pmState = { mode: 'pomodoro', timeLeft: 25 * 60, running: false, interval: null };
+  let _pmTimes = { pomodoro: 25, short: 5, long: 15 };
+  let _pmSessions = 0;
+
+  function initPomodoroPage() {
+    const todayKey = 'nhk_pomo_' + new Date().toISOString().slice(0, 10);
+    _pmSessions = parseInt(localStorage.getItem(todayKey) || '0');
+    _updatePomodoroDisplay();
+    _syncPomodoroModeButtons();
+    const sessEl = document.getElementById('pm-sessions');
+    if (sessEl) sessEl.textContent = _pmSessions;
+    const inputs = ['pm-custom-pomo', 'pm-custom-short', 'pm-custom-long'];
+    const keys   = ['pomodoro', 'short', 'long'];
+    inputs.forEach((id, i) => {
+      const el = document.getElementById(id);
+      if (el) el.value = _pmTimes[keys[i]];
+    });
+  }
+
+  function setPomodoroMode(mode) {
+    if (_pmState.interval) clearInterval(_pmState.interval);
+    _pmState = { mode, timeLeft: _pmTimes[mode] * 60, running: false, interval: null };
+    _updatePomodoroDisplay();
+    _syncPomodoroModeButtons();
+    const btn = document.getElementById('pm-start-btn');
+    if (btn) btn.textContent = '▶ Bắt đầu';
+  }
+
+  function togglePomodoro() {
+    if (_pmState.running) {
+      clearInterval(_pmState.interval);
+      _pmState.running  = false;
+      _pmState.interval = null;
+      const btn = document.getElementById('pm-start-btn');
+      if (btn) btn.textContent = '▶ Tiếp tục';
+    } else {
+      _pmState.running  = true;
+      _pmState.interval = setInterval(_pomodoroTick, 1000);
+      const btn = document.getElementById('pm-start-btn');
+      if (btn) btn.textContent = '⏸ Tạm dừng';
+    }
+  }
+
+  function resetPomodoro() {
+    if (_pmState.interval) clearInterval(_pmState.interval);
+    _pmState.timeLeft = _pmTimes[_pmState.mode] * 60;
+    _pmState.running  = false;
+    _pmState.interval = null;
+    _updatePomodoroDisplay();
+    const btn = document.getElementById('pm-start-btn');
+    if (btn) btn.textContent = '▶ Bắt đầu';
+  }
+
+  function updatePomodoroTimes() {
+    _pmTimes.pomodoro = parseInt(document.getElementById('pm-custom-pomo')?.value)  || 25;
+    _pmTimes.short    = parseInt(document.getElementById('pm-custom-short')?.value) || 5;
+    _pmTimes.long     = parseInt(document.getElementById('pm-custom-long')?.value)  || 15;
+    if (!_pmState.running) {
+      _pmState.timeLeft = _pmTimes[_pmState.mode] * 60;
+      _updatePomodoroDisplay();
+    }
+  }
+
+  function _pomodoroTick() {
+    _pmState.timeLeft--;
+    _updatePomodoroDisplay();
+    if (_pmState.timeLeft <= 0) {
+      clearInterval(_pmState.interval);
+      _pmState.running  = false;
+      _pmState.interval = null;
+      _pomodoroComplete();
+    }
+  }
+
+  function _updatePomodoroDisplay() {
+    const el = document.getElementById('pm-display');
+    if (!el) return;
+    const m = Math.floor(_pmState.timeLeft / 60);
+    const s = _pmState.timeLeft % 60;
+    el.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  function _syncPomodoroModeButtons() {
+    const modes = { pomodoro: 'pm-mode-pomo', short: 'pm-mode-short', long: 'pm-mode-long' };
+    Object.entries(modes).forEach(([m, id]) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.className = m === _pmState.mode ? 'btn-primary' : 'btn-outline';
+      btn.style.padding = '8px 18px';
+      btn.style.fontSize = '13px';
+    });
+  }
+
+  function _pomodoroComplete() {
+    _beepSound();
+    const isPomodoro = _pmState.mode === 'pomodoro';
+    if (isPomodoro) {
+      _pmSessions++;
+      const todayKey = 'nhk_pomo_' + new Date().toISOString().slice(0, 10);
+      localStorage.setItem(todayKey, _pmSessions);
+      const sessEl = document.getElementById('pm-sessions');
+      if (sessEl) sessEl.textContent = _pmSessions;
+    }
+    const msg = isPomodoro
+      ? `🍅 Hoàn thành phiên ${_pmSessions}! Nghỉ ngơi một chút nhé.`
+      : '✅ Hết giờ nghỉ! Sẵn sàng tập trung tiếp chưa?';
+    showToast(msg);
+    const nextMode = isPomodoro ? (_pmSessions % 4 === 0 ? 'long' : 'short') : 'pomodoro';
+    setPomodoroMode(nextMode);
+  }
+
+  function _beepSound() {
+    try {
+      const ctx  = new (window.AudioContext || window.webkitAudioContext)();
+      const freq = [800, 600, 800];
+      freq.forEach((f, i) => {
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = f;
+        const t0 = ctx.currentTime + i * 0.2;
+        gain.gain.setValueAtTime(0.4, t0);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.15);
+        osc.start(t0);
+        osc.stop(t0 + 0.15);
+      });
+    } catch {}
+  }
+
+  // ── v2.6: Câu truyền cảm hứng ────────────────────────────────────────────
+  async function loadDailyQuote() {
+    const el = document.getElementById('daily-quote-card');
+    if (!el) return;
+    try {
+      const d = await API.getQuoteToday();
+      if (!d.quote) return;
+      el.innerHTML = `<div class="card" style="padding:16px;border-left:4px solid var(--primary);background:linear-gradient(135deg,var(--surface),var(--bg))">
+        <div style="font-size:13px;color:var(--text);font-style:italic;line-height:1.6;margin-bottom:8px">"${escapeHtml(d.quote.text)}"</div>
+        ${d.quote.author ? `<div style="font-size:11px;color:var(--text-muted);font-weight:600;text-align:right">— ${escapeHtml(d.quote.author)}</div>` : ''}
+      </div>`;
+      el.style.display = '';
+    } catch {}
+  }
+
+  // ── v2.6: Thống kê năm ───────────────────────────────────────────────────
+  function initYearStatsPage() {
+    const picker = document.getElementById('year-stats-picker');
+    if (picker && !picker.options.length) {
+      const thisYear = new Date().getFullYear();
+      for (let y = thisYear; y >= thisYear - 5; y--) {
+        const opt = document.createElement('option');
+        opt.value = y; opt.textContent = y;
+        picker.appendChild(opt);
+      }
+    }
+    loadYearStats();
+  }
+
+  async function loadYearStats() {
+    const picker  = document.getElementById('year-stats-picker');
+    const year    = picker ? picker.value : new Date().getFullYear();
+    const content = document.getElementById('year-stats-content');
+    if (!content) return;
+    content.innerHTML = '<div class="loading-text">Đang tải...</div>';
+    try {
+      const d = await API.getYearStats(year);
+      if (!d.totalEntries) {
+        content.innerHTML = `<div class="card" style="text-align:center;padding:32px;color:var(--text-muted)">
+          <div style="font-size:36px;margin-bottom:12px">📭</div>
+          <div>Không có nhật ký nào trong năm ${year}.</div>
+        </div>`;
+        return;
+      }
+      const MONTHS = ['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
+      const moodColor = m => !m ? 'var(--border)' : m >= 8 ? '#16a34a' : m >= 5 ? '#d97706' : '#dc2626';
+      const maxCount  = Math.max(...d.moodByMonth.map(m => m.count), 1);
+
+      const bars = d.moodByMonth.map((m, i) => {
+        const pct = Math.round((m.count / maxCount) * 100);
+        return `<div style="flex:1;text-align:center">
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">${MONTHS[i]}</div>
+          <div style="background:var(--border);border-radius:4px;height:70px;display:flex;align-items:flex-end;overflow:hidden">
+            <div style="width:100%;height:${pct}%;background:${moodColor(m.avg)};border-radius:4px 4px 0 0;transition:height .4s"></div>
+          </div>
+          <div style="font-size:10px;font-weight:600;color:${moodColor(m.avg)};margin-top:3px">${m.avg ?? '-'}</div>
+        </div>`;
+      }).join('');
+
+      const topTagsHtml = d.topTags?.length
+        ? d.topTags.map(t => `<span class="tag" style="cursor:default">#${escapeHtml(t.tag)} <span style="opacity:.7;font-size:10px">${t.count}</span></span>`).join(' ')
+        : '<span style="color:var(--text-muted);font-size:13px">Chưa dùng tag nào.</span>';
+
+      content.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:20px">
+          <div class="stat-card"><div class="stat-value">${d.totalEntries}</div><div class="stat-label">Bài viết cả năm</div></div>
+          <div class="stat-card"><div class="stat-value" style="color:${moodColor(d.avgMood)}">${d.avgMood}</div><div class="stat-label">Mood trung bình</div></div>
+          <div class="stat-card"><div class="stat-value">🔥 ${d.maxStreak}</div><div class="stat-label">Streak dài nhất</div></div>
+        </div>
+
+        ${d.bestMonth || d.busyMonth ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+          ${d.bestMonth ? `<div class="card" style="padding:14px">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">🏆 Tháng mood cao nhất</div>
+            <div style="font-weight:700;font-size:20px;color:#16a34a">${MONTHS[d.bestMonth.month-1]} · ${d.bestMonth.avg}/10</div>
+          </div>` : ''}
+          ${d.busyMonth ? `<div class="card" style="padding:14px">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">✍️ Tháng viết nhiều nhất</div>
+            <div style="font-weight:700;font-size:20px;color:var(--primary)">${MONTHS[d.busyMonth.month-1]} · ${d.busyMonth.count} bài</div>
+          </div>` : ''}
+        </div>` : ''}
+
+        <div class="card" style="margin-bottom:20px">
+          <div class="settings-section-title" style="margin-bottom:12px">📈 Mood trung bình theo tháng</div>
+          <div style="display:flex;gap:4px;align-items:flex-end;height:80px">${bars}</div>
+          <div style="margin-top:8px;font-size:11px;color:var(--text-hint)">Chiều cao cột = số bài viết · Màu = mood trung bình</div>
+        </div>
+
+        <div class="card">
+          <div class="settings-section-title" style="margin-bottom:10px">🏷️ Tags dùng nhiều nhất</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">${topTagsHtml}</div>
+        </div>`;
+    } catch {
+      content.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:24px">Không tải được thống kê.</div>';
+    }
+  }
+
+  // ── v2.6: Tự động lưu nháp nhật ký ───────────────────────────────────────
+  let _draftInterval = null;
+
+  function _startAutoDraft() {
+    if (!window.FEATURES || !window.FEATURES.auto_draft) return;
+    if (_draftInterval) clearInterval(_draftInterval);
+    _draftInterval = setInterval(_saveDraft, 30000);
+  }
+
+  function _saveDraft() {
+    const eventText = document.getElementById('event-text')?.value || '';
+    const gratitude = document.getElementById('gratitude-text')?.value || '';
+    if (!eventText.trim() && !gratitude.trim()) return;
+    const selectedTags = Array.from(document.querySelectorAll('.tag-btn.selected')).map(b => b.dataset.tag).join('|');
+    localStorage.setItem('nhk_draft', JSON.stringify({
+      mood: selectedMood,
+      event_text: eventText,
+      gratitude,
+      tags: selectedTags,
+      ts: Date.now(),
+    }));
+  }
+
+  function _clearDraft() {
+    localStorage.removeItem('nhk_draft');
+    if (_draftInterval) { clearInterval(_draftInterval); _draftInterval = null; }
+    const banner = document.getElementById('draft-restore-banner');
+    if (banner) banner.style.display = 'none';
+  }
+
+  function _checkDraft() {
+    if (!window.FEATURES || !window.FEATURES.auto_draft) return;
+    const raw = localStorage.getItem('nhk_draft');
+    if (!raw) return;
+    try {
+      const d = JSON.parse(raw);
+      if (Date.now() - d.ts > 24 * 3600 * 1000) { _clearDraft(); return; }
+      const banner = document.getElementById('draft-restore-banner');
+      if (!banner) return;
+      const ago = Math.round((Date.now() - d.ts) / 60000);
+      const agoStr = ago < 1 ? 'vừa rồi' : ago + ' phút trước';
+      banner.innerHTML = `<div class="card" style="padding:12px 16px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <span style="font-size:13px">📝 Bản nháp chưa lưu (${agoStr})</span>
+        <div style="display:flex;gap:8px">
+          <button onclick="App.restoreDraft()" style="padding:4px 12px;border-radius:6px;border:2px solid #fff;background:transparent;color:#fff;cursor:pointer;font-size:12px;font-weight:600">Khôi phục</button>
+          <button onclick="App.discardDraft()" style="padding:4px 10px;border-radius:6px;border:none;background:rgba(0,0,0,.2);color:#fff;cursor:pointer;font-size:12px">Bỏ qua</button>
+        </div>
+      </div>`;
+      banner.style.display = '';
+    } catch { _clearDraft(); }
+  }
+
+  function restoreDraft() {
+    const raw = localStorage.getItem('nhk_draft');
+    if (!raw) return;
+    try {
+      const d = JSON.parse(raw);
+      if (d.event_text) { const el = document.getElementById('event-text'); if (el) el.value = d.event_text; }
+      if (d.gratitude)  { const el = document.getElementById('gratitude-text'); if (el) el.value = d.gratitude; }
+      if (d.mood && d.mood !== selectedMood) {
+        selectedMood = d.mood;
+        document.querySelectorAll('.mood-btn').forEach(b => b.classList.toggle('selected', parseInt(b.dataset.mood) === d.mood));
+      }
+      if (d.tags) {
+        d.tags.split('|').filter(Boolean).forEach(tag => {
+          const btn = document.querySelector(`.tag-btn[data-tag="${tag}"]`);
+          if (btn && !btn.classList.contains('selected')) btn.click();
+        });
+      }
+      _clearDraft();
+      showToast('📝 Đã khôi phục bản nháp!');
+    } catch { _clearDraft(); }
+  }
+
+  function discardDraft() { _clearDraft(); }
+
   // ── v2.5: Habit Tracker ───────────────────────────────────────────────────
   let _habitsCache = null;
 
@@ -4704,5 +5024,7 @@ const App = (() => {
     sendFriendRequest,acceptFriendRequest,rejectFriendRequest,removeFriend,
     createTemplate,deleteTemplate,editTemplate,saveEditTemplate,openTemplatePicker,closeTemplatePicker,applyTemplate,
     loadMonthlyReport,submitReflection,quickLogMood,
-    initHabitsPage,createHabit,deleteHabit,toggleHabit,togglePinEntry};
+    initHabitsPage,createHabit,deleteHabit,toggleHabit,togglePinEntry,
+    initPomodoroPage,setPomodoroMode,togglePomodoro,resetPomodoro,updatePomodoroTimes,
+    loadYearStats,restoreDraft,discardDraft};
 })();

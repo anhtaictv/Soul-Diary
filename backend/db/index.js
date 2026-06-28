@@ -1056,6 +1056,79 @@ async function initSchema() {
     ALTER TABLE DiaryEntries ADD is_pinned BIT NOT NULL DEFAULT 0
   `);
 
+  // ── v2.6: Câu truyền cảm hứng ────────────────────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Quotes' AND xtype='U')
+    CREATE TABLE Quotes (
+      id       INT IDENTITY PRIMARY KEY,
+      [text]   NVARCHAR(500) NOT NULL,
+      author   NVARCHAR(100),
+      category NVARCHAR(50) DEFAULT 'general'
+    )
+  `);
+
+  const quotesList = [
+    { text: 'Mỗi ngày là một cơ hội mới để trở thành phiên bản tốt hơn của chính mình.', author: 'Ẩn danh', cat: 'growth' },
+    { text: 'Hành trình ngàn dặm bắt đầu từ một bước chân.', author: 'Lão Tử', cat: 'motivation' },
+    { text: 'Bình yên không phải là vắng lặng — đó là giữa cơn bão mà vẫn điềm tĩnh.', author: 'Ẩn danh', cat: 'mindfulness' },
+    { text: 'Cảm xúc là thông tin, không phải lệnh phải tuân theo.', author: 'Ẩn danh', cat: 'emotion' },
+    { text: 'Chăm sóc bản thân không phải là ích kỷ — đó là tình yêu thương với chính mình.', author: 'Ẩn danh', cat: 'self-care' },
+    { text: 'Thất bại là mẹ thành công.', author: 'Tục ngữ Việt Nam', cat: 'motivation' },
+    { text: 'Hôm nay khó khăn, ngày mai khó hơn, nhưng ngày mốt sẽ tươi đẹp.', author: 'Jack Ma', cat: 'motivation' },
+    { text: 'Bạn không cần phải vĩ đại để bắt đầu, nhưng bạn phải bắt đầu để trở nên vĩ đại.', author: 'Les Brown', cat: 'growth' },
+    { text: 'Điều duy nhất bạn có thể kiểm soát là phản ứng của mình với những gì xảy ra.', author: 'Ẩn danh', cat: 'mindfulness' },
+    { text: 'Mỗi khoảnh khắc khó khăn đều chứa đựng hạt mầm của sự trưởng thành.', author: 'Ẩn danh', cat: 'growth' },
+    { text: 'Đừng so sánh hành trình của bạn với người khác — bản đồ của mỗi người là khác nhau.', author: 'Ẩn danh', cat: 'self-care' },
+    { text: 'Dũng cảm không phải là không sợ hãi, mà là hành động dù có sợ hãi.', author: 'Ẩn danh', cat: 'courage' },
+    { text: 'Bạn có đủ sức mạnh để vượt qua điều này.', author: 'Ẩn danh', cat: 'encouragement' },
+    { text: 'Hãy kiên nhẫn. Mọi thứ đều cần thời gian để phát triển.', author: 'Ẩn danh', cat: 'mindfulness' },
+    { text: 'Học từ ngày hôm qua, sống cho ngày hôm nay, hy vọng vào ngày mai.', author: 'Albert Einstein', cat: 'wisdom' },
+    { text: 'Cách tốt nhất để dự đoán tương lai là tự tạo ra nó.', author: 'Peter Drucker', cat: 'motivation' },
+    { text: 'Không ai có thể trở lại và bắt đầu lại từ đầu, nhưng ai cũng có thể bắt đầu từ hôm nay.', author: 'Ẩn danh', cat: 'growth' },
+    { text: 'Sức khỏe tâm thần quan trọng không kém sức khỏe thể chất.', author: 'Ẩn danh', cat: 'self-care' },
+    { text: 'Cho phép bản thân cảm nhận — cảm xúc là cầu nối đến sự thấu hiểu.', author: 'Ẩn danh', cat: 'emotion' },
+    { text: 'Mỗi buổi sáng thức dậy là một món quà. Hãy trân trọng nó.', author: 'Ẩn danh', cat: 'gratitude' },
+    { text: 'Bạn đã vượt qua 100% những ngày tồi tệ nhất trong cuộc đời mình.', author: 'Ẩn danh', cat: 'encouragement' },
+    { text: 'Giá trị của bạn không được đo bằng năng suất — bạn đủ giá trị chỉ vì bạn tồn tại.', author: 'Ẩn danh', cat: 'self-care' },
+    { text: 'Tiến bộ nhỏ và đều đặn mạnh hơn những bước nhảy lớn nhưng đứt đoạn.', author: 'Ẩn danh', cat: 'growth' },
+    { text: 'Hơi thở nhắc nhở bạn: bạn vẫn ở đây, và điều đó đã là đủ.', author: 'Ẩn danh', cat: 'mindfulness' },
+    { text: 'Viết ra cảm xúc là cách tốt nhất để hiểu chính mình.', author: 'Ẩn danh', cat: 'emotion' },
+    { text: 'Đừng để nỗi sợ về tương lai chiếm mất niềm vui của hiện tại.', author: 'Ẩn danh', cat: 'mindfulness' },
+    { text: 'Mỗi người có một nhịp độ riêng — hãy tôn trọng nhịp độ của bạn.', author: 'Ẩn danh', cat: 'self-care' },
+    { text: 'Điều bạn chú ý đến sẽ phát triển. Hãy chú ý đến điều tốt đẹp.', author: 'Ẩn danh', cat: 'gratitude' },
+    { text: 'Sự tử tế là ngôn ngữ mà người điếc có thể nghe và người mù có thể thấy.', author: 'Mark Twain', cat: 'wisdom' },
+    { text: 'Khi bạn không thể thay đổi hướng gió, hãy điều chỉnh cánh buồm.', author: 'Ẩn danh', cat: 'resilience' },
+  ];
+  const existingQuotes = await db.request().query('SELECT COUNT(*) as n FROM Quotes');
+  if (existingQuotes.recordset[0].n === 0) {
+    for (const q of quotesList) {
+      await db.request()
+        .input('t', sql.NVarChar, q.text)
+        .input('a', sql.NVarChar, q.author)
+        .input('c', sql.NVarChar, q.cat)
+        .query(`INSERT INTO Quotes ([text], author, category) VALUES (@t, @a, @c)`);
+    }
+  }
+
+  // ── v2.6: Seed feature flags ──────────────────────────────────────────────
+  const v26flags = [
+    { key: 'pomodoro_timer',  label: 'Pomodoro Timer',           desc: 'Bộ đếm thời gian học tập 25/5 phút, tùy chỉnh, đếm phiên hôm nay',    ver: 'v2.6', title: 'Năng lượng & Sáng tạo', sort: 260 },
+    { key: 'daily_quote',     label: 'Câu truyền cảm hứng',      desc: 'Câu truyền cảm hứng thay đổi mỗi ngày trên dashboard',                ver: 'v2.6', title: 'Năng lượng & Sáng tạo', sort: 261 },
+    { key: 'year_stats',      label: 'Thống kê năm',             desc: 'Tổng quan cả năm: avg mood, tháng tốt nhất, biểu đồ 12 tháng',        ver: 'v2.6', title: 'Năng lượng & Sáng tạo', sort: 262 },
+    { key: 'auto_draft',      label: 'Tự động lưu nháp',         desc: 'Tự lưu bản nháp nhật ký mỗi 30 giây, khôi phục nếu đóng tab lỡ tay', ver: 'v2.6', title: 'Năng lượng & Sáng tạo', sort: 263 },
+  ];
+  for (const f of v26flags) {
+    await db.request()
+      .input('k', sql.NVarChar, f.key).input('l', sql.NVarChar, f.label)
+      .input('d', sql.NVarChar, f.desc).input('v', sql.NVarChar, f.ver)
+      .input('vt', sql.NVarChar, f.title).input('s', sql.Int, f.sort)
+      .query(`
+        IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key = @k)
+        INSERT INTO FeatureFlags (flag_key, label, description, version, version_title, enabled, sort_order)
+        VALUES (@k, @l, @d, @v, @vt, 0, @s)
+      `);
+  }
+
   // Index
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_DiaryEntries_user_created')
