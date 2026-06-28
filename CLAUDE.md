@@ -185,6 +185,17 @@ After editing backend files, restart the PM2 process (`pm2 restart souldiary-api
 
 - **Quick Mood Log** (`quick_mood_log`) — frontend-only widget `#quick-mood-widget` trên dashboard. 5 emoji (😢😕😐🙂😄 → mood 2/4/6/8/10). Click → `App.quickLogMood(score)` gọi `POST /api/diary` với entry minimal (mood_score, event_text rỗng). Nếu đã viết nhật ký hôm nay, hiện mood hiện tại thay vì emoji picker. Widget ẩn mặc định (`display:none`), chỉ render khi flag bật.
 
+### v2.5 — Habit Tracker & Kỷ niệm *(gate sau feature flags — bật trong admin)*
+
+- **Habit Tracker** (`habit_tracker`) — bảng `Habits` (id, user_id, name, icon, sort_order, created_at) + `HabitLogs` (id, habit_id, user_id, log_date DATE, UNIQUE UQ_HabitLog). Route `routes/habits.js`: `GET /api/habits` (list + 7-day done[] + streak + done_today), `POST /api/habits` (create, max 5), `DELETE /api/habits/:id`, `POST /api/habits/:id/log` (toggle: insert nếu chưa có, delete nếu rồi). Frontend: trang `habits` (nav `#nav-habits`, ẩn mặc định) với form tạo (icon + name) + danh sách 7-day dot grid + streak badge + toggle button. Dashboard widget `#habit-dashboard-widget` (compact checklist hôm nay + progress bar). `App.initHabitsPage()`, `App.createHabit()`, `App.deleteHabit(id)`, `App.toggleHabit(id,btn)`, `App.renderHabitDashboardWidget()`.
+
+- **Gợi ý bài tập cảm xúc** (`exercise_suggest`) — frontend-only modal overlay `#exercise-suggest-overlay` xuất hiện khi mood ≤ 6 sau khi lưu nhật ký (`saveDiaryEntry`) hoặc quick mood log (`quickLogMood`). Bảng gợi ý theo nhóm mood: ≤3 → Body Scan + Thở 4-7-8, ≤5 → Thở hộp + PMR, ≤6 → 5-4-3-2-1 + Biết ơn. Mỗi bài tập là nút gọi trực tiếp modal tương ứng rồi đóng overlay. `_showExerciseSuggest(score)` (internal).
+
+- **Ghim nhật ký** (`pinned_entries`) — cột `DiaryEntries.is_pinned BIT NOT NULL DEFAULT 0`. Endpoint `PATCH /api/diary/:id/pin` toggle is_pinned (max 5 pinned enforced server-side, trả `{is_pinned}`). Section `#pinned-entries-section` trên dashboard hiện các entry đã ghim (click → openEntry). Nút `#entry-pin-btn` trong entry modal (ẩn nếu flag tắt) → `App.togglePinEntry()` cập nhật button text + cache + re-render section. `App.renderPinnedEntries(entries)`, `App.togglePinEntry()`.
+
+  **Backend mới:** `backend/routes/habits.js`.  
+  **Frontend mới:** `PAGES['habits']` trong `pages.js`. Nav item `#nav-habits` (hidden, reveal by flag). Dashboard: `#habit-dashboard-widget`, `#pinned-entries-section`.
+
 ## Feature Flag — quy tắc bắt buộc
 
 ### Nguyên tắc cốt lõi (QUAN TRỌNG — áp dụng cho mọi lần nâng cấp sau này)

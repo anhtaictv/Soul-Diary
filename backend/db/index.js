@@ -976,6 +976,9 @@ async function initSchema() {
     { key: 'monthly_report',      label: 'Báo cáo tháng',              desc: 'Thống kê tháng: avg mood, top tags, ngày tốt nhất, xu hướng theo tuần', ver: 'v2.4', title: 'Báo cáo Cá nhân & Phản tư Tuần', sort: 240 },
     { key: 'weekly_reflection',   label: 'Phản tư cuối tuần',          desc: '5 câu hỏi hướng dẫn mỗi Chủ nhật, lưu lại để xem lại sau',            ver: 'v2.4', title: 'Báo cáo Cá nhân & Phản tư Tuần', sort: 241 },
     { key: 'quick_mood_log',      label: 'Quick Mood Log',              desc: 'Widget 5 emoji trên dashboard, ghi mood 1 chạm không cần mở form',    ver: 'v2.4', title: 'Báo cáo Cá nhân & Phản tư Tuần', sort: 242 },
+    { key: 'habit_tracker',       label: 'Habit Tracker',               desc: 'Tạo tối đa 5 thói quen, check-in hàng ngày, xem streak 7 ngày',       ver: 'v2.5', title: 'Habit Tracker & Kỷ niệm', sort: 250 },
+    { key: 'exercise_suggest',    label: 'Gợi ý bài tập cảm xúc',      desc: 'Gợi ý bài tập phù hợp khi mood thấp (PMR, hít thở, grounding...)',    ver: 'v2.5', title: 'Habit Tracker & Kỷ niệm', sort: 251 },
+    { key: 'pinned_entries',      label: 'Ghim nhật ký',                desc: 'Ghim tối đa 5 entry quan trọng, hiện ở section riêng',                ver: 'v2.5', title: 'Habit Tracker & Kỷ niệm', sort: 252 },
   ];
   for (const f of v22flags) {
     await db.request()
@@ -1022,6 +1025,35 @@ async function initSchema() {
       default_mood     INT DEFAULT 5,
       created_at       DATETIME2 DEFAULT GETDATE()
     )
+  `);
+
+  // ── v2.5: Habit Tracker ──────────────────────────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Habits' AND xtype='U')
+    CREATE TABLE Habits (
+      id          INT IDENTITY PRIMARY KEY,
+      user_id     INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      name        NVARCHAR(100) NOT NULL,
+      icon        NVARCHAR(10) NOT NULL DEFAULT '✅',
+      sort_order  INT DEFAULT 0,
+      created_at  DATETIME2 DEFAULT GETDATE()
+    )
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='HabitLogs' AND xtype='U')
+    CREATE TABLE HabitLogs (
+      id          INT IDENTITY PRIMARY KEY,
+      habit_id    INT NOT NULL REFERENCES Habits(id) ON DELETE CASCADE,
+      user_id     INT NOT NULL,
+      log_date    DATE NOT NULL,
+      CONSTRAINT UQ_HabitLog UNIQUE (habit_id, log_date)
+    )
+  `);
+
+  // ── v2.5: Ghim nhật ký ───────────────────────────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='DiaryEntries' AND COLUMN_NAME='is_pinned')
+    ALTER TABLE DiaryEntries ADD is_pinned BIT NOT NULL DEFAULT 0
   `);
 
   // Index

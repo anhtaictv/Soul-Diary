@@ -92,6 +92,7 @@ const App = (() => {
       case 'templates':     initTemplatesPage();       break;
       case 'report':        initReportPage();          break;
       case 'reflection':    initReflectionPage();      break;
+      case 'habits':        initHabitsPage();          break;
     }
   }
 
@@ -206,6 +207,10 @@ const App = (() => {
 
     // Quick mood log widget (v2.4)
     if (window.FEATURES && window.FEATURES.quick_mood_log) renderQuickMoodWidget(todayEntry);
+    // Habit tracker widget (v2.5)
+    if (window.FEATURES && window.FEATURES.habit_tracker) renderHabitDashboardWidget();
+    // Pinned entries (v2.5)
+    if (window.FEATURES && window.FEATURES.pinned_entries) renderPinnedEntries(cachedEntries);
   }
 
   function renderRecommendations(mood) {
@@ -324,6 +329,17 @@ const App = (() => {
     document.getElementById('entry-modal-body').innerHTML = bodyHtml;
     const shareBtn = document.getElementById('entry-share-btn');
     if (shareBtn) shareBtn.style.display = (window.FEATURES && window.FEATURES.share_entry) ? '' : 'none';
+    // Nút ghim (v2.5)
+    const pinBtn = document.getElementById('entry-pin-btn');
+    if (pinBtn) {
+      if (window.FEATURES && window.FEATURES.pinned_entries) {
+        pinBtn.style.display = '';
+        pinBtn.textContent = e.is_pinned ? '📌 Bỏ ghim' : '📌 Ghim';
+        pinBtn.dataset.pinned = e.is_pinned ? '1' : '0';
+      } else {
+        pinBtn.style.display = 'none';
+      }
+    }
     document.getElementById('entry-modal').classList.add('open');
   }
 
@@ -789,6 +805,9 @@ const App = (() => {
         API.getEntryCompanion(res.entry.id).then(d => { if (d && d.message) showCompanionMessage(d.message); }).catch(() => {});
       }
       if (res.low_streak) setTimeout(showLowMoodAlert, 800);
+      if (selectedMood <= 6 && window.FEATURES && window.FEATURES.exercise_suggest) {
+        setTimeout(() => _showExerciseSuggest(selectedMood), 1000);
+      }
       await loadDiaryEntries();
       showToast('✅ Đã lưu nhật ký!');
     } catch(err) { showToast('❌ Lỗi lưu nhật ký: '+err.message); }
@@ -3949,6 +3968,11 @@ const App = (() => {
       if (el) el.style.display = '';
       loadReflectionBadge();
     }
+    // v2.5 — hiện nav sau flag
+    if (window.FEATURES && window.FEATURES.habit_tracker) {
+      const el = document.getElementById('nav-habits');
+      if (el) el.style.display = '';
+    }
     nav('dashboard');
   }
 
@@ -4437,7 +4461,239 @@ const App = (() => {
         <div style="font-size:32px">${m.emoji}</div>
         <div style="font-size:13px;font-weight:600;color:var(--primary)">${score}/10 · ${m.label}</div>
       </div>`;
+      if (score <= 6 && window.FEATURES && window.FEATURES.exercise_suggest) {
+        setTimeout(() => _showExerciseSuggest(score), 800);
+      }
     } catch (err) { showToast('❌ ' + err.message); }
+  }
+
+  // ── v2.5: Habit Tracker ───────────────────────────────────────────────────
+  let _habitsCache = null;
+
+  async function initHabitsPage() {
+    _loadHabitsList();
+  }
+
+  async function _loadHabitsList() {
+    const el = document.getElementById('habits-list');
+    if (!el) return;
+    el.innerHTML = '<div class="loading-text">Đang tải...</div>';
+    try {
+      const d = await API.getHabits();
+      _habitsCache = d.habits;
+      if (!d.habits.length) {
+        el.innerHTML = `<div style="text-align:center;padding:32px;color:var(--text-muted)">
+          <div style="font-size:36px;margin-bottom:12px">🌱</div>
+          <div>Chưa có thói quen nào. Thêm thói quen đầu tiên!</div>
+        </div>`;
+        return;
+      }
+      const today = new Date();
+      const days7 = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(today);
+        d.setDate(today.getDate() - (6 - i));
+        return d.toISOString().slice(0, 10);
+      });
+      const dayLabels = ['T2','T3','T4','T5','T6','T7','CN','T2','T3','T4','T5','T6','T7','CN'];
+
+      el.innerHTML = d.habits.map(h => {
+        const grid = h.days.map((done, i) => {
+          const label = dayLabels[new Date(days7[i]).getDay()];
+          return `<div style="text-align:center;flex:1">
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:3px">${label}</div>
+            <div style="width:28px;height:28px;border-radius:50%;margin:0 auto;
+              background:${done ? 'var(--primary)' : 'var(--border)'};
+              display:flex;align-items:center;justify-content:center;font-size:14px">
+              ${done ? '✓' : ''}
+            </div>
+          </div>`;
+        }).join('');
+
+        const streakBadge = h.streak > 0
+          ? `<span style="background:var(--primary);color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">🔥 ${h.streak} ngày</span>`
+          : '';
+
+        return `<div class="card" style="margin-bottom:12px;padding:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:24px">${escapeHtml(h.icon)}</span>
+              <span style="font-weight:600;font-size:15px">${escapeHtml(h.name)}</span>
+              ${streakBadge}
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <button onclick="App.toggleHabit(${h.id}, this)" style="padding:6px 14px;border-radius:var(--radius);border:2px solid var(--primary);
+                background:${h.done_today ? 'var(--primary)' : 'transparent'};
+                color:${h.done_today ? '#fff' : 'var(--primary)'};
+                font-size:13px;font-weight:600;cursor:pointer">
+                ${h.done_today ? '✅ Xong' : '○ Làm'}
+              </button>
+              <button onclick="App.deleteHabit(${h.id},this)" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:18px;padding:4px" title="Xóa">🗑</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:4px">${grid}</div>
+        </div>`;
+      }).join('');
+    } catch (err) {
+      if (el) el.innerHTML = `<div style="color:var(--text-muted);text-align:center;padding:20px">Không tải được danh sách.</div>`;
+    }
+  }
+
+  async function createHabit() {
+    const icon = (document.getElementById('habit-icon')?.value || '').trim() || '✅';
+    const name = (document.getElementById('habit-name')?.value || '').trim();
+    if (!name) { showToast('Nhập tên thói quen!'); return; }
+    const btn = document.querySelector('#habits-list + div button, button[onclick="App.createHabit()"]');
+    try {
+      await API.createHabit({ icon, name });
+      const iconEl = document.getElementById('habit-icon');
+      const nameEl = document.getElementById('habit-name');
+      if (iconEl) iconEl.value = '';
+      if (nameEl) nameEl.value = '';
+      showToast('✅ Đã thêm thói quen!');
+      _loadHabitsList();
+    } catch (err) { showToast('❌ ' + err.message); }
+  }
+
+  async function deleteHabit(id, btn) {
+    if (!confirm('Xóa thói quen này và toàn bộ lịch sử?')) return;
+    try {
+      await API.deleteHabit(id);
+      showToast('Đã xóa thói quen.');
+      _loadHabitsList();
+    } catch (err) { showToast('❌ ' + err.message); }
+  }
+
+  async function toggleHabit(id, btn) {
+    try {
+      const d = await API.toggleHabitLog(id);
+      if (_habitsCache) {
+        const h = _habitsCache.find(x => x.id === id);
+        if (h) {
+          h.done_today = d.done;
+          if (d.done) h.streak = (h.streak || 0) + 1;
+          else h.streak = Math.max(0, (h.streak || 1) - 1);
+        }
+      }
+      if (btn) {
+        btn.style.background   = d.done ? 'var(--primary)' : 'transparent';
+        btn.style.color        = d.done ? '#fff' : 'var(--primary)';
+        btn.textContent        = d.done ? '✅ Xong' : '○ Làm';
+      }
+      if (d.done && window.FEATURES && window.FEATURES.exercise_suggest) {
+        _showExerciseSuggest();
+      }
+    } catch (err) { showToast('❌ ' + err.message); }
+  }
+
+  async function renderHabitDashboardWidget() {
+    const el = document.getElementById('habit-dashboard-widget');
+    if (!el) return;
+    try {
+      const d = await API.getHabits();
+      if (!d.habits.length) { el.style.display = 'none'; return; }
+      const total = d.habits.length;
+      const done  = d.habits.filter(h => h.done_today).length;
+      el.innerHTML = `<div class="card" style="padding:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-weight:600;font-size:13px">📋 Thói quen hôm nay</div>
+          <span style="font-size:12px;color:var(--text-muted)">${done}/${total} hoàn thành</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${d.habits.map(h => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border-radius:var(--radius);background:var(--border)">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span>${escapeHtml(h.icon)}</span>
+                <span style="font-size:13px">${escapeHtml(h.name)}</span>
+              </div>
+              <button onclick="App.toggleHabit(${h.id},this)" style="width:28px;height:28px;border-radius:50%;border:2px solid var(--primary);
+                background:${h.done_today ? 'var(--primary)' : 'transparent'};color:${h.done_today ? '#fff' : 'var(--primary)'};
+                font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center">
+                ${h.done_today ? '✓' : ''}
+              </button>
+            </div>`).join('')}
+        </div>
+        <div style="margin-top:10px;height:4px;background:var(--border);border-radius:2px">
+          <div style="width:${Math.round(done/total*100)}%;height:100%;background:var(--primary);border-radius:2px;transition:width .4s"></div>
+        </div>
+      </div>`;
+      el.style.display = '';
+    } catch { el.style.display = 'none'; }
+  }
+
+  // ── v2.5: Ghim nhật ký ────────────────────────────────────────────────────
+  function renderPinnedEntries(entries) {
+    const section = document.getElementById('pinned-entries-section');
+    if (!section) return;
+    const pinned = (entries || []).filter(e => e.is_pinned);
+    if (!pinned.length) { section.style.display = 'none'; return; }
+    const MOOD_ICONS = ['','😢','😢','😕','😕','😐','😐','🙂','🙂','😄','😄'];
+    section.innerHTML = `<div style="font-weight:700;font-size:15px;margin-bottom:10px;display:flex;align-items:center;gap:6px">📌 Nhật ký đã ghim <span style="font-size:12px;color:var(--text-muted);font-weight:400">(${pinned.length})</span></div>
+      ${pinned.map(e => `
+        <div class="entry-item" onclick="App.openEntry(${e.id})" style="cursor:pointer;margin-bottom:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="font-size:12px;color:var(--text-muted)">${new Date(e.created_at).toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'})}</div>
+            <div style="font-size:18px">${MOOD_ICONS[e.mood_score] || ''} <span style="font-size:12px;color:var(--primary);font-weight:700">${e.mood_score}/10</span></div>
+          </div>
+          ${e.event_text ? `<div style="font-size:13px;color:var(--text);margin-top:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${escapeHtml(e.event_text.slice(0,80))}</div>` : ''}
+        </div>`).join('')}`;
+    section.style.display = '';
+  }
+
+  async function togglePinEntry() {
+    if (!_shareEntryId) return;
+    const btn = document.getElementById('entry-pin-btn');
+    try {
+      const d = await API.pinEntry(_shareEntryId);
+      const pinned = d.is_pinned;
+      if (btn) {
+        btn.textContent        = pinned ? '📌 Bỏ ghim' : '📌 Ghim';
+        btn.dataset.pinned     = pinned ? '1' : '0';
+      }
+      showToast(pinned ? '📌 Đã ghim nhật ký!' : '📌 Đã bỏ ghim.');
+      if (cachedEntries) {
+        const idx = cachedEntries.findIndex(e => e.id === _shareEntryId);
+        if (idx !== -1) cachedEntries[idx].is_pinned = pinned ? 1 : 0;
+      }
+      if (window.FEATURES && window.FEATURES.pinned_entries) renderPinnedEntries(cachedEntries);
+    } catch (err) { showToast('❌ ' + err.message); }
+  }
+
+  // ── v2.5: Gợi ý bài tập cảm xúc ─────────────────────────────────────────
+  const EXERCISE_SUGGEST_MAP = [
+    { maxScore: 3, label: '😢 Mood thấp', exercises: [
+        { icon: '🧘', name: 'Body Scan', action: "App.openBodyScanModal()" },
+        { icon: '🌬️', name: 'Thở 4-7-8',  action: "App.openBreathModal()" },
+      ]},
+    { maxScore: 5, label: '😕 Mood buồn', exercises: [
+        { icon: '📦', name: 'Thở hộp',     action: "App.openBoxBreathModal()" },
+        { icon: '🤸', name: 'PMR',          action: "App.openPMRModal()" },
+      ]},
+    { maxScore: 6, label: '😐 Bình thường', exercises: [
+        { icon: '🌿', name: '5-4-3-2-1',   action: "App.openGroundingModal()" },
+        { icon: '🙏', name: 'Biết ơn',      action: "App.openGratitudeModal()" },
+      ]},
+  ];
+
+  function _showExerciseSuggest(score) {
+    const bucket = EXERCISE_SUGGEST_MAP.find(b => !score || score <= b.maxScore);
+    if (!bucket) return;
+    const overlay = document.createElement('div');
+    overlay.id = 'exercise-suggest-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;display:flex;align-items:center;justify-content:center;padding:20px';
+    overlay.innerHTML = `<div class="card" style="max-width:360px;width:100%;padding:24px;text-align:center">
+      <div style="font-size:28px;margin-bottom:8px">💆</div>
+      <div style="font-weight:700;font-size:16px;margin-bottom:6px">Bài tập thư giãn</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:18px">Thử bài tập nhỏ để cải thiện tâm trạng nhé!</div>
+      <div style="display:flex;gap:10px;justify-content:center;margin-bottom:18px">
+        ${bucket.exercises.map(ex => `
+          <button onclick="${ex.action};document.getElementById('exercise-suggest-overlay').remove()" style="flex:1;padding:14px 8px;border-radius:var(--radius);border:2px solid var(--primary);background:transparent;color:var(--primary);cursor:pointer;font-size:13px;font-weight:600">
+            <div style="font-size:26px;margin-bottom:4px">${ex.icon}</div>${ex.name}
+          </button>`).join('')}
+      </div>
+      <button onclick="document.getElementById('exercise-suggest-overlay').remove()" style="color:var(--text-muted);background:none;border:none;cursor:pointer;font-size:13px">Bỏ qua</button>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   }
 
   return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,applyTheme,toggleThemePicker,loadMoreDiary,
@@ -4447,5 +4703,6 @@ const App = (() => {
     shareCurrentEntry,closeShareModal,copyShareLink,revokeCurrentShare,
     sendFriendRequest,acceptFriendRequest,rejectFriendRequest,removeFriend,
     createTemplate,deleteTemplate,editTemplate,saveEditTemplate,openTemplatePicker,closeTemplatePicker,applyTemplate,
-    loadMonthlyReport,submitReflection,quickLogMood};
+    loadMonthlyReport,submitReflection,quickLogMood,
+    initHabitsPage,createHabit,deleteHabit,toggleHabit,togglePinEntry};
 })();

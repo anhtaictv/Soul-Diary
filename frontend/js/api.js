@@ -193,6 +193,15 @@ const API = (() => {
     removeFriend:       (id)       => request(`/friends/${id}`,        { method: 'DELETE' }),
 
     // v2.3 — Nhật ký định kỳ (templates)
+    // v2.5 — Ghim nhật ký
+    pinEntry:         (id)        => request(`/diary/${id}/pin`, { method: 'PATCH' }),
+
+    // v2.5 — Habit Tracker
+    getHabits:        ()          => request('/habits'),
+    createHabit:      (body)      => request('/habits',             { method: 'POST',   body }),
+    deleteHabit:      (id)        => request(`/habits/${id}`,       { method: 'DELETE' }),
+    toggleHabitLog:   (id)        => request(`/habits/${id}/log`,   { method: 'POST' }),
+
     // v2.4 — Báo cáo tháng
     getMonthlyReport: (month) => request(`/diary/monthly-report${month ? '?month='+month : ''}`),
 

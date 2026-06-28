@@ -34,6 +34,12 @@ const PAGES = {
       <!-- Quick Mood Log widget (v2.4, ẩn cho đến khi quick_mood_log flag bật) -->
       <div id="quick-mood-widget" style="display:none;margin-bottom:16px"></div>
 
+      <!-- Habit Tracker widget (v2.5, ẩn cho đến khi habit_tracker flag bật) -->
+      <div id="habit-dashboard-widget" style="display:none;margin-bottom:16px"></div>
+
+      <!-- Nhật ký đã ghim (v2.5, ẩn cho đến khi pinned_entries flag bật) -->
+      <div id="pinned-entries-section" style="display:none"></div>
+
       <div class="section-label">Gợi ý dành cho bạn</div>
       <div id="recommendations"></div>
 
@@ -954,6 +960,39 @@ const PAGES = {
       <!-- Lịch sử phản tư -->
       <div class="section-label">📚 Phản tư các tuần trước</div>
       <div id="reflection-history">
+        <div class="loading-text">Đang tải...</div>
+      </div>
+    </div>
+  `,
+
+  habits: () => `
+    <div class="page active" id="page-habits">
+      <div class="page-header">
+        <div class="page-title">🌱 Thói quen của tôi</div>
+        <div class="page-sub">Xây dựng thói quen tốt mỗi ngày, theo dõi streak 7 ngày</div>
+      </div>
+
+      <!-- Tạo habit mới -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="settings-section-title" style="margin-bottom:14px">➕ Thêm thói quen mới <span style="color:var(--text-hint);font-size:12px;font-weight:400">(tối đa 5)</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+          <div style="flex:0 0 60px">
+            <label class="form-label">Icon</label>
+            <input class="text-input" id="habit-icon" value="✅" maxlength="2" style="text-align:center;font-size:18px;padding:8px" />
+          </div>
+          <div style="flex:1;min-width:160px">
+            <label class="form-label">Tên thói quen</label>
+            <input class="text-input" id="habit-name" placeholder="VD: Uống đủ nước, Đọc sách 15 phút..." maxlength="100"
+              onkeydown="if(event.key==='Enter')App.createHabit()" />
+          </div>
+          <button class="btn-primary" style="padding:10px 18px;white-space:nowrap;flex-shrink:0" onclick="App.createHabit()">Thêm</button>
+        </div>
+        <div id="habit-create-msg" style="margin-top:8px;font-size:13px"></div>
+      </div>
+
+      <!-- Danh sách habit + lịch 7 ngày -->
+      <div class="section-label">📅 Theo dõi 7 ngày gần nhất</div>
+      <div id="habits-list">
         <div class="loading-text">Đang tải...</div>
       </div>
     </div>
