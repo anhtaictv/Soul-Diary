@@ -812,6 +812,33 @@ select.form-input{cursor:pointer}
 .yr-month-bar   { width:100%; border-radius:3px 3px 0 0; min-height:2px; transition:height .3s; }
 .yr-month-lbl   { font-size:9px; color:var(--text-hint); }
 
+/* ── Nút nguy hiểm (dùng toàn cục, không chỉ admin) ── */
+.btn-danger{background:var(--rose);color:#fff;border:none;padding:10px 20px;border-radius:var(--radius-sm);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+.btn-danger:hover{background:#be123c}
+
+/* ── Custom confirm dialog ── */
+#confirm-modal .modal{max-width:340px;text-align:center;padding:28px 24px}
+#confirm-modal-icon{font-size:36px;margin-bottom:10px}
+#confirm-message{font-size:14px;color:var(--text);line-height:1.6;margin-bottom:20px}
+#confirm-modal .modal-actions{display:flex;gap:10px;justify-content:center}
+#confirm-modal .modal-actions button{flex:1;padding:10px}
+
+/* ── Scroll-to-top FAB ── */
+#scroll-top-fab{position:fixed;bottom:24px;right:70px;width:40px;height:40px;border-radius:50%;background:var(--primary);color:#fff;border:none;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 3px 12px rgba(0,0,0,.25);z-index:150;transition:opacity .2s,transform .2s,background .15s;opacity:0;pointer-events:none}
+#scroll-top-fab.visible{opacity:1;pointer-events:auto}
+#scroll-top-fab:hover{background:var(--primary-dark);transform:scale(1.1)}
+
+/* ── Char counter ── */
+.char-counter{text-align:right;font-size:11px;color:var(--text-hint);margin-top:2px;transition:color .2s}
+.char-counter.warn{color:var(--amber)}
+.char-counter.danger{color:var(--rose)}
+
+/* ── Empty state cải tiến ── */
+.empty-state{text-align:center;padding:48px 20px}
+.empty-state-icon{font-size:52px;margin-bottom:12px}
+.empty-state-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px}
+.empty-state-sub{font-size:13px;color:var(--text-hint);margin-bottom:18px;line-height:1.6}
+
 /* ══════════════ DARK MODE ══════════════
    Layered dark tones (4 levels):
    body #0D1117 → app #161B22 → card #21262D → surface #2D333B

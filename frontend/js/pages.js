@@ -129,6 +129,7 @@ const PAGES = {
             <div class="form-group" id="diary-free-section">
               <label class="form-label">Bắt đầu viết nhật ký</label>
               <textarea class="diary-textarea" id="diary-event" placeholder="Viết tự do bất cứ điều gì bạn muốn..."></textarea>
+              <div id="diary-event-count" class="char-counter">0 / 5000</div>
             </div>
 
             <!-- Form viết nhật ký theo hướng dẫn CBT (4 bước) -->
