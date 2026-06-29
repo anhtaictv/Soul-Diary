@@ -80,6 +80,18 @@ router.post('/register', async (req, res) => {
     const user  = result.recordset[0];
     const token = signToken(user);
 
+    // Thông báo chào mừng (notification_center) — fire-and-forget
+    setImmediate(async () => {
+      try {
+        const { createNotification } = require('../utils/notifier');
+        await createNotification(user.id, 'welcome',
+          'Chào mừng đến với Soul Diary! 🌱',
+          'Bắt đầu ghi nhật ký cảm xúc đầu tiên của bạn nhé. Mỗi dòng chữ là một bước hiểu bản thân hơn.',
+          '/diary'
+        );
+      } catch {}
+    });
+
     res.status(201).json({
       message: 'Đăng ký thành công!',
       token,
@@ -424,6 +436,73 @@ router.delete('/account', authMiddleware, async (req, res) => {
     res.json({ message: 'Tài khoản đã được xóa.' });
   } catch (err) {
     console.error('Delete account error:', err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+// ── GET /api/auth/profile-stats — thống kê hồ sơ cá nhân (personal_profile) ──
+router.get('/profile-stats', authMiddleware, async (req, res) => {
+  try {
+    const db  = await getPool();
+    const uid = req.user.id;
+
+    const [statsR, tagsR, moodR, userR] = await Promise.all([
+      db.request().input('uid', sql.Int, uid).query(`
+        SELECT COUNT(*) AS total,
+               AVG(CAST(mood_score AS FLOAT)) AS avgMood
+        FROM DiaryEntries WHERE user_id = @uid
+      `),
+      db.request().input('uid', sql.Int, uid).query(`
+        SELECT TOP 5 tag, COUNT(*) AS cnt
+        FROM (
+          SELECT value AS tag
+          FROM DiaryEntries
+          CROSS APPLY STRING_SPLIT(tags, '|')
+          WHERE user_id = @uid AND tags IS NOT NULL AND tags != ''
+        ) t
+        WHERE tag != ''
+        GROUP BY tag
+        ORDER BY cnt DESC
+      `),
+      db.request().input('uid', sql.Int, uid).query(`
+        SELECT mood_score, COUNT(*) AS cnt
+        FROM DiaryEntries WHERE user_id = @uid
+        GROUP BY mood_score
+        ORDER BY mood_score
+      `),
+      db.request().input('uid', sql.Int, uid).query(`
+        SELECT streak, max_streak, created_at AS join_date, avatar_url, bio, full_name, avatar_text,
+               (SELECT COUNT(*) FROM DiaryEntries
+                WHERE user_id = @uid AND created_at >= DATEADD(DAY,-7,GETDATE())) AS this_week,
+               (SELECT COUNT(*) FROM DiaryEntries
+                WHERE user_id = @uid
+                  AND MONTH(created_at)=MONTH(GETDATE()) AND YEAR(created_at)=YEAR(GETDATE())) AS this_month
+        FROM Users WHERE id = @uid
+      `),
+    ]);
+
+    const user  = userR.recordset[0];
+    const stats = statsR.recordset[0];
+    const moodDist = {};
+    moodR.recordset.forEach(r => { moodDist[r.mood_score] = r.cnt; });
+
+    res.json({
+      totalEntries:     stats.total,
+      avgMood:          stats.avgMood ? parseFloat(stats.avgMood.toFixed(1)) : null,
+      maxStreak:        user.max_streak,
+      currentStreak:    user.streak,
+      joinDate:         user.join_date,
+      entryThisWeek:    user.this_week,
+      entryThisMonth:   user.this_month,
+      topTags:          tagsR.recordset,
+      moodDistribution: moodDist,
+      avatarUrl:        user.avatar_url,
+      bio:              user.bio,
+      fullName:         user.full_name,
+      avatarText:       user.avatar_text,
+    });
+  } catch (err) {
+    console.error('Profile stats error:', err);
     res.status(500).json({ message: 'Lỗi server.' });
   }
 });

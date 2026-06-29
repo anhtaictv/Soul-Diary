@@ -228,5 +228,31 @@ const API = (() => {
 
     // v2.8 — Tải đầy đủ 1 entry kèm ảnh/âm thanh (lazy load)
     getDiaryEntry:   (id)         => request('/diary/' + id),
+
+    // v3.0 — Trung tâm Thông báo (notification_center)
+    getNotifications:    ()    => request('/notifications'),
+    getNotifUnread:      ()    => request('/notifications/unread-count'),
+    markNotifRead:       (id)  => request(`/notifications/${id}/read`, { method: 'PATCH' }),
+    markAllNotifsRead:   ()    => request('/notifications/read-all',   { method: 'PATCH' }),
+
+    // v3.0 — Hồ sơ Cá nhân (personal_profile)
+    getProfileStats: () => request('/auth/profile-stats'),
+
+    // v3.0 — Tìm kiếm Nâng cao (advanced_search) — searchDiary đã được mở rộng với params mới
+    // Dùng lại API.searchDiary nhưng với extra params
+    searchDiaryAdvanced: (params) => {
+      const q = new URLSearchParams();
+      if (params.q)        q.set('q',        params.q);
+      if (params.from)     q.set('from',     params.from);
+      if (params.to)       q.set('to',       params.to);
+      if (params.mood_min) q.set('mood_min', params.mood_min);
+      if (params.mood_max) q.set('mood_max', params.mood_max);
+      if (params.has_media) q.set('has_media', 'true');
+      if (params.has_cbt)   q.set('has_cbt',   'true');
+      return request('/diary/search?' + q.toString());
+    },
+
+    // v3.0 — AI Coach Tuần (ai_weekly_coach)
+    getAICoach: () => request('/diary/ai-coach'),
   };
 })();

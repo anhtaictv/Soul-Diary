@@ -97,7 +97,9 @@ const App = (() => {
       case 'year-stats':    initYearStatsPage();       break;
       case 'gallery':       initGalleryPage();         break;
       case 'notes':         initNotesPage();           break;
-      case 'mood-compare':  initMoodComparePage();     break;
+      case 'mood-compare':    initMoodComparePage();       break;
+      case 'notifications':   initNotificationsPage();    break;
+      case 'profile':         initProfilePage();           break;
     }
   }
 
@@ -222,6 +224,8 @@ const App = (() => {
     if (window.FEATURES && window.FEATURES.quick_notes) _loadNotesDashboardWidget();
     // Cảnh báo sức khỏe (v2.7)
     _checkWellnessAlert();
+    // AI Coach Tuần (v3.0)
+    if (window.FEATURES && window.FEATURES.ai_weekly_coach) loadAICoach();
   }
 
   function renderRecommendations(mood) {
@@ -4070,6 +4074,16 @@ const App = (() => {
       const el = document.getElementById('nav-mood-compare');
       if (el) el.style.display = '';
     }
+    // v3.0 — hiện nav sau flag
+    if (window.FEATURES && window.FEATURES.notification_center) {
+      const el = document.getElementById('nav-notifications');
+      if (el) el.style.display = '';
+      loadNotifBadge();
+    }
+    if (window.FEATURES && window.FEATURES.personal_profile) {
+      const el = document.getElementById('nav-profile');
+      if (el) el.style.display = '';
+    }
     nav('dashboard');
   }
 
@@ -4369,6 +4383,11 @@ const App = (() => {
     const picker = document.getElementById('report-month-picker');
     if (picker && !picker.value) {
       picker.value = new Date().toISOString().slice(0, 7);
+    }
+    // Hiện nút Xuất PDF nếu flag bật (pdf_export)
+    if (window.FEATURES && window.FEATURES.pdf_export) {
+      const pdfBtn = document.getElementById('btn-export-pdf');
+      if (pdfBtn) pdfBtn.style.display = '';
     }
     loadMonthlyReport();
   }
@@ -4763,6 +4782,258 @@ const App = (() => {
       </div>`;
       banner.style.display = '';
     } catch {}
+  }
+
+  // ── v3.0: Trung tâm Thông báo (notification_center) ─────────────────────
+  async function loadNotifBadge() {
+    if (!window.FEATURES || !window.FEATURES.notification_center) return;
+    try {
+      const d     = await API.getNotifUnread();
+      const badge = document.getElementById('notif-badge');
+      if (badge) {
+        badge.textContent = d.count > 0 ? (d.count > 9 ? '9+' : d.count) : '';
+        badge.style.display = d.count > 0 ? '' : 'none';
+      }
+    } catch {}
+  }
+
+  async function initNotificationsPage() {
+    await loadNotifBadge(); // badge có thể giảm sau khi vào trang
+    const el = document.getElementById('notif-list');
+    if (!el) return;
+    el.innerHTML = '<div class="loading-text">Đang tải...</div>';
+    try {
+      const d     = await API.getNotifications();
+      const notifs = d.notifications || [];
+      // Đánh dấu tất cả đã đọc ngay khi mở trang
+      if (notifs.some(n => !n.is_read)) {
+        API.markAllNotifsRead().catch(() => {});
+      }
+      if (!notifs.length) {
+        el.innerHTML = `<div class="empty-state" style="padding:48px 0;text-align:center">
+          <div style="font-size:48px;margin-bottom:12px">🔔</div>
+          <div style="color:var(--text-muted)">Chưa có thông báo nào.</div>
+        </div>`;
+        loadNotifBadge();
+        return;
+      }
+      const typeIcon = { welcome: '🌱', streak_milestone: '🔥', system: '📢' };
+      el.innerHTML = notifs.map(n => `
+        <div class="card" style="margin-bottom:10px;padding:14px 16px;${!n.is_read ? 'border-left:3px solid var(--primary);' : 'opacity:.75'}">
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <span style="font-size:22px;flex-shrink:0">${typeIcon[n.type] || '📬'}</span>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;margin-bottom:3px">${escapeHtml(n.title)}</div>
+              ${n.body ? `<div style="font-size:13px;color:var(--text-muted);line-height:1.5">${escapeHtml(n.body)}</div>` : ''}
+              <div style="font-size:11px;color:var(--text-hint);margin-top:6px">${new Date(n.created_at).toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })}</div>
+            </div>
+          </div>
+        </div>`).join('');
+      // Reset badge
+      const badge = document.getElementById('notif-badge');
+      if (badge) { badge.textContent = ''; badge.style.display = 'none'; }
+    } catch(e) {
+      el.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:32px">Không tải được thông báo.</div>';
+    }
+  }
+
+  async function markAllNotifsRead() {
+    try {
+      await API.markAllNotifsRead();
+      await initNotificationsPage();
+    } catch(e) { showToast('❌ ' + e.message); }
+  }
+
+  // ── v3.0: Hồ sơ Cá nhân (personal_profile) ──────────────────────────────
+  const LEVELS = [
+    { min: 0,   name: 'Mầm non',      emoji: '🌱' },
+    { min: 10,  name: 'Người khám phá', emoji: '🌿' },
+    { min: 30,  name: 'Người viết',    emoji: '✍️' },
+    { min: 60,  name: 'Nhật ký viên',  emoji: '📖' },
+    { min: 100, name: 'Soul Keeper',   emoji: '🌳' },
+  ];
+  const BADGES = [
+    { id: 'first_entry',  emoji: '📝', name: 'Bước đầu tiên',  cond: s => s.totalEntries >= 1 },
+    { id: 'streak_7',     emoji: '🔥', name: '7 ngày liên tiếp', cond: s => s.maxStreak >= 7 },
+    { id: 'streak_30',    emoji: '💎', name: '30 ngày streak', cond: s => s.maxStreak >= 30 },
+    { id: 'writer_10',    emoji: '✍️', name: '10 nhật ký',     cond: s => s.totalEntries >= 10 },
+    { id: 'writer_50',    emoji: '📚', name: '50 nhật ký',     cond: s => s.totalEntries >= 50 },
+    { id: 'writer_100',   emoji: '🏆', name: '100 nhật ký',    cond: s => s.totalEntries >= 100 },
+    { id: 'consistent',   emoji: '📅', name: 'Bền bỉ',         cond: s => s.entryThisMonth >= 20 },
+    { id: 'tagger',       emoji: '🏷️', name: 'Hay dùng tag',   cond: s => (s.topTags || []).length >= 3 },
+    { id: 'high_mood',    emoji: '😄', name: 'Tinh thần cao',   cond: s => s.avgMood >= 7 },
+  ];
+
+  async function initProfilePage() {
+    const el = document.getElementById('profile-content');
+    if (!el) return;
+    try {
+      const user  = Auth.getUser();
+      const d     = await API.getProfileStats();
+
+      const level = [...LEVELS].reverse().find(l => d.totalEntries >= l.min) || LEVELS[0];
+      const nextL = LEVELS[LEVELS.findIndex(l => l === level) + 1];
+      const xp    = d.totalEntries;
+      const xpNxt = nextL ? nextL.min : null;
+      const pct   = xpNxt ? Math.round((xp - level.min) / (xpNxt - level.min) * 100) : 100;
+
+      const earnedBadges  = BADGES.filter(b => b.cond(d));
+      const lockedBadges  = BADGES.filter(b => !b.cond(d));
+
+      const avatarHtml = d.avatarUrl
+        ? `<img src="${d.avatarUrl}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)">`
+        : `<div class="user-avatar" style="width:80px;height:80px;font-size:28px">${escapeHtml(d.avatarText || 'SD')}</div>`;
+
+      const moodDist  = d.moodDistribution || {};
+      const maxCnt    = Math.max(...Object.values(moodDist), 1);
+      const MOOD_COL  = ['','#ef4444','#f97316','#f97316','#facc15','#facc15','#a3e635','#4ade80','#4ade80','#22c55e','#16a34a'];
+      const moodBars  = Array.from({length:10},(_,i)=>i+1).map(i => {
+        const c = moodDist[i] || 0;
+        return `<div style="flex:1;text-align:center">
+          <div style="background:var(--border);border-radius:4px;height:50px;display:flex;align-items:flex-end;overflow:hidden">
+            <div style="width:100%;height:${Math.round(c/maxCnt*100)}%;background:${MOOD_COL[i]};border-radius:4px 4px 0 0;transition:height .4s"></div>
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:3px">${i}</div>
+        </div>`;
+      }).join('');
+
+      el.innerHTML = `
+        <!-- Avatar + tên -->
+        <div class="card" style="text-align:center;padding:24px;margin-bottom:16px">
+          <div style="display:flex;justify-content:center;margin-bottom:12px">${avatarHtml}</div>
+          <div style="font-weight:700;font-size:18px">${escapeHtml(d.fullName || user?.full_name || '')}</div>
+          ${d.bio ? `<div style="font-size:13px;color:var(--text-muted);margin-top:4px;white-space:pre-wrap">${escapeHtml(d.bio)}</div>` : ''}
+          <div style="margin-top:8px;color:var(--text-muted);font-size:12px">Tham gia: ${new Date(d.joinDate).toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'})}</div>
+        </div>
+
+        <!-- Cấp độ -->
+        <div class="card" style="margin-bottom:16px;padding:16px">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+            <span style="font-size:32px">${level.emoji}</span>
+            <div>
+              <div style="font-weight:700;font-size:16px">${level.name}</div>
+              ${xpNxt ? `<div style="font-size:12px;color:var(--text-muted)">${xp} / ${xpNxt} nhật ký → cấp tiếp theo</div>` : '<div style="font-size:12px;color:var(--primary);font-weight:600">Cấp độ cao nhất!</div>'}
+            </div>
+          </div>
+          ${xpNxt ? `<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--primary);border-radius:4px;transition:width .6s"></div></div>` : ''}
+        </div>
+
+        <!-- Stats -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:16px">
+          <div class="stat-card"><div class="stat-val">${d.totalEntries}</div><div class="stat-lbl">Tổng nhật ký</div></div>
+          <div class="stat-card"><div class="stat-val">${d.avgMood ?? '—'}</div><div class="stat-lbl">Mood trung bình</div></div>
+          <div class="stat-card"><div class="stat-val">🔥 ${d.maxStreak}</div><div class="stat-lbl">Streak dài nhất</div></div>
+          <div class="stat-card"><div class="stat-val">${d.entryThisMonth}</div><div class="stat-lbl">Tháng này</div></div>
+        </div>
+
+        <!-- Phân bố mood -->
+        <div class="card" style="margin-bottom:16px;padding:16px">
+          <div class="settings-section-title" style="margin-bottom:10px">📊 Phân bố tâm trạng</div>
+          <div style="display:flex;gap:3px;align-items:flex-end;height:60px">${moodBars}</div>
+        </div>
+
+        <!-- Huy hiệu -->
+        <div class="card" style="margin-bottom:16px;padding:16px">
+          <div class="settings-section-title" style="margin-bottom:12px">🏅 Huy hiệu đạt được (${earnedBadges.length}/${BADGES.length})</div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px">
+            ${earnedBadges.map(b => `
+              <div title="${escapeHtml(b.name)}" style="text-align:center;background:linear-gradient(135deg,var(--primary),#8b5cf6);border-radius:12px;padding:10px 14px;color:#fff">
+                <div style="font-size:24px">${b.emoji}</div>
+                <div style="font-size:10px;font-weight:600;margin-top:3px">${escapeHtml(b.name)}</div>
+              </div>`).join('')}
+            ${lockedBadges.map(b => `
+              <div title="${escapeHtml(b.name)}" style="text-align:center;background:var(--border);border-radius:12px;padding:10px 14px;opacity:.4">
+                <div style="font-size:24px">${b.emoji}</div>
+                <div style="font-size:10px;color:var(--text-muted);margin-top:3px">${escapeHtml(b.name)}</div>
+              </div>`).join('')}
+          </div>
+        </div>
+
+        <!-- Top Tags -->
+        ${d.topTags.length ? `<div class="card" style="padding:16px">
+          <div class="settings-section-title" style="margin-bottom:10px">🏷️ Tags hay dùng nhất</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${d.topTags.map(t => `<span class="tag" style="cursor:default">#${escapeHtml(t.tag)} <span style="font-size:10px;opacity:.7">${t.cnt}</span></span>`).join('')}
+          </div>
+        </div>` : ''}
+      `;
+    } catch(e) {
+      el.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:32px">Không tải được hồ sơ.</div>';
+    }
+  }
+
+  // ── v3.0: AI Coach Tuần (ai_weekly_coach) ────────────────────────────────
+  async function loadAICoach() {
+    const el = document.getElementById('ai-coach-card');
+    if (!el) return;
+    if (!window.FEATURES || !window.FEATURES.ai_weekly_coach) return;
+    try {
+      const d = await API.getAICoach();
+      if (!d.advice || !d.advice.length) return;
+      el.innerHTML = `<div class="card" style="padding:16px;border-left:4px solid var(--primary)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-weight:700;font-size:14px">🤖 AI Coach tuần này</div>
+          <div style="font-size:11px;color:var(--text-muted)">${d.cached ? '📋 Đã lưu' : '✨ Vừa phân tích'}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          ${d.advice.map(a => `
+            <div style="background:var(--bg);border-radius:var(--radius);padding:12px 14px;display:flex;gap:10px;align-items:flex-start">
+              <span style="font-size:22px;flex-shrink:0">${a.emoji || '💡'}</span>
+              <div>
+                <div style="font-weight:600;font-size:13px;margin-bottom:3px">${escapeHtml(a.title || '')}</div>
+                <div style="font-size:12px;color:var(--text-muted);line-height:1.5">${escapeHtml(a.body || '')}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+      el.style.display = '';
+    } catch {}
+  }
+
+  // ── v3.0: Xuất PDF báo cáo (pdf_export) ─────────────────────────────────
+  async function exportPDF() {
+    const monthPicker = document.getElementById('report-month-picker');
+    const month = monthPicker ? monthPicker.value : new Date().toISOString().slice(0,7);
+    showToast('⏳ Đang chuẩn bị PDF...');
+    try {
+      const d = await API.getMonthlyReport(month);
+      if (!d.totalEntries) { showToast('Không có dữ liệu để xuất.'); return; }
+      const moodColor = m => m >= 8 ? '#16a34a' : m >= 5 ? '#d97706' : '#dc2626';
+      const user = Auth.getUser();
+      const html = `<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8">
+        <title>Báo cáo tháng ${month} — Soul Diary</title>
+        <style>
+          body{font-family:'Segoe UI',sans-serif;max-width:700px;margin:0 auto;padding:32px;color:#1e293b;background:#fff}
+          h1{color:#2563eb;margin-bottom:4px;font-size:22px}
+          .sub{color:#64748b;font-size:13px;margin-bottom:24px}
+          .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+          .stat{background:#f8fafc;border-radius:10px;padding:14px;text-align:center;border:1px solid #e2e8f0}
+          .stat-v{font-size:24px;font-weight:700;color:#2563eb}
+          .stat-l{font-size:12px;color:#64748b;margin-top:4px}
+          .card{background:#f8fafc;border-radius:10px;padding:16px;margin-bottom:16px;border:1px solid #e2e8f0}
+          .card-title{font-weight:700;font-size:14px;margin-bottom:10px;color:#374151}
+          .tag{display:inline-block;background:#ede9fe;color:#6d28d9;border-radius:20px;padding:3px 10px;font-size:12px;margin:2px}
+          @media print{body{padding:16px}}
+        </style></head><body>
+        <h1>Báo cáo tháng ${month}</h1>
+        <div class="sub">Soul Diary · ${escapeHtml(user?.full_name || user?.username || '')} · In ngày ${new Date().toLocaleDateString('vi-VN')}</div>
+        <div class="stats">
+          <div class="stat"><div class="stat-v">${d.totalEntries}</div><div class="stat-l">Bài viết</div></div>
+          <div class="stat"><div class="stat-v" style="color:${moodColor(d.avgMood)}">${d.avgMood}</div><div class="stat-l">Mood trung bình</div></div>
+          <div class="stat"><div class="stat-v">${d.entryDays}</div><div class="stat-l">Ngày có nhật ký</div></div>
+        </div>
+        ${d.bestDay ? `<div class="card"><div class="card-title">📈 Ngày nổi bật</div>
+          <p>🏆 Tốt nhất: ${new Date(d.bestDay.date).toLocaleDateString('vi-VN')} — mood <strong>${d.bestDay.avg}/10</strong></p>
+          ${d.worstDay ? `<p>💪 Khó nhất: ${new Date(d.worstDay.date).toLocaleDateString('vi-VN')} — mood <strong>${d.worstDay.avg}/10</strong></p>` : ''}
+        </div>` : ''}
+        ${d.topTags.length ? `<div class="card"><div class="card-title">🏷️ Tags nhiều nhất</div>
+          ${d.topTags.map(t => `<span class="tag">#${t.tag} (${t.count})</span>`).join(' ')}
+        </div>` : ''}
+        <p style="color:#94a3b8;font-size:11px;text-align:center;margin-top:32px">Soul Diary — Nhật ký cảm xúc số</p>
+      </body></html>`;
+      const w = window.open('', '_blank', 'width=800,height=600');
+      if (w) { w.document.write(html); w.document.close(); w.focus(); w.print(); }
+    } catch(e) { showToast('❌ ' + e.message); }
   }
 
   // ── v2.6: Pomodoro Timer ─────────────────────────────────────────────────
@@ -5319,5 +5590,8 @@ const App = (() => {
     initPomodoroPage,setPomodoroMode,togglePomodoro,resetPomodoro,updatePomodoroTimes,
     loadYearStats,restoreDraft,discardDraft,
     initGalleryPage,initNotesPage,selectNoteColor,createNote,deleteNote,
-    initMoodComparePage,loadMoodCompare};
+    initMoodComparePage,loadMoodCompare,
+    initNotificationsPage,markAllNotifsRead,
+    initProfilePage,
+    exportPDF};
 })();

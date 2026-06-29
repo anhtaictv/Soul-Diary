@@ -317,24 +317,45 @@ router.get('/patterns', async (req, res) => {
 // ── GET /api/diary/search — tìm kiếm toàn văn nhật ký ──────────────────
 router.get('/search', async (req, res) => {
   try {
-    const q    = (req.query.q || '').trim();
-    const from = req.query.from || null;
-    const to   = req.query.to   || null;
-    if (!q) return res.json({ entries: [] });
+    const q        = (req.query.q || '').trim();
+    const from     = req.query.from     || null;
+    const to       = req.query.to       || null;
+    const moodMin  = req.query.mood_min ? parseInt(req.query.mood_min) : null;
+    const moodMax  = req.query.mood_max ? parseInt(req.query.mood_max) : null;
+    const hasMedia = req.query.has_media === 'true';
+    const hasCbt   = req.query.has_cbt   === 'true';
+
+    // q không bắt buộc khi có filter khác
+    const hasFilter = q || from || to || moodMin !== null || moodMax !== null || hasMedia || hasCbt;
+    if (!hasFilter) return res.json({ entries: [] });
 
     const db = await getPool();
-    const r  = db.request().input('user_id', sql.Int, req.user.id).input('q', sql.NVarChar, `%${q}%`);
-    if (from) r.input('from', sql.Date, from);
-    if (to)   r.input('to',   sql.Date, to);
+    const r  = db.request().input('user_id', sql.Int, req.user.id);
+    if (q)       r.input('q',        sql.NVarChar, `%${q}%`);
+    if (from)    r.input('from',     sql.Date,     from);
+    if (to)      r.input('to',       sql.Date,     to);
+    if (moodMin !== null) r.input('mood_min', sql.Int, moodMin);
+    if (moodMax !== null) r.input('mood_max', sql.Int, moodMax);
 
     const result = await r.query(`
-      SELECT TOP 50 id, mood_score, event_text, tags, cbt_data, created_at
-      FROM DiaryEntries
-      WHERE user_id = @user_id
-        AND (event_text LIKE @q OR thoughts LIKE @q OR gratitude LIKE @q OR tags LIKE @q)
-        ${from ? 'AND CAST(created_at AS DATE) >= @from' : ''}
-        ${to   ? 'AND CAST(created_at AS DATE) <= @to'   : ''}
-      ORDER BY created_at DESC
+      SELECT TOP 50 d.id, d.mood_score, d.event_text, d.tags, d.cbt_data, d.created_at,
+                    d.has_photos, d.photo_count, d.has_audio
+      FROM (
+        SELECT e.id, e.mood_score, e.event_text, e.tags, e.cbt_data, e.created_at,
+               (SELECT COUNT(*) FROM EntryPhotos WHERE entry_id=e.id) AS photo_count,
+               CAST(CASE WHEN EXISTS(SELECT 1 FROM EntryPhotos WHERE entry_id=e.id) THEN 1 ELSE 0 END AS BIT) AS has_photos,
+               CAST(CASE WHEN e.audio_data IS NOT NULL THEN 1 ELSE 0 END AS BIT) AS has_audio
+        FROM DiaryEntries e
+        WHERE e.user_id = @user_id
+          ${q       ? 'AND (e.event_text LIKE @q OR e.thoughts LIKE @q OR e.gratitude LIKE @q OR e.tags LIKE @q)' : ''}
+          ${from    ? 'AND CAST(e.created_at AS DATE) >= @from' : ''}
+          ${to      ? 'AND CAST(e.created_at AS DATE) <= @to'   : ''}
+          ${moodMin !== null ? 'AND e.mood_score >= @mood_min' : ''}
+          ${moodMax !== null ? 'AND e.mood_score <= @mood_max' : ''}
+          ${hasCbt  ? 'AND e.cbt_data IS NOT NULL' : ''}
+      ) d
+      ${hasMedia ? 'WHERE d.has_photos = 1 OR d.has_audio = 1' : ''}
+      ORDER BY d.created_at DESC
     `);
 
     res.json({
@@ -878,6 +899,16 @@ router.post('/', async (req, res) => {
       const newMaxStreak  = Math.max(max_streak, newStreak);
       const freezeDelta   = freezeGrant - (freezeUsed ? 1 : 0);
       newFreezeCount = Math.max(0, streak_freeze + freezeDelta);
+
+      // Thông báo đạt mốc streak (notification_center) — fire-and-forget
+      if (milestoneGrants[newStreak]) {
+        const { createNotification } = require('../utils/notifier');
+        setImmediate(() => createNotification(req.user.id, 'streak_milestone',
+          `🎉 Bạn đạt mốc ${newStreak} ngày streak!`,
+          `Thật tuyệt vời! Chuỗi ${newStreak} ngày ghi nhật ký liên tiếp — bạn đã nhận thêm ${freezeGrant} lượt cứu streak. Tiếp tục nhé!`,
+          '/diary'
+        ).catch(() => {}));
+      }
 
       await db.request()
         .input('user_id',    sql.Int,  req.user.id)
@@ -1477,6 +1508,90 @@ router.get('/sleep-stats', authMiddleware, async (req, res) => {
     `);
     res.json({ data: result.recordset.reverse() });
   } catch (err) {
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+// ── GET /api/diary/ai-coach — AI Coach phân tích nhật ký, cache 7 ngày ──
+// Phải đứng TRƯỚC /:id
+router.get('/ai-coach', async (req, res) => {
+  try {
+    const db  = await getPool();
+    const uid = req.user.id;
+
+    // Kiểm tra cache còn dùng được không (7 ngày)
+    const cacheR = await db.request().input('id', sql.Int, uid)
+      .query(`SELECT ai_coach_text, ai_coach_date FROM Users WHERE id = @id`);
+    const row = cacheR.recordset[0];
+    if (row && row.ai_coach_text && row.ai_coach_date) {
+      const ageDays = Math.floor((Date.now() - new Date(row.ai_coach_date).getTime()) / 86400000);
+      if (ageDays < 7) {
+        return res.json({ advice: JSON.parse(row.ai_coach_text), cached: true });
+      }
+    }
+
+    // Lấy 30 entry gần nhất
+    const entriesR = await db.request().input('uid', sql.Int, uid).query(`
+      SELECT TOP 30 mood_score, event_text, tags, created_at
+      FROM DiaryEntries WHERE user_id = @uid
+      ORDER BY created_at DESC
+    `);
+    const entries = entriesR.recordset;
+    if (entries.length < 3) {
+      return res.json({ advice: null, message: 'Cần ít nhất 3 nhật ký để phân tích.' });
+    }
+
+    let advice = null;
+    const avgMood = entries.reduce((s, e) => s + e.mood_score, 0) / entries.length;
+
+    if (genai) {
+      const summary = entries.slice(0, 10).map((e, i) =>
+        `#${i+1}: Mood ${e.mood_score}/10. "${(e.event_text || '').slice(0, 100)}"`
+      ).join('\n');
+      const prompt = `Bạn là coach tâm lý ấm áp cho học sinh/sinh viên Việt Nam. Phân tích nhật ký cảm xúc (mood TB: ${avgMood.toFixed(1)}/10) và đưa ra đúng 3 lời khuyên thực tế, cụ thể, ấm áp.
+Trả về JSON thuần (không markdown): {"advice":[{"emoji":"🌱","title":"Tiêu đề ngắn","body":"2-3 câu cụ thể"}]}
+Nhật ký gần nhất:\n${summary}`;
+      try {
+        const model  = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const result = await model.generateContent(prompt);
+        const raw    = result.response.text().trim().replace(/^```json\n?|\n?```$/g, '');
+        const parsed = JSON.parse(raw);
+        if (parsed.advice && Array.isArray(parsed.advice) && parsed.advice.length > 0) {
+          advice = parsed.advice.slice(0, 3);
+        }
+      } catch (e) {
+        console.error('Gemini coach error:', e.message);
+      }
+    }
+
+    // Fallback rule-based
+    if (!advice) {
+      const tagFreq = {};
+      entries.forEach(e => {
+        if (e.tags) e.tags.split('|').filter(Boolean).forEach(t => { tagFreq[t] = (tagFreq[t] || 0) + 1; });
+      });
+      const topTag = Object.keys(tagFreq).sort((a, b) => tagFreq[b] - tagFreq[a])[0];
+      advice = [
+        avgMood < 5
+          ? { emoji: '💙', title: 'Chăm sóc bản thân', body: 'Tâm trạng gần đây có vẻ nặng nề. Hãy thử dành 10 phút mỗi ngày cho một hoạt động yêu thích — đọc sách, nghe nhạc, hay đi dạo nhẹ nhàng.' }
+          : { emoji: '🌟', title: 'Duy trì năng lượng', body: 'Tâm trạng bạn đang khá tốt! Ghi lại những gì đang giúp bạn cảm thấy như vậy để tái tạo khi cần thiết.' },
+        { emoji: '📓', title: 'Kiên trì với nhật ký', body: `Bạn đã ghi ${entries.length} nhật ký gần đây — đây là nền tảng tuyệt vời. Thử đặt nhắc nhở mỗi tối để không bỏ lỡ ngày nào.` },
+        topTag
+          ? { emoji: '🔍', title: `Khám phá chủ đề "${topTag}"`, body: `Bạn thường xuyên ghi về "${topTag}". Hãy suy ngẫm sâu hơn: điều này ảnh hưởng tới bạn thế nào và bạn có thể phát triển ở đây không?` }
+          : { emoji: '🏷️', title: 'Thêm nhãn cảm xúc', body: 'Thử thêm tags vào nhật ký để dễ nhìn lại xu hướng. Ví dụ: "học tập", "gia đình", "bạn bè", "stress".' },
+      ];
+    }
+
+    // Cache 7 ngày
+    await db.request()
+      .input('id',   sql.Int,      uid)
+      .input('text', sql.NVarChar, JSON.stringify(advice))
+      .input('date', sql.Date,     new Date())
+      .query(`UPDATE Users SET ai_coach_text = @text, ai_coach_date = @date WHERE id = @id`);
+
+    res.json({ advice, cached: false });
+  } catch (err) {
+    console.error('AI coach error:', err);
     res.status(500).json({ message: 'Lỗi server.' });
   }
 });
