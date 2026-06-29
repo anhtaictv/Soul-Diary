@@ -215,6 +215,21 @@
     <audio id="music-audio"></audio>
   </div>
 
+  <!-- Scroll to top FAB -->
+  <button id="scroll-top-fab" onclick="App.scrollToTop()" title="Lên đầu trang" aria-label="Lên đầu trang">↑</button>
+
+  <!-- Custom Confirm Dialog -->
+  <div class="modal-overlay" id="confirm-modal" style="display:none" onclick="if(event.target===this)App._confirmResolve(false)">
+    <div class="modal">
+      <div id="confirm-modal-icon">⚠️</div>
+      <div id="confirm-message"></div>
+      <div class="modal-actions">
+        <button class="btn-outline" onclick="App._confirmResolve(false)">Hủy</button>
+        <button class="btn-danger"  onclick="App._confirmResolve(true)" id="confirm-ok-btn">Xác nhận</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Streak Celebration Modal -->
   <div class="modal-overlay" id="streak-modal">
     <div class="modal streak-modal-inner">

@@ -49,6 +49,7 @@ const App = (() => {
       return;
     }
     document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === page));
+    document.querySelector('.main')?.scrollTo({ top: 0, behavior: 'instant' });
     switch (page) {
       case 'dashboard': initDashboard();              break;
       case 'diary':     initDiaryPage();              break;
@@ -452,7 +453,7 @@ const App = (() => {
 
   async function revokeCurrentShare() {
     if (!_shareEntryId) return;
-    if (!confirm('Thu hồi chia sẻ? Liên kết cũ sẽ không còn hoạt động.')) return;
+    if (!await showConfirm('Thu hồi chia sẻ? Liên kết cũ sẽ không còn hoạt động.', '🔒')) return;
     try {
       await API.revokeShare(_shareEntryId);
       closeShareModal();
@@ -480,10 +481,18 @@ const App = (() => {
     document.getElementById('emotion-tags').innerHTML = EMOTION_TAGS.map(tag =>
       `<span class="tag" data-tag="${tag}" onclick="App.toggleTag(this)">${tag}</span>`).join('');
     const textarea = document.getElementById('diary-event');
-    if (textarea) textarea.addEventListener('input', function() {
-      this.style.height = 'auto';
-      this.style.height = Math.min(this.scrollHeight, 380) + 'px';
-    });
+    if (textarea) {
+      const counter = document.getElementById('diary-event-count');
+      textarea.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 380) + 'px';
+        if (counter) {
+          const len = this.value.length;
+          counter.textContent = len + ' / 5000';
+          counter.className = 'char-counter' + (len > 4500 ? ' danger' : len > 4000 ? ' warn' : '');
+        }
+      });
+    }
     // Hiện nút template nếu flag bật và user đã có template
     if (window.FEATURES && window.FEATURES.diary_templates) {
       API.getTemplates().then(d => {
@@ -621,7 +630,12 @@ const App = (() => {
       if (reset) cachedEntries = entries;
       else cachedEntries = [...cachedEntries, ...entries];
       if (!cachedEntries.length) {
-        el.innerHTML = '<div style="text-align:center;color:var(--text-hint);font-size:13px;padding:40px 0">Chưa có nhật ký nào. Hãy viết nhật ký đầu tiên! 🌱</div>';
+        el.innerHTML = `<div class="empty-state">
+          <div class="empty-state-icon">📖</div>
+          <div class="empty-state-title">Chưa có nhật ký nào</div>
+          <div class="empty-state-sub">Hôm nay bạn cảm thấy thế nào?<br>Chỉ vài dòng thôi — không cần hoàn hảo!</div>
+          <button class="btn-primary" style="width:auto;padding:10px 24px" onclick="document.getElementById('diary-event')?.focus()">✍️ Viết nhật ký đầu tiên</button>
+        </div>`;
         return;
       }
       const hasMore = cachedEntries.length < _diaryTotal;
@@ -880,7 +894,7 @@ const App = (() => {
   }
 
   async function deleteEntry(id, btn) {
-    if (!confirm('Xóa nhật ký này?')) return;
+    if (!await showConfirm('Xóa nhật ký này? Hành động không thể hoàn tác.', '🗑️')) return;
     btn.textContent='...';
     try { await API.deleteEntry(id); await loadDiaryEntries(); showToast('🗑 Đã xóa.'); }
     catch(err) { showToast('❌ Không thể xóa: '+err.message); }
@@ -1456,7 +1470,7 @@ const App = (() => {
   }
 
   async function quitChallenge(id) {
-    if (!confirm('Bạn có chắc muốn bỏ thử thách này không?')) return;
+    if (!await showConfirm('Bạn có chắc muốn bỏ thử thách này không?', '🏳️')) return;
     try {
       await API.quitChallenge(id);
       showToast('Đã rời khỏi thử thách.');
@@ -1558,7 +1572,7 @@ const App = (() => {
   }
 
   async function deletePost(id) {
-    if (!confirm('Xóa bài tâm sự này?')) return;
+    if (!await showConfirm('Xóa bài tâm sự này?', '🗑️')) return;
     try {
       await API.deleteCommunityPost(id);
       document.getElementById(`community-post-${id}`)?.remove();
@@ -4031,6 +4045,36 @@ const App = (() => {
     }
   }
 
+  // ── Custom confirm dialog (thay browser confirm()) ───────────────────
+  let _confirmResolve = null;
+  function showConfirm(message, icon = '⚠️') {
+    return new Promise(resolve => {
+      _confirmResolve = (val) => {
+        document.getElementById('confirm-modal').style.display = 'none';
+        _confirmResolve = null;
+        resolve(val);
+      };
+      document.getElementById('confirm-message').textContent = message;
+      document.getElementById('confirm-modal-icon').textContent = icon;
+      document.getElementById('confirm-modal').style.display = 'flex';
+      setTimeout(() => document.getElementById('confirm-ok-btn')?.focus(), 50);
+    });
+  }
+
+  // ── Scroll-to-top FAB ────────────────────────────────────────────────
+  function scrollToTop() {
+    document.querySelector('.main')?.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function _initScrollFAB() {
+    const main = document.querySelector('.main');
+    const fab  = document.getElementById('scroll-top-fab');
+    if (!main || !fab) return;
+    main.addEventListener('scroll', () => {
+      fab.classList.toggle('visible', main.scrollTop > 280);
+    }, { passive: true });
+  }
+
   // ── Offline Detection (v2.0) ──────────────────────────────────────
   function initOfflineDetection() {
     function update() {
@@ -4119,6 +4163,7 @@ const App = (() => {
     // v2.0 init
     initOfflineDetection();
     _checkPinRequired();
+    _initScrollFAB();
     // v2.1 — PWA install button (chỉ hiện nếu flag bật VÀ trình duyệt đã ghi nhận beforeinstallprompt)
     if (window.FEATURES && window.FEATURES.pwa_install && _pwaPrompt) {
       const pwaBtn = document.getElementById('pwa-install-btn');
@@ -5674,5 +5719,6 @@ const App = (() => {
     initNotificationsPage,markAllNotifsRead,
     initProfilePage,
     exportPDF,
-    toggleSidebar,closeSidebar};
+    toggleSidebar,closeSidebar,scrollToTop,
+    _confirmResolve: (val) => _confirmResolve && _confirmResolve(val)};
 })();
