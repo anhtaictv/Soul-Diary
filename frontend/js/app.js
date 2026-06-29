@@ -51,6 +51,7 @@ const App = (() => {
       return;
     }
     document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === page));
+    document.querySelector('.nav-item.active')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     document.querySelector('.main')?.scrollTo({ top: 0, behavior: 'instant' });
     doneProgress();
     switch (page) {
@@ -544,6 +545,8 @@ const App = (() => {
       });
     }
     await loadDiaryEntries();
+    // Auto-focus textarea khi mở trang (chỉ trên desktop)
+    if (window.innerWidth > 720) setTimeout(() => document.getElementById('diary-event')?.focus(), 80);
     // Auto-draft (v2.6)
     _checkDraft();
     _startAutoDraft();
@@ -4793,6 +4796,13 @@ const App = (() => {
   async function _loadReflectionHistory() {
     const el = document.getElementById('reflection-history');
     if (!el) return;
+    el.innerHTML = Array(2).fill(0).map(() => `
+      <div class="card" style="margin-bottom:12px;padding:14px 16px">
+        <div class="skeleton" style="height:13px;width:40%;margin-bottom:12px"></div>
+        <div class="skeleton" style="height:11px;width:90%;margin-bottom:6px"></div>
+        <div class="skeleton" style="height:11px;width:70%;margin-bottom:6px"></div>
+        <div class="skeleton" style="height:11px;width:80%"></div>
+      </div>`).join('');
     try {
       const d = await API.getReflections();
       if (!d.reflections.length) {
@@ -4809,7 +4819,10 @@ const App = (() => {
         return `<div class="card" style="margin-bottom:12px"><div style="font-weight:600;margin-bottom:10px;color:var(--primary)">📅 Tuần từ ${weekLabel}</div>${html}</div>`;
       }).join('');
     } catch {
-      el.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px">Không tải được lịch sử.</div>';
+      el.innerHTML = `<div style="text-align:center;padding:20px">
+        <div style="color:var(--text-muted);margin-bottom:10px">Không tải được lịch sử.</div>
+        <button class="btn-outline" style="width:auto;padding:6px 16px;font-size:12px" onclick="App._loadReflectionHistory()">🔄 Thử lại</button>
+      </div>`;
     }
   }
 
@@ -5082,7 +5095,15 @@ const App = (() => {
     await loadNotifBadge(); // badge có thể giảm sau khi vào trang
     const el = document.getElementById('notif-list');
     if (!el) return;
-    el.innerHTML = '<div class="loading-text">Đang tải...</div>';
+    el.innerHTML = Array(4).fill(0).map(() => `
+      <div class="card" style="margin-bottom:10px;padding:14px 16px;display:flex;gap:10px;align-items:flex-start">
+        <div class="skeleton" style="width:32px;height:32px;border-radius:50%;flex-shrink:0"></div>
+        <div style="flex:1">
+          <div class="skeleton" style="height:13px;width:55%;margin-bottom:8px"></div>
+          <div class="skeleton" style="height:11px;width:80%;margin-bottom:6px"></div>
+          <div class="skeleton" style="height:10px;width:30%"></div>
+        </div>
+      </div>`).join('');
     try {
       const d     = await API.getNotifications();
       const notifs = d.notifications || [];
@@ -5114,7 +5135,11 @@ const App = (() => {
       const badge = document.getElementById('notif-badge');
       if (badge) { badge.textContent = ''; badge.style.display = 'none'; }
     } catch(e) {
-      el.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:32px">Không tải được thông báo.</div>';
+      el.innerHTML = `<div class="empty-state" style="padding:40px 0">
+        <div style="font-size:36px;margin-bottom:10px">😵</div>
+        <div style="color:var(--text-muted);margin-bottom:12px">Không tải được thông báo.</div>
+        <button class="btn-outline" style="width:auto;padding:8px 20px" onclick="App.nav('notifications')">🔄 Thử lại</button>
+      </div>`;
     }
   }
 
@@ -5621,7 +5646,17 @@ const App = (() => {
   async function _loadHabitsList() {
     const el = document.getElementById('habits-list');
     if (!el) return;
-    el.innerHTML = '<div class="loading-text">Đang tải...</div>';
+    el.innerHTML = Array(3).fill(0).map(() => `
+      <div class="card" style="margin-bottom:14px;padding:14px 16px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <div class="skeleton" style="width:36px;height:36px;border-radius:50%;flex-shrink:0"></div>
+          <div style="flex:1"><div class="skeleton" style="height:14px;width:45%"></div></div>
+          <div class="skeleton" style="width:52px;height:28px;border-radius:6px"></div>
+        </div>
+        <div style="display:flex;gap:6px">
+          ${Array(7).fill(0).map(() => `<div class="skeleton" style="flex:1;height:28px;border-radius:50%"></div>`).join('')}
+        </div>
+      </div>`).join('');
     try {
       const d = await API.getHabits();
       _habitsCache = d.habits;
@@ -5678,7 +5713,11 @@ const App = (() => {
         </div>`;
       }).join('');
     } catch (err) {
-      if (el) el.innerHTML = `<div style="color:var(--text-muted);text-align:center;padding:20px">Không tải được danh sách.</div>`;
+      if (el) el.innerHTML = `<div class="empty-state" style="padding:32px 0">
+        <div style="font-size:32px;margin-bottom:10px">😵</div>
+        <div style="color:var(--text-muted);margin-bottom:12px">Không tải được danh sách.</div>
+        <button class="btn-outline" style="width:auto;padding:8px 20px" onclick="App._loadHabitsList()">🔄 Thử lại</button>
+      </div>`;
     }
   }
 
@@ -5857,5 +5896,6 @@ const App = (() => {
     initProfilePage,
     exportPDF,
     toggleSidebar,closeSidebar,scrollToTop,animateCount,haptic,
+    _loadReflectionHistory,_loadHabitsList,
     _confirmResolve: (val) => _confirmResolve && _confirmResolve(val)};
 })();
