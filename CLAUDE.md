@@ -222,7 +222,15 @@ After editing backend files, restart the PM2 process (`pm2 restart souldiary-api
   **Backend mới:** `backend/routes/notes.js`.  
   **Frontend mới:** `PAGES.gallery`, `PAGES.notes`, `PAGES['mood-compare']` trong `pages.js`. Nav items `#nav-gallery`, `#nav-notes`, `#nav-mood-compare` (hidden). Dashboard: `#notes-dashboard-widget`, `#wellness-alert-banner`.
 
-### v2.8 — Tối ưu Hiệu năng & Bảo mật *(không có feature flags — sửa lỗi và cải tiến nền)*
+### v2.9 — Tối ưu Hiệu năng *(gate sau feature flags, enabled=1 ngay — đã triển khai)*
+
+- **`http_compression`** — Middleware `compression` (gzip/brotli), ~70% bandwidth savings.
+- **`batch_db_operations`** — Cron push: thay N UPDATE riêng bằng batch `WHERE id IN (...)`.
+- **`db_connection_tuning`** — Pool `min:2 max:15` + 4 covering indexes mới.
+
+  **Flags (enabled=1 từ seed, released_at = GETDATE()):** `http_compression`, `batch_db_operations`, `db_connection_tuning`.
+
+### v2.8 — Tối ưu Hiệu năng & Bảo mật *(gate sau feature flags, enabled=1 ngay — đã triển khai)*
 
 - **Tối ưu payload diary list**: `GET /api/diary` không còn trả binary ảnh/âm thanh. Thay vào đó trả `has_photos` (bool), `photo_count` (int), `has_audio` (bool). Giảm ~90% payload khi có ảnh.
 
@@ -234,7 +242,24 @@ After editing backend files, restart the PM2 process (`pm2 restart souldiary-api
 
 - **Cache quote ngày**: `routes/quotes.js` giờ cache kết quả trong bộ nhớ theo key `YYYY-MM-DD`, tránh query DB mỗi request; cache cũ tự xóa khi ngày thay đổi.
 
+  **Flags (enabled=1 từ seed):** `lazy_media_load`, `payload_optimization`, `diary_input_validation`.  
   **API mới:** `API.getDiaryEntry(id)` trong `api.js`. Card entry dùng chỉ báo text (`📷 2 ảnh · 🎙 Ghi âm`) thay vì thumbnail binary.
+
+### v3.0 — Kết nối & Cá nhân hoá *(gate sau feature flags — bật trong admin)*
+
+- **Trung tâm Thông báo** (`notification_center`) — Bảng `Notifications` (id, user_id, type, title, body, link, is_read, created_at). Route `backend/routes/notifications.js` (`GET /api/notifications`, `GET /api/notifications/unread-count`, `PATCH /read-all`, `PATCH /:id/read`). Utility `backend/utils/notifier.js` (`createNotification`). Trigger: chào mừng khi đăng ký, mốc streak 7/14/21/30/50/100 ngày. Badge `#notif-badge` trên `#nav-notifications`. Trang `notifications`. `App.initNotificationsPage()`, `App.markAllNotifsRead()`, `loadNotifBadge()`.
+
+- **Hồ sơ Cá nhân** (`personal_profile`) — `GET /api/auth/profile-stats` trả: `totalEntries`, `avgMood`, `maxStreak`, `currentStreak`, `joinDate`, `entryThisWeek/Month`, `topTags[5]`, `moodDistribution{}`, `avatarUrl/bio/fullName/avatarText`. Trang `profile`: avatar, thanh cấp độ (5 cấp từ Mầm non → Soul Keeper, dựa vào `totalEntries`), 9 huy hiệu (đã đạt + khóa), phân bố mood, top tags. `App.initProfilePage()`.
+
+- **Tìm kiếm Nâng cao** (`advanced_search`) — Mở rộng `GET /api/diary/search` với params mới: `mood_min`, `mood_max`, `has_media` (BIT), `has_cbt` (BIT). `q` không còn bắt buộc khi có filter khác. `API.searchDiaryAdvanced(params)` trong `api.js`. Button lọc `#btn-export-pdf` ẩn mặc định. Frontend: bộ lọc bổ sung ẩn/hiện theo flag khi mở trang diary.
+
+- **AI Coach Tuần** (`ai_weekly_coach`) — Cột `Users.ai_coach_text NVARCHAR(MAX)` + `Users.ai_coach_date DATE`. `GET /api/diary/ai-coach` (phải đứng trước `/:id`): Gemini phân tích 30 entry gần nhất → 3 lời khuyên JSON `[{emoji,title,body}]`, cache 7 ngày, fallback rule-based. Dashboard card `#ai-coach-card`. `App.loadAICoach()`.
+
+- **Xuất báo cáo PDF** (`pdf_export`) — Frontend-only. Nút `#btn-export-pdf` trong trang `report` (ẩn mặc định, hiện khi flag bật qua `initReportPage()`). `App.exportPDF()` gọi `API.getMonthlyReport()` → tạo HTML styled → `window.open()` + `print()`. Không cần CDN.
+
+  **Backend mới:** `backend/routes/notifications.js`, `backend/utils/notifier.js`.  
+  **Frontend mới:** `PAGES.notifications`, `PAGES.profile` trong `pages.js`. Nav items `#nav-notifications` (với badge), `#nav-profile` (hidden). Dashboard: `#ai-coach-card`.  
+  **Gotcha**: `/ai-coach` phải đứng TRƯỚC `/:id` trong `routes/diary.js` (hiện đứng ở ~line 1517, trước `/:id` ở ~1600).
 
 ## Feature Flag — quy tắc bắt buộc
 
@@ -273,6 +298,7 @@ Lý do: user cần kiểm soát hoàn toàn những gì được kích hoạt tr
 |---|---|
 | Tính năng mới (trang, chức năng, AI) | Flag bắt buộc, `enabled=0` |
 | Cải thiện UX đáng kể (thay đổi flow, UI lớn) | Flag bắt buộc, `enabled=0` |
+| Tối ưu hiệu năng / hạ tầng (đã deploy) | Flag bắt buộc, **`enabled=1` từ seed** (để hiện trong admin panel, track version) |
 | Sửa lỗi (bug fix, crash, security) | Áp dụng ngay, **không cần flag** |
 | Cải tiến UI nhỏ (style, wording, spacing) | Áp dụng ngay, **không cần flag** |
 

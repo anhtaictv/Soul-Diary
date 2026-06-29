@@ -49,6 +49,9 @@ const PAGES = {
       <!-- Ghi chú nhanh widget (v2.7) -->
       <div id="notes-dashboard-widget" style="display:none;margin-bottom:16px"></div>
 
+      <!-- AI Coach Tuần (v3.0, ẩn cho đến khi ai_weekly_coach flag bật) -->
+      <div id="ai-coach-card" style="display:none;margin-bottom:16px"></div>
+
       <div class="section-label">Gợi ý dành cho bạn</div>
       <div id="recommendations"></div>
 
@@ -921,6 +924,7 @@ const PAGES = {
         <label class="form-label" style="margin:0;white-space:nowrap">Xem tháng:</label>
         <input type="month" id="report-month-picker" class="text-input" style="max-width:180px" />
         <button class="btn-primary" style="padding:8px 18px;white-space:nowrap" onclick="App.loadMonthlyReport()">📊 Xem báo cáo</button>
+        <button id="btn-export-pdf" class="btn-outline" style="padding:8px 18px;white-space:nowrap;display:none" onclick="App.exportPDF()">📄 Xuất PDF</button>
       </div>
 
       <div id="report-content">
@@ -1161,6 +1165,31 @@ const PAGES = {
       <div id="year-stats-content">
         <div class="loading-text">Đang tải...</div>
       </div>
+    </div>
+  `,
+
+  // ── v3.0: Trung tâm Thông báo ────────────────────────────────────────────
+  notifications: () => `
+    <div class="page active" id="page-notifications">
+      <div class="page-header">
+        <div class="page-title">🔔 Thông báo</div>
+        <div class="page-subtitle">Cập nhật từ Soul Diary</div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+        <button onclick="App.markAllNotifsRead()" class="btn-outline" style="font-size:13px;padding:6px 14px">✓ Đánh dấu tất cả đã đọc</button>
+      </div>
+      <div id="notif-list"><div class="loading-text">Đang tải...</div></div>
+    </div>
+  `,
+
+  // ── v3.0: Hồ sơ Cá nhân ─────────────────────────────────────────────────
+  profile: () => `
+    <div class="page active" id="page-profile">
+      <div class="page-header">
+        <div class="page-title">👤 Hồ sơ Cá nhân</div>
+        <div class="page-subtitle">Hành trình cảm xúc của bạn</div>
+      </div>
+      <div id="profile-content"><div class="loading-text">Đang tải...</div></div>
     </div>
   `,
 };

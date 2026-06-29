@@ -1200,6 +1200,91 @@ async function initSchema() {
       EXEC('DELETE FROM PushSubscriptions WHERE updated_at < DATEADD(DAY, -30, GETDATE())')
   `);
 
+  // ── v2.8: Feature flags (đã triển khai, enabled=1) ───────────────────────
+  const v28flags = [
+    { key: 'lazy_media_load',        label: 'Lazy-load Ảnh & Ghi âm',      desc: 'Tải media theo yêu cầu thay vì khi mở trang — giảm ~90% payload danh sách nhật ký',  ver: 'v2.8', title: 'Tối ưu Hiệu năng & Bảo mật', sort: 280 },
+    { key: 'payload_optimization',   label: 'Tối ưu Payload Nhật ký',      desc: 'GET /api/diary không trả binary ảnh/âm thanh — chỉ trả has_photos, photo_count, has_audio', ver: 'v2.8', title: 'Tối ưu Hiệu năng & Bảo mật', sort: 281 },
+    { key: 'diary_input_validation', label: 'Kiểm tra đầu vào Nhật ký',    desc: 'Giới hạn độ dài event_text (5000), gratitude (2000), thoughts (3000), tags (500)', ver: 'v2.8', title: 'Tối ưu Hiệu năng & Bảo mật', sort: 282 },
+  ];
+  for (const f of v28flags) {
+    await db.request()
+      .input('k', sql.NVarChar, f.key).input('l', sql.NVarChar, f.label)
+      .input('d', sql.NVarChar, f.desc).input('v', sql.NVarChar, f.ver)
+      .input('vt', sql.NVarChar, f.title).input('s', sql.Int, f.sort)
+      .query(`
+        IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key = @k)
+        INSERT INTO FeatureFlags (flag_key, label, description, version, version_title, enabled, sort_order, released_at)
+        VALUES (@k, @l, @d, @v, @vt, 1, @s, GETDATE())
+      `);
+  }
+
+  // ── v2.9: Feature flags (đã triển khai, enabled=1) ───────────────────────
+  const v29flags = [
+    { key: 'http_compression',      label: 'Nén HTTP gzip/brotli',          desc: 'Middleware compression — giảm ~70% bandwidth JSON response cho toàn bộ API',          ver: 'v2.9', title: 'Tối ưu Hiệu năng', sort: 290 },
+    { key: 'batch_db_operations',   label: 'Gộp thao tác DB (batch)',       desc: 'Thay N UPDATE riêng lẻ bằng batch WHERE id IN (...) — giảm round trips khi cron push', ver: 'v2.9', title: 'Tối ưu Hiệu năng', sort: 291 },
+    { key: 'db_connection_tuning',  label: 'Tối ưu Pool & Index DB',        desc: 'Connection pool min:2 max:15 + 4 covering indexes mới giảm key lookup', ver: 'v2.9', title: 'Tối ưu Hiệu năng', sort: 292 },
+  ];
+  for (const f of v29flags) {
+    await db.request()
+      .input('k', sql.NVarChar, f.key).input('l', sql.NVarChar, f.label)
+      .input('d', sql.NVarChar, f.desc).input('v', sql.NVarChar, f.ver)
+      .input('vt', sql.NVarChar, f.title).input('s', sql.Int, f.sort)
+      .query(`
+        IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key = @k)
+        INSERT INTO FeatureFlags (flag_key, label, description, version, version_title, enabled, sort_order, released_at)
+        VALUES (@k, @l, @d, @v, @vt, 1, @s, GETDATE())
+      `);
+  }
+
+  // ── v3.0: Bảng Notifications ─────────────────────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Notifications' AND xtype='U')
+    CREATE TABLE Notifications (
+      id         INT IDENTITY(1,1) PRIMARY KEY,
+      user_id    INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      type       NVARCHAR(50)  NOT NULL,
+      title      NVARCHAR(200) NOT NULL,
+      body       NVARCHAR(MAX),
+      link       NVARCHAR(500),
+      is_read    BIT NOT NULL DEFAULT 0,
+      created_at DATETIME2 DEFAULT GETDATE()
+    )
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_Notifications_user')
+    CREATE INDEX IX_Notifications_user ON Notifications(user_id, is_read, created_at DESC)
+  `);
+
+  // ── v3.0: Cột AI Coach vào Users ─────────────────────────────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Users' AND COLUMN_NAME='ai_coach_text')
+    ALTER TABLE Users ADD ai_coach_text NVARCHAR(MAX) NULL
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Users' AND COLUMN_NAME='ai_coach_date')
+    ALTER TABLE Users ADD ai_coach_date DATE NULL
+  `);
+
+  // ── v3.0: Feature flags (enabled=0 — bật qua admin panel) ───────────────
+  const v30flags = [
+    { key: 'notification_center', label: 'Trung tâm Thông báo',   desc: 'Chuông thông báo trong sidebar — streak milestone, chào mừng, tin hệ thống', ver: 'v3.0', title: 'Kết nối & Cá nhân hoá', sort: 300 },
+    { key: 'personal_profile',    label: 'Hồ sơ Cá nhân',         desc: 'Trang profile: avatar, cấp độ, huy hiệu, thống kê tổng quan, top tags',       ver: 'v3.0', title: 'Kết nối & Cá nhân hoá', sort: 301 },
+    { key: 'advanced_search',     label: 'Tìm kiếm Nâng cao',     desc: 'Bộ lọc bổ sung: mood min/max, chỉ entry có ảnh, chỉ entry CBT',               ver: 'v3.0', title: 'Kết nối & Cá nhân hoá', sort: 302 },
+    { key: 'ai_weekly_coach',     label: 'AI Coach Tuần',          desc: 'Card AI phân tích nhật ký và đưa ra 3 lời khuyên cụ thể, cache 7 ngày',      ver: 'v3.0', title: 'Kết nối & Cá nhân hoá', sort: 303 },
+    { key: 'pdf_export',          label: 'Xuất báo cáo PDF',       desc: 'Xuất báo cáo tháng ra file PDF qua tính năng in của trình duyệt',             ver: 'v3.0', title: 'Kết nối & Cá nhân hoá', sort: 304 },
+  ];
+  for (const f of v30flags) {
+    await db.request()
+      .input('k', sql.NVarChar, f.key).input('l', sql.NVarChar, f.label)
+      .input('d', sql.NVarChar, f.desc).input('v', sql.NVarChar, f.ver)
+      .input('vt', sql.NVarChar, f.title).input('s', sql.Int, f.sort)
+      .query(`
+        IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key = @k)
+        INSERT INTO FeatureFlags (flag_key, label, description, version, version_title, enabled, sort_order)
+        VALUES (@k, @l, @d, @v, @vt, 0, @s)
+      `);
+  }
+
   console.log('✅ Schema đã sẵn sàng');
 }
 
