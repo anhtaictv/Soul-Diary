@@ -1207,3 +1207,39 @@ body.dark-mode .body-zone.bz-done{fill:#14532d}
 /* Gratitude journal */
 .gratitude-question{font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px;line-height:1.4}
 .gratitude-hint{font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.5}
+
+/* ── UX batch 7 ────────────────────────────────────────────────────── */
+
+/* #1 Save button spinner */
+.btn-spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:5px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* #2 Save success pulse on form card */
+@keyframes saveFlash{0%{box-shadow:0 0 0 0 rgba(37,99,235,.45)}70%{box-shadow:0 0 0 14px rgba(37,99,235,0)}100%{box-shadow:0 0 0 0 rgba(37,99,235,0)}}
+.save-success-flash{animation:saveFlash .65s ease-out!important}
+
+/* #3 Inline field error */
+.field-error-msg{font-size:12px;color:var(--rose);margin-top:4px;display:none}
+.field-error-msg.visible{display:block}
+.field-has-error{border-color:var(--rose)!important;box-shadow:0 0 0 2px rgba(190,18,60,.15)!important}
+
+/* #4 Recent tags */
+#diary-recent-tags .recent-tag{cursor:pointer;opacity:.75;font-size:12px;padding:3px 10px;border:1px dashed var(--primary)}
+#diary-recent-tags .recent-tag:hover{opacity:1;background:var(--primary-light)}
+
+/* #5 Entry delete slide-out */
+@keyframes entrySlideOut{to{opacity:0;transform:translateX(-14px) scaleY(.7);margin-bottom:0;padding-top:0;padding-bottom:0;max-height:0}}
+.entry-item.deleting{animation:entrySlideOut .26s ease-in forwards;overflow:hidden;pointer-events:none}
+
+/* #7 CSS tooltip via data-tooltip attribute */
+[data-tooltip]{position:relative}
+[data-tooltip]::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:rgba(15,15,30,.88);color:#fff;font-size:11px;padding:4px 9px;border-radius:6px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .15s;z-index:1000;line-height:1.4}
+[data-tooltip]:hover::after{opacity:1}
+
+/* #8 Search term highlight */
+.search-hl{background:rgba(37,99,235,.15);border-radius:2px;font-weight:600;color:var(--primary)}
+
+/* #10 Reduced motion */
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+}

@@ -101,6 +101,7 @@ const PAGES = {
             </div>
             <div class="form-group">
               <label class="form-label">Cảm xúc chủ đạo</label>
+              <div id="diary-recent-tags" class="tag-row" style="display:none;margin-bottom:6px;gap:6px"></div>
               <div class="tag-row" id="emotion-tags"></div>
             </div>
 
