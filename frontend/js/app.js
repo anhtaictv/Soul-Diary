@@ -293,7 +293,7 @@ const App = (() => {
         <div class="mood-dot" style="background:${MOOD_DATA[e.mood_score].color}">${MOOD_DATA[e.mood_score].emoji}</div>
         <div>
           <div style="font-size:13px;font-weight:600;color:var(--text)">${MOOD_DATA[e.mood_score].label}${hasCbt ? ' <span class="cbt-entry-badge">🧠 CBT</span>' : ''}</div>
-          <div class="entry-date">${formatDate(e.created_at)}</div>
+          <div class="entry-date">${formatDateRelative(e.created_at)}</div>
         </div>
         ${withDelete ? `<button onclick="event.stopPropagation();App.deleteEntry(${e.id},this)" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-hint);padding:4px">🗑</button>` : ''}
       </div>
@@ -529,6 +529,16 @@ const App = (() => {
         if (fromEl && !fromEl.value) fromEl.value = jan1;
         if (toEl   && !toEl.value)   toEl.value   = today;
       }
+    }
+    // Debounced real-time search
+    const _srchInput = document.getElementById('diary-search-input');
+    if (_srchInput) {
+      let _srchTimer = null;
+      _srchInput.addEventListener('input', () => {
+        clearTimeout(_srchTimer);
+        if (!_srchInput.value.trim()) { clearSearch(); return; }
+        _srchTimer = setTimeout(() => searchDiary(), 450);
+      });
     }
     await loadDiaryEntries();
     // Auto-draft (v2.6)
@@ -4078,6 +4088,38 @@ const App = (() => {
     }
   }
 
+  // ── Swipe gesture: vuốt phải mở sidebar, vuốt trái đóng ────────────────
+  function _initSwipeGesture() {
+    let startX = 0, startY = 0;
+    document.addEventListener('touchstart', e => {
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    }, { passive: true });
+    document.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - startX;
+      const dy = e.changedTouches[0].clientY - startY;
+      if (Math.abs(dx) < Math.abs(dy) * 1.5 || Math.abs(dx) < 55) return;
+      const sidebarOpen = document.querySelector('.sidebar.sidebar-open');
+      if (dx > 0 && startX < 45 && !sidebarOpen) toggleSidebar();
+      else if (dx < 0 && sidebarOpen) closeSidebar();
+    }, { passive: true });
+  }
+
+  // ── Ripple effect khi click nút ──────────────────────────────────────
+  function _initRipple() {
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('.btn-primary,.btn-outline,.btn-danger,.nav-item');
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
+      const size = Math.max(rect.width, rect.height);
+      const r = document.createElement('span');
+      r.className = 'ripple-fx';
+      r.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX-rect.left-size/2}px;top:${e.clientY-rect.top-size/2}px`;
+      btn.appendChild(r);
+      setTimeout(() => r.remove(), 650);
+    });
+  }
+
   // ── Custom confirm dialog (thay browser confirm()) ───────────────────
   let _confirmResolve = null;
   function showConfirm(message, icon = '⚠️') {
@@ -4204,6 +4246,8 @@ const App = (() => {
     initOfflineDetection();
     _checkPinRequired();
     _initScrollFAB();
+    _initSwipeGesture();
+    _initRipple();
     // v2.1 — PWA install button (chỉ hiện nếu flag bật VÀ trình duyệt đã ghi nhận beforeinstallprompt)
     if (window.FEATURES && window.FEATURES.pwa_install && _pwaPrompt) {
       const pwaBtn = document.getElementById('pwa-install-btn');
