@@ -42,14 +42,17 @@ const App = (() => {
     // Lưu ý: KHÔNG dừng nhạc ở đây — thẻ <audio id="music-audio"> nằm ngoài #main-content
     // (xem index.html) nên nó không bị huỷ khi đổi trang, nhạc tiếp tục phát xuyên suốt SPA.
     if (!PAGES[page]) { console.error('Trang không tồn tại:', page); return; }
+    startProgress();
     try {
       document.getElementById('main-content').innerHTML = PAGES[page]();
     } catch(e) {
       console.error('Lỗi render trang', page, e);
+      doneProgress();
       return;
     }
     document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === page));
     document.querySelector('.main')?.scrollTo({ top: 0, behavior: 'instant' });
+    doneProgress();
     switch (page) {
       case 'dashboard': initDashboard();              break;
       case 'diary':     initDiaryPage();              break;
@@ -2790,10 +2793,11 @@ const App = (() => {
     t.textContent = msg;
     // Auto-detect type từ emoji prefix
     t.className = 'toast';
-    if (/^(✅|🎉|🌱|💚|🏆|🥇|🔓)/.test(msg))       t.classList.add('toast-success');
-    else if (/^(❌|🚫)/.test(msg))                    t.classList.add('toast-error');
-    else if (/^(⚠️|🔒|⏳)/.test(msg))               t.classList.add('toast-warn');
-    else if (/^(ℹ️|💡|📌)/.test(msg))               t.classList.add('toast-info');
+    if (/^(✅|🎉|🌱|💚|🏆|🥇|🔓)/.test(msg)) { t.classList.add('toast-success'); haptic('success'); }
+    else if (/^(❌|🚫)/.test(msg))             { t.classList.add('toast-error');   haptic('error'); }
+    else if (/^(⚠️|🔒|⏳)/.test(msg))         { t.classList.add('toast-warn');    haptic('medium'); }
+    else if (/^(ℹ️|💡|📌)/.test(msg))         { t.classList.add('toast-info');    haptic('light'); }
+    else                                         { haptic('light'); }
     t.classList.add('show');
     if (_toastTimer) clearTimeout(_toastTimer);
     _toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
@@ -4088,6 +4092,48 @@ const App = (() => {
     }
   }
 
+  // ── Haptic feedback (mobile) ─────────────────────────────────────────
+  function haptic(type = 'light') {
+    if (!navigator.vibrate) return;
+    const p = { light: [8], medium: [18], success: [8, 40, 8], error: [80] };
+    navigator.vibrate(p[type] || [8]);
+  }
+
+  // ── Top loading progress bar ──────────────────────────────────────────
+  function startProgress() {
+    const bar = document.getElementById('progress-bar');
+    if (!bar) return;
+    bar.className = '';
+    void bar.offsetWidth;
+    bar.classList.add('pb-loading');
+  }
+  function doneProgress() {
+    const bar = document.getElementById('progress-bar');
+    if (!bar) return;
+    bar.className = 'pb-done';
+    setTimeout(() => { bar.className = ''; bar.style.cssText = ''; }, 450);
+  }
+
+  // ── Modal entrance animation (MutationObserver) ───────────────────────
+  function _initModalAnimations() {
+    const replay = (overlay) => {
+      const modal = overlay.querySelector('.modal');
+      if (!modal) return;
+      modal.style.animation = 'none';
+      void modal.offsetWidth;
+      modal.style.animation = '';
+    };
+    const obs = new MutationObserver(muts => {
+      for (const m of muts) {
+        if (m.attributeName === 'style' && m.target.style.display === 'flex')
+          replay(m.target);
+      }
+    });
+    document.querySelectorAll('.modal-overlay').forEach(el =>
+      obs.observe(el, { attributes: true, attributeFilter: ['style'] })
+    );
+  }
+
   // ── Swipe gesture: vuốt phải mở sidebar, vuốt trái đóng ────────────────
   function _initSwipeGesture() {
     let startX = 0, startY = 0;
@@ -4248,6 +4294,7 @@ const App = (() => {
     _initScrollFAB();
     _initSwipeGesture();
     _initRipple();
+    _initModalAnimations();
     // v2.1 — PWA install button (chỉ hiện nếu flag bật VÀ trình duyệt đã ghi nhận beforeinstallprompt)
     if (window.FEATURES && window.FEATURES.pwa_install && _pwaPrompt) {
       const pwaBtn = document.getElementById('pwa-install-btn');
@@ -4354,6 +4401,12 @@ const App = (() => {
   async function _loadFriendsList() {
     const el = document.getElementById('friends-list');
     if (!el) return;
+    el.innerHTML = Array(3).fill(0).map(() =>
+      `<div style="display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:8px;pointer-events:none">
+        <div class="skeleton" style="width:44px;height:44px;border-radius:50%;flex-shrink:0"></div>
+        <div style="flex:1"><div class="skeleton" style="height:14px;width:55%;margin-bottom:8px"></div><div class="skeleton" style="height:11px;width:38%"></div></div>
+        <div class="skeleton" style="height:24px;width:52px;border-radius:6px"></div>
+      </div>`).join('');
     try {
       const d = await API.getFriends();
       if (!d.friends.length) {
@@ -5803,6 +5856,6 @@ const App = (() => {
     initNotificationsPage,markAllNotifsRead,
     initProfilePage,
     exportPDF,
-    toggleSidebar,closeSidebar,scrollToTop,animateCount,
+    toggleSidebar,closeSidebar,scrollToTop,animateCount,haptic,
     _confirmResolve: (val) => _confirmResolve && _confirmResolve(val)};
 })();
