@@ -4,7 +4,7 @@
 
 **Không gian riêng tư để lắng nghe tâm hồn mình**
 
-[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v2.0-6366f1?style=for-the-badge&logo=github)](https://github.com/anhtaictv/SoulDiary)
+[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v3.1-6366f1?style=for-the-badge&logo=github)](https://github.com/anhtaictv/Soul-Diary)
 [![Stack](https://img.shields.io/badge/Node.js_+_MSSQL-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)]()
 [![Vanilla JS](https://img.shields.io/badge/Vanilla_JS-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)]()
 [![License](https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge)]()
@@ -230,13 +230,27 @@ pm2 restart souldiary-api
 | Phiên bản | Tên | Tính năng chính |
 |-----------|-----|-----------------|
 | v1.0 | Ra mắt | JWT auth, nhật ký cảm xúc, biểu đồ, nhạc, thở 4-7-8, SOS |
-| v1.01 | Nền tảng | Admin panel, CRUD bài viết EasyMDE, ghi âm, đính kèm ảnh |
-| v1.2 | Giữ chân | Streak đa mốc, Weekly Recap, Huy hiệu & Level, AI Recap, Web Push |
-| v1.3 | AI Cảm xúc | Feature Flags, AI phân tích cảm xúc, Dashboard sức khoẻ, CBT |
-| v1.4 | Check-in | PHQ-9 / GAD-7 / PSS-10 / WHO-5 hàng tuần |
-| v1.5 | Tâm hồn | Lịch cảm xúc, AI Trợ lý, Không gian mood, Hạt mầm tâm hồn |
-| v1.9 | Cá nhân hoá | Dark Mode, 6 Themes, Tìm kiếm, Phân trang, Sửa lỗi XSS/timeout |
-| **v2.0** | **Đột phá** | **PWA Offline, Memory Card, Thư Tương Lai, PIN Lock, Xuất dữ liệu, AI Patterns, Nhiệm vụ tuần** |
+| v1.1 | Nền tảng | Admin panel, CRUD bài viết EasyMDE, ghi âm 30s, đính kèm ảnh, rate limiting |
+| v1.2 | Giữ chân | Streak đa mốc, Weekly Recap, Huy hiệu & Level, AI Recap tuần, Web Push |
+| v1.3 | AI Cảm xúc | Feature Flags, AI phân tích cảm xúc tự động, Dashboard sức khoẻ nâng cao, CBT |
+| v1.4 | Check-in | Check-in tâm lý hàng tuần: PHQ-9 / GAD-7 / PSS-10 / WHO-5 |
+| v1.5 | Tâm hồn | Lịch cảm xúc, AI Trợ lý, Không gian mood, Hạt mầm tâm hồn 🌱 |
+| v1.6 | Chăm sóc | Cảnh báo chuỗi tâm trạng tiêu cực, push SOS tự động, sửa lỗi ghi âm |
+| v1.7 | Admin | Hộp thư hỗ trợ, Heatmap cảm xúc năm, Thử thách sức khoẻ, Tâm sự ẩn danh |
+| v1.8 | Học liệu | Soul Chat AI, Lịch học tập, Mini Courses tâm lý, Mục tiêu cá nhân |
+| v1.9 | Cá nhân hoá | Dark Mode, 6 Themes màu, Tìm kiếm nhật ký, Phân trang, fix XSS/timeout |
+| v2.0 | Đột phá | PWA Offline, Memory Card, Thư Tương Lai, PIN Lock, Xuất dữ liệu, AI Patterns |
+| v2.1 | Tinh chỉnh | PWA install button, PIN management trong Settings, Canvas font tiếng Việt |
+| v2.2 | Kết nối | Avatar & Bio, Ghi âm 120s, Nhắc nhở thông minh, Radar cảm xúc, Chia sẻ entry |
+| v2.3 | Bạn bè | Streak bạn bè & bảng xếp hạng, Nhật ký định kỳ (Templates) |
+| v2.4 | Báo cáo | Báo cáo tháng, Phản tư cuối tuần, Quick Mood Log 5 emoji |
+| v2.5 | Thói quen | Habit Tracker, Gợi ý bài tập cảm xúc, Ghim nhật ký |
+| v2.6 | Năng lượng | Pomodoro Timer, Câu cảm hứng hàng ngày, Thống kê năm, Tự động lưu nháp |
+| v2.7 | Sáng tạo | Gallery ảnh, Ghi chú nhanh, So sánh tâm trạng, Cảnh báo sức khoẻ |
+| v2.8 | Bảo mật | Lazy-load media, Input validation, Dọn dẹp DB tự động |
+| v2.9 | Hiệu năng | HTTP Compression, Batch DB ops, Pool tuning, Promise.all song song |
+| v3.0 | Cộng đồng | Trung tâm Thông báo, Hồ sơ cá nhân, Tìm kiếm nâng cao, AI Coach tuần |
+| **v3.1** | **UX** | **40 cải tiến UX: skeleton, animation, swipe, ripple, focus trap, reduced motion…** |
 
 ---
 
