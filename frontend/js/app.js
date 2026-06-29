@@ -607,7 +607,12 @@ const App = (() => {
     if (!el) return;
     if (reset) {
       _diaryPage = 1;
-      el.innerHTML = '<div class="loading-text">Đang tải...</div>';
+      el.innerHTML = Array(3).fill(0).map(() => `
+        <div class="entry-item" style="pointer-events:none;gap:8px">
+          <div class="skeleton" style="height:14px;width:55%;margin-bottom:8px"></div>
+          <div class="skeleton" style="height:12px;width:80%;margin-bottom:6px"></div>
+          <div class="skeleton" style="height:12px;width:38%"></div>
+        </div>`).join('');
     }
     try {
       const res = await API.getDiary(_diaryPage, DIARY_PAGE_SIZE);
@@ -3959,6 +3964,73 @@ const App = (() => {
     if (outcome === 'accepted') _pwaPrompt = null;
   }
 
+  // ── Mobile sidebar (v3.1 UX) ────────────────────────────────────────
+  function toggleSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const hamburger = document.getElementById('sidebar-hamburger');
+    const isOpen = sidebar.classList.toggle('sidebar-open');
+    if (overlay) overlay.style.display = isOpen ? 'block' : 'none';
+    if (hamburger) hamburger.textContent = isOpen ? '✕' : '☰';
+  }
+
+  function closeSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const hamburger = document.getElementById('sidebar-hamburger');
+    if (!sidebar) return;
+    sidebar.classList.remove('sidebar-open');
+    if (overlay) overlay.style.display = 'none';
+    if (hamburger) hamburger.textContent = '☰';
+  }
+
+  // ── Keyboard shortcuts (v3.1 UX) ─────────────────────────────────────
+  function _handleKeyboard(e) {
+    const ctrl = e.ctrlKey || e.metaKey;
+    const tag  = document.activeElement?.tagName;
+    const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+    // Ctrl+S — lưu nhật ký (kể cả khi đang trong textarea)
+    if (ctrl && e.key === 's') {
+      const saveBtn = document.getElementById('diary-save-btn');
+      if (saveBtn && !saveBtn.disabled) { e.preventDefault(); saveBtn.click(); }
+      return;
+    }
+
+    // Escape — đóng modal/overlay đang mở
+    if (e.key === 'Escape') {
+      // Photo lightbox
+      const lightbox = document.getElementById('photo-lightbox');
+      if (lightbox && lightbox.style.display === 'flex') { closeLightbox(); return; }
+      // Admin editor overlay
+      const admEditor = document.getElementById('adm-editor-overlay');
+      if (admEditor && admEditor.style.display !== 'none') { admEditor.style.display = 'none'; return; }
+      // Exercise suggest overlay
+      const exSuggest = document.getElementById('exercise-suggest-overlay');
+      if (exSuggest && exSuggest.style.display === 'flex') { exSuggest.style.display = 'none'; return; }
+      // Bất kỳ .modal-overlay nào đang hiển thị (click backdrop để đóng)
+      const visibleModal = document.querySelector('.modal-overlay[style*="flex"]');
+      if (visibleModal) { visibleModal.click(); return; }
+      // Mobile sidebar
+      if (document.querySelector('.sidebar.sidebar-open')) { closeSidebar(); return; }
+      return;
+    }
+
+    // Ctrl+K — focus ô tìm kiếm
+    if (ctrl && e.key === 'k') {
+      const searchInput = document.getElementById('diary-search-input');
+      if (searchInput) { e.preventDefault(); searchInput.focus(); searchInput.select(); }
+      return;
+    }
+
+    // / — focus tìm kiếm khi không đang nhập liệu
+    if (e.key === '/' && !inInput) {
+      const searchInput = document.getElementById('diary-search-input');
+      if (searchInput) { e.preventDefault(); searchInput.focus(); }
+      return;
+    }
+  }
+
   // ── Offline Detection (v2.0) ──────────────────────────────────────
   function initOfflineDetection() {
     function update() {
@@ -3974,7 +4046,11 @@ const App = (() => {
   async function init() {
     applyDarkMode(localStorage.getItem('nhk_dark') === '1');
     applyTheme(localStorage.getItem('nhk_theme') || '');
-    document.querySelectorAll('.nav-item').forEach(btn=>btn.addEventListener('click',()=>nav(btn.dataset.page)));
+    document.querySelectorAll('.nav-item').forEach(btn => btn.addEventListener('click', () => {
+      nav(btn.dataset.page);
+      closeSidebar();
+    }));
+    document.addEventListener('keydown', _handleKeyboard);
     const navAdmin = document.getElementById('nav-admin');
     if (navAdmin) navAdmin.style.display = (Auth.getUser()?.role === 'admin') ? '' : 'none';
     document.getElementById('close-breath-modal').addEventListener('click',closeBreathModal);
@@ -5597,5 +5673,6 @@ const App = (() => {
     initMoodComparePage,loadMoodCompare,
     initNotificationsPage,markAllNotifsRead,
     initProfilePage,
-    exportPDF};
+    exportPDF,
+    toggleSidebar,closeSidebar};
 })();
