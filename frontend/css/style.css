@@ -499,13 +499,29 @@ select.form-input{cursor:pointer}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:#bfdbfe;border-radius:4px}
 
+/* ── Page transition (v3.1 UX) ── */
+.page{animation:pageFadeIn .14s ease}
+@keyframes pageFadeIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Mobile sidebar hamburger & overlay (v3.1 UX) ── */
+#sidebar-hamburger{display:none;position:fixed;top:10px;left:10px;z-index:250;width:40px;height:40px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-size:20px;cursor:pointer;align-items:center;justify-content:center;box-shadow:0 2px 10px rgba(0,0,0,.28);transition:background .2s}
+#sidebar-hamburger:hover{background:var(--primary-dark)}
+#sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:195;backdrop-filter:blur(2px)}
+
 /* Responsive */
 @media(max-width:720px){
-  .app{flex-direction:column}
-  .sidebar{width:100%;min-width:unset;height:auto;position:relative}
-  .main{height:auto}
-  .nav{display:flex;flex-wrap:wrap;padding:8px}
-  .nav-item{flex:1;min-width:80px;justify-content:center;flex-direction:column;gap:2px;font-size:10px;padding:8px 4px}
+  #sidebar-hamburger{display:flex}
+  .sidebar{
+    position:fixed!important;top:0;left:0;
+    height:100dvh!important;width:min(260px,80vw)!important;
+    min-width:unset;transform:translateX(-100%);
+    transition:transform .28s cubic-bezier(.4,0,.2,1);
+    z-index:200;overflow-y:auto;
+  }
+  .sidebar.sidebar-open{transform:translateX(0)}
+  .main{height:auto;padding-top:60px}
+  .nav{display:block;padding:4px 0}
+  .nav-item{flex:none!important;min-width:unset!important;justify-content:flex-start!important;flex-direction:row!important;gap:10px;font-size:13px!important;padding:10px 16px}
   .grid-2,.grid-3,.grid-4{grid-template-columns:1fr}
   .page{padding:16px}
   .auth-card{padding:28px 20px}
