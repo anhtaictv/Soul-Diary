@@ -150,6 +150,7 @@
           <button class="nav-item" data-page="library">        <span class="nav-icon">📚</span> Thư viện</button>
           <button class="nav-item" data-page="exercises">      <span class="nav-icon">🧘</span> Bài tập</button>
           <button class="nav-item" data-page="music">          <span class="nav-icon">🎧</span> Nhạc thư giãn</button>
+          <div class="nav-separator" id="nav-sep-features"></div>
           <button class="nav-item" data-page="checkin" id="nav-checkin" style="display:none">
             <span class="nav-icon">🧪</span> Check-in tâm lý<span id="checkin-badge" class="nav-badge-dot" style="display:none"></span>
           </button>
@@ -175,6 +176,7 @@
           <button class="nav-item" data-page="mood-compare"  id="nav-mood-compare"  style="display:none"><span class="nav-icon">⚖️</span> So sánh mood</button>
           <button class="nav-item" data-page="notifications" id="nav-notifications" style="display:none"><span class="nav-icon">🔔</span> Thông báo<span id="notif-badge" class="nav-badge-dot" style="display:none"></span></button>
           <button class="nav-item" data-page="profile"       id="nav-profile"       style="display:none"><span class="nav-icon">👤</span> Hồ sơ cá nhân</button>
+          <div class="nav-separator"></div>
           <button class="nav-item" data-page="settings"><span class="nav-icon">⚙️</span> Cài đặt</button>
           <button class="nav-item" data-page="sos">            <span class="nav-icon">📞</span> Đường dây hỗ trợ</button>
           <button class="nav-item" data-page="admin" id="nav-admin" style="display:none"><span class="nav-icon">🛠️</span> Quản trị</button>
@@ -214,6 +216,9 @@
     <!-- Phát nhạc thư giãn xuyên suốt khi chuyển trang trong app — chỉ dừng khi rời khỏi web -->
     <audio id="music-audio"></audio>
   </div>
+
+  <!-- Top loading progress bar -->
+  <div id="progress-bar"></div>
 
   <!-- Scroll to top FAB -->
   <button id="scroll-top-fab" onclick="App.scrollToTop()" title="Lên đầu trang" aria-label="Lên đầu trang">↑</button>
