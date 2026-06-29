@@ -1194,10 +1194,10 @@ async function initSchema() {
   await db.request().query(`
     DELETE FROM HabitLogs WHERE log_date < CAST(DATEADD(DAY, -90, GETDATE()) AS DATE)
   `);
-  // Xóa push subscriptions không hoạt động > 30 ngày
+  // Xóa push subscriptions không hoạt động > 30 ngày (dùng EXEC để tránh parse-time error)
   await db.request().query(`
     IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PushSubscriptions' AND COLUMN_NAME='updated_at')
-      DELETE FROM PushSubscriptions WHERE updated_at < DATEADD(DAY, -30, GETDATE())
+      EXEC('DELETE FROM PushSubscriptions WHERE updated_at < DATEADD(DAY, -30, GETDATE())')
   `);
 
   console.log('✅ Schema đã sẵn sàng');
