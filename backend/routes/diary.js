@@ -416,37 +416,6 @@ router.get('/', async (req, res) => {
 });
 
 // ── GET /api/diary/:id — entry đầy đủ (có media binary) ─────────────────
-router.get('/:id', authMiddleware, async (req, res) => {
-  const id = parseInt(req.params.id);
-  if (!id) return res.status(400).json({ message: 'ID không hợp lệ.' });
-  try {
-    const db = await getPool();
-    const r  = await db.request()
-      .input('id',  sql.Int, id)
-      .input('uid', sql.Int, req.user.id)
-      .query(`
-        SELECT id, mood_score, event_text, thoughts, gratitude, tags,
-               ai_emotion, ai_companion_message, cbt_data, is_pinned, share_token, created_at
-        FROM DiaryEntries WHERE id = @id AND user_id = @uid
-      `);
-    if (!r.recordset.length)
-      return res.status(404).json({ message: 'Không tìm thấy nhật ký.' });
-    const entry    = r.recordset[0];
-    const mediaMap = await loadMediaForEntries(db, [entry.id]);
-    res.json({
-      entry: {
-        ...entry,
-        tags:       entry.tags ? entry.tags.split('|') : [],
-        photos:     mediaMap.get(entry.id)?.photos     || [],
-        audio_data: mediaMap.get(entry.id)?.audio_data || null,
-      },
-    });
-  } catch (err) {
-    console.error('Get diary entry error:', err);
-    res.status(500).json({ message: 'Lỗi server.' });
-  }
-});
-
 // ── GET /api/diary/mental-health — 4 chỉ số sức khỏe tâm thần ──────────────
 router.get('/mental-health', async (req, res) => {
   try {
@@ -1508,6 +1477,38 @@ router.get('/sleep-stats', authMiddleware, async (req, res) => {
     `);
     res.json({ data: result.recordset.reverse() });
   } catch (err) {
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+// ── GET /api/diary/:id — Tải đầy đủ 1 entry kèm media (phải đứng SAU tất cả named routes) ──
+router.get('/:id', authMiddleware, async (req, res) => {
+  const id = parseInt(req.params.id);
+  if (!id) return res.status(400).json({ message: 'ID không hợp lệ.' });
+  try {
+    const db = await getPool();
+    const r  = await db.request()
+      .input('id',  sql.Int, id)
+      .input('uid', sql.Int, req.user.id)
+      .query(`
+        SELECT id, mood_score, event_text, thoughts, gratitude, tags,
+               ai_emotion, ai_companion_message, cbt_data, is_pinned, share_token, created_at
+        FROM DiaryEntries WHERE id = @id AND user_id = @uid
+      `);
+    if (!r.recordset.length)
+      return res.status(404).json({ message: 'Không tìm thấy nhật ký.' });
+    const entry    = r.recordset[0];
+    const mediaMap = await loadMediaForEntries(db, [entry.id]);
+    res.json({
+      entry: {
+        ...entry,
+        tags:       entry.tags ? entry.tags.split('|') : [],
+        photos:     mediaMap.get(entry.id)?.photos     || [],
+        audio_data: mediaMap.get(entry.id)?.audio_data || null,
+      },
+    });
+  } catch (err) {
+    console.error('Get diary entry error:', err);
     res.status(500).json({ message: 'Lỗi server.' });
   }
 });
