@@ -5,3 +5,4 @@ CLAUDE.md
 .claude/scheduled_tasks.lock
 SESSION_LOG.md
 .git-rewrite/
+_backup/
