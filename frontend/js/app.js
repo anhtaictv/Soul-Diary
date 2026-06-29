@@ -190,10 +190,10 @@ const App = (() => {
     const elAvg     = document.getElementById('dash-avg');
     const elStreak  = document.getElementById('dash-streak');
     const elToday   = document.getElementById('dash-today');
-    if (elEntries) elEntries.textContent = totalEntries || '—';
-    if (elAvg)     elAvg.textContent     = avg;
-    if (elStreak)  elStreak.textContent  = user ? (user.streak || 0) : '—';
-    if (elToday)   elToday.textContent   = todayEntry ? (todayEntry.mood_score + '/10') : '—';
+    if (elEntries) { if (totalEntries) animateCount(elEntries, totalEntries); else elEntries.textContent = '—'; }
+    if (elAvg)     elAvg.textContent = avg;
+    if (elStreak)  animateCount(elStreak, user ? (user.streak || 0) : 0);
+    if (elToday)   elToday.textContent = todayEntry ? (todayEntry.mood_score + '/10') : '—';
 
     renderStreakCalendar('streak-calendar-card');
     if (totalEntries) renderLevelBar(totalEntries);
@@ -1588,6 +1588,19 @@ const App = (() => {
   let allApiArticles = [];
 
   async function initLibrary() {
+    // Skeleton placeholder trong khi tải
+    const gridElPre = document.getElementById('articles-grid');
+    if (gridElPre) {
+      gridElPre.style.display = 'grid';
+      gridElPre.innerHTML = Array(6).fill(0).map(() =>
+        `<div class="article-card" style="pointer-events:none">
+          <div class="skeleton" style="height:120px"></div>
+          <div style="padding:12px">
+            <div class="skeleton" style="height:13px;width:65%;margin-bottom:8px"></div>
+            <div class="skeleton" style="height:11px;width:40%"></div>
+          </div>
+        </div>`).join('');
+    }
     try {
       const catRes = await API.getCategories();
       const catMap = {stress:'😤 Stress',sleep:'🌙 Giấc ngủ',depression:'💙 Trầm cảm',relationship:'💛 Mối quan hệ',study:'📚 Học tập',other:'📌 Khác'};
@@ -2765,10 +2778,30 @@ const App = (() => {
   function showToast(msg) {
     const t = document.getElementById('toast');
     t.textContent = msg;
+    // Auto-detect type từ emoji prefix
+    t.className = 'toast';
+    if (/^(✅|🎉|🌱|💚|🏆|🥇|🔓)/.test(msg))       t.classList.add('toast-success');
+    else if (/^(❌|🚫)/.test(msg))                    t.classList.add('toast-error');
+    else if (/^(⚠️|🔒|⏳)/.test(msg))               t.classList.add('toast-warn');
+    else if (/^(ℹ️|💡|📌)/.test(msg))               t.classList.add('toast-info');
     t.classList.add('show');
     if (_toastTimer) clearTimeout(_toastTimer);
     _toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
     t.onclick = () => { clearTimeout(_toastTimer); t.classList.remove('show'); };
+  }
+
+  // ── Count-up animation cho stat numbers ─────────────────────────────
+  function animateCount(el, target, duration = 650) {
+    if (!el || isNaN(target) || target === 0) { if (el) el.textContent = target; return; }
+    const start = performance.now();
+    const step = (now) => {
+      const p = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(target * eased);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = target;
+    };
+    requestAnimationFrame(step);
   }
 
   // ── Tìm kiếm nhật ký (v1.9) ─────────────────────────────────────────
@@ -4095,6 +4128,13 @@ const App = (() => {
       closeSidebar();
     }));
     document.addEventListener('keydown', _handleKeyboard);
+    // Auto-resize tất cả .diary-textarea khi gõ (event delegation)
+    document.addEventListener('input', e => {
+      if (e.target.classList.contains('diary-textarea')) {
+        e.target.style.height = 'auto';
+        e.target.style.height = Math.min(e.target.scrollHeight, 380) + 'px';
+      }
+    }, { passive: true });
     const navAdmin = document.getElementById('nav-admin');
     if (navAdmin) navAdmin.style.display = (Auth.getUser()?.role === 'admin') ? '' : 'none';
     document.getElementById('close-breath-modal').addEventListener('click',closeBreathModal);
@@ -5719,6 +5759,6 @@ const App = (() => {
     initNotificationsPage,markAllNotifsRead,
     initProfilePage,
     exportPDF,
-    toggleSidebar,closeSidebar,scrollToTop,
+    toggleSidebar,closeSidebar,scrollToTop,animateCount,
     _confirmResolve: (val) => _confirmResolve && _confirmResolve(val)};
 })();

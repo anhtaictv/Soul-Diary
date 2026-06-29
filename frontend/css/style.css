@@ -493,6 +493,14 @@ select.form-input{cursor:pointer}
 /* Toast */
 .toast{position:fixed;bottom:24px;right:24px;background:#1a2744;color:#e0e7ff;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;z-index:9999;transform:translateY(80px);opacity:0;transition:.3s;box-shadow:0 8px 24px rgba(0,0,0,.2);pointer-events:none;max-width:320px}
 .toast.show{transform:translateY(0);opacity:1;pointer-events:auto;cursor:pointer}
+.toast.toast-success{background:#15803d}
+.toast.toast-error{background:#be123c}
+.toast.toast-warn{background:#b45309}
+.toast.toast-info{background:#0369a1}
+
+/* Badge dot pulse */
+.nav-badge-dot{animation:badgePulse 2.5s ease-in-out infinite}
+@keyframes badgePulse{0%,70%,100%{transform:scale(1)}35%{transform:scale(1.6)}}
 
 /* Scrollbar */
 ::-webkit-scrollbar{width:5px}
