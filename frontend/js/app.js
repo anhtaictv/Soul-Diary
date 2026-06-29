@@ -1779,13 +1779,6 @@ const App = (() => {
   // ── Check-in Sức khỏe Tinh thần hàng tuần ───────────────────────────
   const CHECKIN_LEVEL_LABEL = { low: 'Thấp', moderate: 'Trung bình', high: 'Cao' };
 
-  // Escape nội dung do AI sinh ra (có thể chứa trích dẫn từ nhật ký người dùng) trước khi chèn bằng innerHTML
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str ?? '';
-    return div.innerHTML;
-  }
-
   async function initCheckinPage() {
     const el = document.getElementById('checkin-content');
     el.innerHTML = '<div class="loading-text">Đang tải...</div>';
@@ -2749,10 +2742,6 @@ const App = (() => {
       </div>`).join('');
   }
 
-  // ── Helpers ──────────────────────────────────────────────────────────
-  function formatDate(iso) {
-    return new Date(iso).toLocaleDateString('vi-VN',{weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-  }
   let _toastTimer = null;
   function showToast(msg) {
     const t = document.getElementById('toast');
@@ -4879,25 +4868,6 @@ const App = (() => {
   }
 
   // ── v3.0: Hồ sơ Cá nhân (personal_profile) ──────────────────────────────
-  const LEVELS = [
-    { min: 0,   name: 'Mầm non',      emoji: '🌱' },
-    { min: 10,  name: 'Người khám phá', emoji: '🌿' },
-    { min: 30,  name: 'Người viết',    emoji: '✍️' },
-    { min: 60,  name: 'Nhật ký viên',  emoji: '📖' },
-    { min: 100, name: 'Soul Keeper',   emoji: '🌳' },
-  ];
-  const BADGES = [
-    { id: 'first_entry',  emoji: '📝', name: 'Bước đầu tiên',  cond: s => s.totalEntries >= 1 },
-    { id: 'streak_7',     emoji: '🔥', name: '7 ngày liên tiếp', cond: s => s.maxStreak >= 7 },
-    { id: 'streak_30',    emoji: '💎', name: '30 ngày streak', cond: s => s.maxStreak >= 30 },
-    { id: 'writer_10',    emoji: '✍️', name: '10 nhật ký',     cond: s => s.totalEntries >= 10 },
-    { id: 'writer_50',    emoji: '📚', name: '50 nhật ký',     cond: s => s.totalEntries >= 50 },
-    { id: 'writer_100',   emoji: '🏆', name: '100 nhật ký',    cond: s => s.totalEntries >= 100 },
-    { id: 'consistent',   emoji: '📅', name: 'Bền bỉ',         cond: s => s.entryThisMonth >= 20 },
-    { id: 'tagger',       emoji: '🏷️', name: 'Hay dùng tag',   cond: s => (s.topTags || []).length >= 3 },
-    { id: 'high_mood',    emoji: '😄', name: 'Tinh thần cao',   cond: s => s.avgMood >= 7 },
-  ];
-
   async function initProfilePage() {
     const el = document.getElementById('profile-content');
     if (!el) return;

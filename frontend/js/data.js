@@ -127,3 +127,25 @@ const EXERCISES = [
   { icon:'🚶', bg:'#f0fdf4', title:'Đi bộ chánh niệm',             duration:'10–30 phút', desc:'Kết hợp vận động nhẹ với chánh niệm — nghiên cứu Harvard giảm 20% triệu chứng lo âu.',     steps:['Chọn tuyến đường quen thuộc','Tắt điện thoại hoặc để im lặng','Chú ý từng bước chân chạm đất','Quan sát xung quanh bằng con mắt mới','Hít thở sâu đều đặn theo nhịp bước'], action:'walk' },
   { icon:'🌊', bg:'#f0f9ff', title:'Quét Cơ thể (Body Scan)',      duration:'10–15 phút', desc:'Thiền định dựa trên MBSR của Jon Kabat-Zinn — đưa sự chú ý lần lượt qua từng vùng cơ thể để giải phóng căng thẳng tích lũy mà bạn không nhận ra.',    steps:['Nằm xuống hoặc ngồi thoải mái, nhắm mắt','Bắt đầu từ ngón chân — chú ý mọi cảm giác: ấm, lạnh, tê, căng','Di chuyển chậm lên bàn chân, mắt cá, bắp chân','Tiếp tục lên đầu gối, đùi, hông — thở sâu khi gặp vùng căng','Lên bụng, ngực, vai, tay, cổ, mặt — dừng 30 giây mỗi vùng'], action:'bodyscan' },
 ];
+
+// ── Cấp độ người dùng (v1.2) ────────────────────────────────────────────
+const LEVELS = [
+  { min: 0,   name: 'Mầm non',       emoji: '🌱' },
+  { min: 10,  name: 'Người khám phá', emoji: '🌿' },
+  { min: 30,  name: 'Người viết',    emoji: '✍️' },
+  { min: 60,  name: 'Nhật ký viên',  emoji: '📖' },
+  { min: 100, name: 'Soul Keeper',   emoji: '🌳' },
+];
+
+// ── Huy hiệu (v1.2) ──────────────────────────────────────────────────────
+const BADGES = [
+  { id: 'first_entry', emoji: '📝', name: 'Bước đầu tiên',   cond: s => s.totalEntries >= 1 },
+  { id: 'streak_7',    emoji: '🔥', name: '7 ngày liên tiếp', cond: s => s.maxStreak >= 7 },
+  { id: 'streak_30',   emoji: '💎', name: '30 ngày streak',  cond: s => s.maxStreak >= 30 },
+  { id: 'writer_10',   emoji: '✍️', name: '10 nhật ký',      cond: s => s.totalEntries >= 10 },
+  { id: 'writer_50',   emoji: '📚', name: '50 nhật ký',      cond: s => s.totalEntries >= 50 },
+  { id: 'writer_100',  emoji: '🏆', name: '100 nhật ký',     cond: s => s.totalEntries >= 100 },
+  { id: 'consistent',  emoji: '📅', name: 'Bền bỉ',          cond: s => s.entryThisMonth >= 20 },
+  { id: 'tagger',      emoji: '🏷️', name: 'Hay dùng tag',    cond: s => (s.topTags || []).length >= 3 },
+  { id: 'high_mood',   emoji: '😄', name: 'Tinh thần cao',   cond: s => s.avgMood >= 7 },
+];
