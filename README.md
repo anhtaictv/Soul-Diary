@@ -75,7 +75,8 @@
 
 <div align="center">
 
-> *Giao diện sạch sẽ, tối giản — tập trung vào nội dung*
+> <img width="536" height="643" alt="image" src="https://github.com/user-attachments/assets/194f8266-8a1b-454f-9fa8-010c5b8ba062" />
+
 
 </div>
 
