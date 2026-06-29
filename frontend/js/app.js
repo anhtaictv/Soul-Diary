@@ -169,6 +169,11 @@ const App = (() => {
   // ── Dashboard ────────────────────────────────────────────────────────
   async function initDashboard() {
     buildMoodScale('quick-mood-scale', v => { selectedMood = v; });
+    // #6 skeleton stat cards while data loads
+    ['dash-entries','dash-avg','dash-streak','dash-today'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '<span class="skeleton" style="display:inline-block;width:38px;height:22px;border-radius:4px"></span>';
+    });
     // allSettled để 1 call thất bại không crash cả dashboard
     const [entriesSettled, userSettled, statsSettled] = await Promise.allSettled([
       API.getDiary(1,20), API.getMe(), API.getStats(14)
@@ -299,9 +304,9 @@ const App = (() => {
           <div style="font-size:13px;font-weight:600;color:var(--text)">${MOOD_DATA[e.mood_score].label}${hasCbt ? ' <span class="cbt-entry-badge">🧠 CBT</span>' : ''}</div>
           <div class="entry-date">${formatDateRelative(e.created_at)}</div>
         </div>
-        ${withDelete ? `<button onclick="event.stopPropagation();App.deleteEntry(${e.id},this)" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-hint);padding:4px">🗑</button>` : ''}
+        ${withDelete ? `<button onclick="event.stopPropagation();App.deleteEntry(${e.id},this)" data-tooltip="Xóa nhật ký" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-hint);padding:4px">🗑</button>` : ''}
       </div>
-      ${(cbtPreview || e.event_text) ? `<div class="entry-preview">${cbtPreview || e.event_text}</div>` : ''}
+      ${(cbtPreview || e.event_text) ? `<div class="entry-preview">${_searchActive && _lastSearchQ ? _highlightTerm(cbtPreview || e.event_text, _lastSearchQ) : escapeHtml(cbtPreview || e.event_text)}</div>` : ''}
       ${tags.length ? `<div class="entry-tags">${tags.map(t=>`<span class="entry-tag">${t}</span>`).join('')}</div>` : ''}
       ${mediaHints.length ? `<div style="font-size:12px;color:var(--text-hint);margin-top:6px">${mediaHints.join(' · ')}</div>` : ''}
     </div>`;
@@ -350,7 +355,7 @@ const App = (() => {
       bodyHtml += `<audio controls src="${cachedAudio}" style="width:100%;margin-bottom:12px;height:36px"></audio>`;
     }
     if (cachedPhotos) {
-      bodyHtml += `<div class="entry-photo-gallery">${cachedPhotos.map(p=>`<img src="${p}" class="entry-gallery-photo" onclick="App.openLightbox(this.src)" />`).join('')}</div>`;
+      bodyHtml += `<div class="entry-photo-gallery">${cachedPhotos.map(p=>`<img src="${p}" class="entry-gallery-photo" loading="lazy" onclick="App.openLightbox(this.src)" />`).join('')}</div>`;
     }
     if (needsLazy) {
       bodyHtml += `<div id="entry-media-placeholder" style="text-align:center;color:var(--text-hint);padding:12px;font-size:13px">⏳ Đang tải media…</div>`;
@@ -387,7 +392,7 @@ const App = (() => {
           mediaHtml += `<audio controls src="${fe.audio_data}" style="width:100%;margin-bottom:12px;height:36px"></audio>`;
         }
         if (photos.length) {
-          mediaHtml += `<div class="entry-photo-gallery">${photos.map(p=>`<img src="${p}" class="entry-gallery-photo" onclick="App.openLightbox(this.src)" />`).join('')}</div>`;
+          mediaHtml += `<div class="entry-photo-gallery">${photos.map(p=>`<img src="${p}" class="entry-gallery-photo" loading="lazy" onclick="App.openLightbox(this.src)" />`).join('')}</div>`;
         }
         if (!mediaHtml) mediaHtml = '';
         const ph = document.getElementById('entry-media-placeholder');
@@ -469,6 +474,30 @@ const App = (() => {
 
   // ── Diary ────────────────────────────────────────────────────────────
 
+  // #4 Recent tags from cached entries
+  function _renderRecentTags() {
+    const el = document.getElementById('diary-recent-tags');
+    if (!el) return;
+    const tagCount = {};
+    cachedEntries.forEach(e => {
+      const tags = Array.isArray(e.tags) ? e.tags : (e.tags ? e.tags.split('|') : []);
+      tags.forEach(t => { if (t) tagCount[t] = (tagCount[t] || 0) + 1; });
+    });
+    const top = Object.entries(tagCount).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([t]) => t);
+    if (!top.length) { el.style.display = 'none'; return; }
+    el.style.display = '';
+    el.innerHTML = '<span style="font-size:11px;color:var(--text-muted);margin-right:4px;align-self:center">Dùng lại:</span>' +
+      top.map(t => `<span class="tag recent-tag" onclick="App._addRecentTag('${escapeHtml(t)}')">${escapeHtml(t)}</span>`).join('');
+  }
+
+  function _addRecentTag(tag) {
+    if (selectedTags.includes(tag)) return;
+    selectedTags.push(tag);
+    const tagEl = document.querySelector(`#emotion-tags [data-tag="${tag}"]`);
+    if (tagEl) tagEl.classList.add('sel');
+    else showToast('💡 Tag đã được thêm: ' + tag);
+  }
+
   // Gắn thang điểm mood của trang Nhật ký — tách riêng vì cần gọi lại y hệt từ resetDiaryForm()
   // sau khi lưu, để gradient/gợi ý nhạc theo cảm xúc (mood_ambience) không bị mất hook khi reset form.
   function bindDiaryMoodScale(defaultVal) {
@@ -492,7 +521,8 @@ const App = (() => {
         this.style.height = Math.min(this.scrollHeight, 380) + 'px';
         if (counter) {
           const len = this.value.length;
-          counter.textContent = len + ' / 5000';
+          const words = this.value.trim() ? this.value.trim().split(/\s+/).length : 0;
+          counter.textContent = `${words} từ · ${len} / 5000 ký tự`;
           counter.className = 'char-counter' + (len > 4500 ? ' danger' : len > 4000 ? ' warn' : '');
         }
       });
@@ -545,6 +575,7 @@ const App = (() => {
       });
     }
     await loadDiaryEntries();
+    _renderRecentTags();
     // Auto-focus textarea khi mở trang (chỉ trên desktop)
     if (window.innerWidth > 720) setTimeout(() => document.getElementById('diary-event')?.focus(), 80);
     // Auto-draft (v2.6)
@@ -853,18 +884,19 @@ const App = (() => {
       const cbtFeelings = document.getElementById('cbt-feelings')?.value.trim() || '';
       const cbtBehavior = document.getElementById('cbt-behavior')?.value.trim() || '';
       if (!cbtEvent && !cbtThoughts) {
-        showToast('⚠️ Hãy điền ít nhất "Sự kiện" hoặc "Suy nghĩ"!');
+        _showFieldError('cbt-event', 'Hãy điền ít nhất "Sự kiện" hoặc "Suy nghĩ"!');
         return;
       }
       cbt_data   = { event: cbtEvent, thoughts: cbtThoughts, feelings: cbtFeelings, behavior: cbtBehavior };
       event_text = cbtEvent || cbtThoughts;
     } else {
       event_text = document.getElementById('diary-event')?.value.trim() || '';
-      if (!event_text) { showToast('⚠️ Hãy viết ít nhất một dòng nhật ký!'); return; }
+      if (!event_text) { _showFieldError('diary-event', 'Hãy viết ít nhất một dòng nhật ký!'); return; }
     }
 
     const btn = document.getElementById('btn-save-diary');
-    btn.disabled=true; btn.textContent='Đang lưu...';
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-spinner"></span> Đang lưu...';
     try {
       const res = await API.createEntry({
         mood_score: selectedMood,
@@ -877,6 +909,9 @@ const App = (() => {
         photos:     uploadedPhotos.filter(Boolean),
       });
       resetDiaryForm();
+      // #2: save success pulse on form card
+      const card = document.getElementById('diary-form-card');
+      if (card) { card.classList.add('save-success-flash'); setTimeout(() => card.classList.remove('save-success-flash'), 700); }
       const user = Auth.getUser();
       if (user) {
         user.streak = res.streak;
@@ -906,14 +941,17 @@ const App = (() => {
       await loadDiaryEntries();
       showToast('✅ Đã lưu nhật ký!');
     } catch(err) { showToast('❌ Lỗi lưu nhật ký: '+err.message); }
-    finally { btn.disabled=false; btn.textContent='💾 Lưu nhật ký'; }
+    finally { btn.disabled = false; btn.innerHTML = '💾 Lưu nhật ký'; }
   }
 
   async function deleteEntry(id, btn) {
     if (!await showConfirm('Xóa nhật ký này? Hành động không thể hoàn tác.', '🗑️')) return;
-    btn.textContent='...';
+    // #5 animate out the entry row before actually deleting
+    const row = btn?.closest('.entry-item');
+    if (row) { row.classList.add('deleting'); await new Promise(r => setTimeout(r, 240)); }
+    btn.textContent = '...';
     try { await API.deleteEntry(id); await loadDiaryEntries(); showToast('🗑 Đã xóa.'); }
-    catch(err) { showToast('❌ Không thể xóa: '+err.message); }
+    catch(err) { if (row) row.classList.remove('deleting'); showToast('❌ Không thể xóa: '+err.message); }
   }
 
   // ── Streak celebration ───────────────────────────────────────────────
@@ -2822,7 +2860,7 @@ const App = (() => {
   }
 
   // ── Tìm kiếm nhật ký (v1.9) ─────────────────────────────────────────
-  let _searchActive = false;
+  let _searchActive = false, _lastSearchQ = '';
 
   async function searchDiary() {
     const q        = (document.getElementById('diary-search-input')?.value || '').trim();
@@ -2838,7 +2876,7 @@ const App = (() => {
     const el  = document.getElementById('diary-entries-list');
     const lbl = document.getElementById('search-result-label');
     if (el) el.innerHTML = '<div class="loading-text">Đang tìm...</div>';
-    _searchActive = true;
+    _searchActive = true; _lastSearchQ = q;
     try {
       const res     = hasAdv
         ? await API.searchDiaryAdvanced({ q, from, to, mood_min: moodMin, mood_max: moodMax, has_media: hasMedia, has_cbt: hasCbt })
@@ -2875,6 +2913,7 @@ const App = (() => {
     if (from) from.value = '';
     if (to)   to.value   = '';
     if (lbl)  { lbl.style.display = 'none'; lbl.textContent = ''; }
+    _searchActive = false; _lastSearchQ = '';
     const mMin = document.getElementById('adv-mood-min');
     const mMax = document.getElementById('adv-mood-max');
     const hm   = document.getElementById('adv-has-media');
@@ -4093,6 +4132,15 @@ const App = (() => {
       if (searchInput) { e.preventDefault(); searchInput.focus(); }
       return;
     }
+
+    // 1–9 — chọn mood nhanh khi đang ở trang nhật ký và không focus vào input
+    if (!inInput && !ctrl && /^[1-9]$/.test(e.key)) {
+      const scale = document.getElementById('diary-mood-scale');
+      if (!scale) return;
+      const score = parseInt(e.key, 10);
+      const btn = scale.querySelector(`[data-mood="${score}"]`);
+      if (btn) { btn.click(); e.preventDefault(); }
+    }
   }
 
   // ── Haptic feedback (mobile) ─────────────────────────────────────────
@@ -4100,6 +4148,64 @@ const App = (() => {
     if (!navigator.vibrate) return;
     const p = { light: [8], medium: [18], success: [8, 40, 8], error: [80] };
     navigator.vibrate(p[type] || [8]);
+  }
+
+  // ── #3 Inline field error ─────────────────────────────────────────────
+  function _showFieldError(fieldId, msg) {
+    const field = document.getElementById(fieldId);
+    if (!field) return;
+    field.classList.add('field-has-error');
+    let errEl = field.parentNode.querySelector('.field-error-msg');
+    if (!errEl) { errEl = Object.assign(document.createElement('div'), { className: 'field-error-msg' }); field.after(errEl); }
+    errEl.textContent = msg;
+    errEl.classList.add('visible');
+    field.addEventListener('input', function() {
+      this.classList.remove('field-has-error');
+      errEl.classList.remove('visible');
+    }, { once: true });
+    field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    field.focus();
+  }
+
+  // ── #8 Search term highlight ──────────────────────────────────────────
+  function _highlightTerm(text, term) {
+    if (!term || !text) return escapeHtml(text || '');
+    const escaped = escapeHtml(text);
+    const escapedTerm = escapeHtml(term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return escaped.replace(new RegExp('(' + escapedTerm + ')', 'gi'), '<mark class="search-hl">$1</mark>');
+  }
+
+  // ── #9 Focus trap in modal ────────────────────────────────────────────
+  function _trapFocus(modal) {
+    const sel = 'button:not([disabled]),input:not([disabled]),select,textarea,[tabindex]:not([tabindex="-1"])';
+    const nodes = () => [...modal.querySelectorAll(sel)];
+    function handler(e) {
+      if (e.key !== 'Tab') return;
+      const els = nodes();
+      if (!els.length) return;
+      const first = els[0], last = els[els.length - 1];
+      if (e.shiftKey) { if (document.activeElement === first) { last.focus(); e.preventDefault(); } }
+      else            { if (document.activeElement === last)  { first.focus(); e.preventDefault(); } }
+    }
+    modal.__trap = handler;
+    modal.addEventListener('keydown', handler);
+    setTimeout(() => nodes()[0]?.focus(), 60);
+  }
+  function _releaseFocus(modal) {
+    if (modal?.__trap) { modal.removeEventListener('keydown', modal.__trap); delete modal.__trap; }
+  }
+
+  // ── #14 Global error boundary ─────────────────────────────────────────
+  function _initErrorBoundary() {
+    window.onerror = (msg, src, line) => {
+      console.error('[NHK Error]', msg, src, line);
+      if (String(msg).includes('Script error') || String(src).includes('chrome-extension')) return;
+      showToast('❌ Đã xảy ra lỗi không mong đợi. Vui lòng tải lại trang.');
+    };
+    window.addEventListener('unhandledrejection', e => {
+      console.error('[NHK Unhandled]', e.reason);
+      if (e.reason?.message === 'Unauthorized') return;
+    });
   }
 
   // ── Top loading progress bar ──────────────────────────────────────────
@@ -4117,7 +4223,7 @@ const App = (() => {
     setTimeout(() => { bar.className = ''; bar.style.cssText = ''; }, 450);
   }
 
-  // ── Modal entrance animation (MutationObserver) ───────────────────────
+  // ── Modal entrance animation + focus trap (MutationObserver) ────────────
   function _initModalAnimations() {
     const replay = (overlay) => {
       const modal = overlay.querySelector('.modal');
@@ -4125,11 +4231,17 @@ const App = (() => {
       modal.style.animation = 'none';
       void modal.offsetWidth;
       modal.style.animation = '';
+      _trapFocus(modal);
     };
     const obs = new MutationObserver(muts => {
       for (const m of muts) {
-        if (m.attributeName === 'style' && m.target.style.display === 'flex')
+        if (m.attributeName !== 'style') continue;
+        if (m.target.style.display === 'flex') {
           replay(m.target);
+        } else {
+          const modal = m.target.querySelector('.modal');
+          if (modal) _releaseFocus(modal);
+        }
       }
     });
     document.querySelectorAll('.modal-overlay').forEach(el =>
@@ -4298,6 +4410,7 @@ const App = (() => {
     _initSwipeGesture();
     _initRipple();
     _initModalAnimations();
+    _initErrorBoundary();
     // v2.1 — PWA install button (chỉ hiện nếu flag bật VÀ trình duyệt đã ghi nhận beforeinstallprompt)
     if (window.FEATURES && window.FEATURES.pwa_install && _pwaPrompt) {
       const pwaBtn = document.getElementById('pwa-install-btn');
@@ -4419,7 +4532,7 @@ const App = (() => {
       const me = Auth.getUser();
       el.innerHTML = d.friends.map((f, i) => {
         const avatarHtml = f.avatar_url
-          ? `<img src="${f.avatar_url}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0">`
+          ? `<img src="${f.avatar_url}" loading="lazy" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0">`
           : `<div class="user-avatar" style="width:44px;height:44px;font-size:18px;flex-shrink:0">${f.avatar_text || f.username[0].toUpperCase()}</div>`;
         const wroteToday = f.wrote_today ? '✅ Đã viết hôm nay' : '⏳ Chưa viết hôm nay';
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
@@ -5897,5 +6010,6 @@ const App = (() => {
     exportPDF,
     toggleSidebar,closeSidebar,scrollToTop,animateCount,haptic,
     _loadReflectionHistory,_loadHabitsList,
+    _addRecentTag,_renderRecentTags,
     _confirmResolve: (val) => _confirmResolve && _confirmResolve(val)};
 })();
