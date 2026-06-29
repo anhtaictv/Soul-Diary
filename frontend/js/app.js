@@ -503,6 +503,11 @@ const App = (() => {
       if (promptCard) { promptCard.style.display = ''; loadDailyPrompt(); }
     }
     document.getElementById('companion-message-box').style.display = 'none';
+    // Hiện nút lọc nâng cao nếu flag bật (v3.0)
+    if (window.FEATURES && window.FEATURES.advanced_search) {
+      const advBtn = document.getElementById('adv-search-toggle-btn');
+      if (advBtn) advBtn.style.display = '';
+    }
     // Xuất nhật ký (diary_export flag)
     if (window.FEATURES && window.FEATURES.diary_export) {
       const exportSec = document.getElementById('diary-export-section');
@@ -2762,17 +2767,24 @@ const App = (() => {
   let _searchActive = false;
 
   async function searchDiary() {
-    const q    = (document.getElementById('diary-search-input')?.value || '').trim();
-    const from = document.getElementById('diary-search-from')?.value || '';
-    const to   = document.getElementById('diary-search-to')?.value   || '';
-    if (!q && !from && !to) return loadDiaryEntries();
+    const q        = (document.getElementById('diary-search-input')?.value || '').trim();
+    const from     = document.getElementById('diary-search-from')?.value || '';
+    const to       = document.getElementById('diary-search-to')?.value   || '';
+    const moodMin  = document.getElementById('adv-mood-min')?.value  || '';
+    const moodMax  = document.getElementById('adv-mood-max')?.value  || '';
+    const hasMedia = document.getElementById('adv-has-media')?.checked || false;
+    const hasCbt   = document.getElementById('adv-has-cbt')?.checked  || false;
+    const hasAdv   = moodMin || moodMax || hasMedia || hasCbt;
+    if (!q && !from && !to && !hasAdv) return loadDiaryEntries();
 
     const el  = document.getElementById('diary-entries-list');
     const lbl = document.getElementById('search-result-label');
     if (el) el.innerHTML = '<div class="loading-text">Đang tìm...</div>';
     _searchActive = true;
     try {
-      const res     = await API.searchDiary(q, from, to);
+      const res     = hasAdv
+        ? await API.searchDiaryAdvanced({ q, from, to, mood_min: moodMin, mood_max: moodMax, has_media: hasMedia, has_cbt: hasCbt })
+        : await API.searchDiary(q, from, to);
       const entries = res.entries || [];
       if (lbl) { lbl.style.display = ''; lbl.textContent = `Tìm thấy ${entries.length} kết quả${q ? ' cho "' + escapeHtml(q) + '"' : ''}`; }
       if (!el) return;
@@ -2786,15 +2798,37 @@ const App = (() => {
     }
   }
 
+  function toggleAdvancedSearch() {
+    const panel = document.getElementById('advanced-search-panel');
+    const btn   = document.getElementById('adv-search-toggle-btn');
+    if (!panel) return;
+    const open = panel.style.display === 'none' || !panel.style.display;
+    panel.style.display = open ? '' : 'none';
+    if (btn) btn.style.background = open ? 'var(--primary)' : '';
+    if (btn) btn.style.color      = open ? '#fff' : '';
+  }
+
   function clearSearch() {
     const q    = document.getElementById('diary-search-input');
     const from = document.getElementById('diary-search-from');
     const to   = document.getElementById('diary-search-to');
     const lbl  = document.getElementById('search-result-label');
-    if (q)   q.value   = '';
+    if (q)    q.value    = '';
     if (from) from.value = '';
     if (to)   to.value   = '';
     if (lbl)  { lbl.style.display = 'none'; lbl.textContent = ''; }
+    const mMin = document.getElementById('adv-mood-min');
+    const mMax = document.getElementById('adv-mood-max');
+    const hm   = document.getElementById('adv-has-media');
+    const hc   = document.getElementById('adv-has-cbt');
+    if (mMin) mMin.value   = '';
+    if (mMax) mMax.value   = '';
+    if (hm)   hm.checked  = false;
+    if (hc)   hc.checked  = false;
+    const panel = document.getElementById('advanced-search-panel');
+    if (panel) panel.style.display = 'none';
+    const btn = document.getElementById('adv-search-toggle-btn');
+    if (btn) { btn.style.background = ''; btn.style.color = ''; }
     _searchActive = false;
     loadDiaryEntries();
   }
@@ -5578,7 +5612,7 @@ const App = (() => {
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   }
 
-  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,applyTheme,toggleThemePicker,loadMoreDiary,
+  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,toggleAdvancedSearch,applyTheme,toggleThemePicker,loadMoreDiary,
     pinInput,pinDelete,setPinLock,managePinLock,installPWA,showMemoryCard,createFutureLetter,deleteFutureLetter,exportUserData,
     openPMRModal,openBodyScanModal,openGroundingModal,startGrounding,toggleGroundingItem,nextGroundingStep,openGratitudeModal,gratitudeNext,gratitudeBack,
     handleAvatarUpload,removeAvatar,_applyWritingHour,renderEmotionRadar,

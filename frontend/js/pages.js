@@ -191,10 +191,29 @@ const PAGES = {
             <input type="text" class="diary-search-input" id="diary-search-input" placeholder="🔍 Tìm theo từ khoá, cảm xúc, tag..." onkeydown="if(event.key==='Enter')App.searchDiary()" />
             <button class="diary-search-btn" onclick="App.searchDiary()">Tìm</button>
           </div>
-          <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <div style="display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap">
             <input type="date" class="text-input" id="diary-search-from" style="flex:1;min-width:120px;padding:8px 10px;font-size:12px" title="Từ ngày" />
             <input type="date" class="text-input" id="diary-search-to"   style="flex:1;min-width:120px;padding:8px 10px;font-size:12px" title="Đến ngày" />
+            <button id="adv-search-toggle-btn" class="btn-outline" onclick="App.toggleAdvancedSearch()" style="display:none;font-size:12px;padding:8px 12px">🔧 Lọc</button>
             <button class="btn-outline" onclick="App.clearSearch()" style="font-size:12px;padding:8px 12px">✕ Xoá</button>
+          </div>
+          <!-- Bộ lọc nâng cao (v3.0 — advanced_search flag) -->
+          <div id="advanced-search-panel" style="display:none;padding:10px 12px;margin-bottom:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px">
+            <div style="font-size:11px;font-weight:600;color:var(--text-hint);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Bộ lọc nâng cao</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:12px;color:var(--text-hint)">Mood:</span>
+                <input type="number" id="adv-mood-min" min="1" max="10" placeholder="Từ" style="width:52px;padding:5px 7px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)" />
+                <span style="font-size:12px;color:var(--text-hint)">–</span>
+                <input type="number" id="adv-mood-max" min="1" max="10" placeholder="Đến" style="width:52px;padding:5px 7px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)" />
+              </div>
+              <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:var(--text)">
+                <input type="checkbox" id="adv-has-media" /> 📷 Có ảnh/âm thanh
+              </label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:var(--text)">
+                <input type="checkbox" id="adv-has-cbt" /> 🧠 CBT
+              </label>
+            </div>
           </div>
           <div id="search-result-label" class="search-result-label" style="display:none"></div>
           <div id="diary-entries-list"><div class="loading-text">Đang tải...</div></div>
