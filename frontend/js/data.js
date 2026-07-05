@@ -14,19 +14,23 @@ const MOOD_DATA = {
 
 const EMOTION_TAGS = ['😊 Vui vẻ','😔 Buồn bã','😰 Lo lắng','😤 Tức giận','😴 Mệt mỏi','😌 Bình yên','🤩 Hứng khởi','😕 Bối rối'];
 
-// Lịch sử phiên bản — dùng để tính "phiên bản hiện tại" hiển thị ở modal Giới thiệu.
-// Bản không có flags (v1.0/v1.01/v1.2) là baseline luôn active. Bản có flags chỉ được
-// tính là "hiện tại" khi TẤT CẢ flag của bản đó đã được bật trong Admin > Tính năng.
-const VERSION_LADDER = [
-  { version:'v1.0',  title:'Ra mắt ứng dụng',                 flags:[] },
-  { version:'v1.01', title:'Hoàn thiện nền tảng',              flags:[] },
-  { version:'v1.2',  title:'Giữ chân & Nâng cấp trải nghiệm',  flags:[] },
-  { version:'v1.3',  title:'AI Thấu hiểu cảm xúc',             flags:['ai_emotion_analysis','enhanced_mental_dashboard','cbt_guided_writing'] },
-  { version:'v1.4',  title:'Check-in Tâm lý',                  flags:['weekly_checkin'] },
-  { version:'v1.5',  title:'Nuôi dưỡng Tâm hồn',               flags:['mood_calendar','soul_companion','mood_ambience','soul_seed'] },
-  { version:'v1.6',  title:'Lan tỏa Tâm hồn',                  flags:['mood_wrapped_card'] },
-  { version:'v1.7',  title:'Thử thách & Cộng đồng',             flags:['challenge_system','diary_export','custom_reminder','community_wall'] },
-  { version:'v1.8',  title:'Soul Chat & Học liệu Toàn diện',    flags:['soul_chat','sleep_tracking','study_calendar','mini_courses','year_review','personal_goals'] },
+// Mức độ thông báo hệ thống (v3.1) — nguồn dữ liệu chung cho cả app.js (banner người dùng)
+// và admin.js (bảng quản trị + form tạo mới), tránh khai báo lặp lại 3 nơi khác nhau.
+const ANNOUNCEMENT_SEVERITIES = {
+  info:     { icon:'ℹ️', label:'Thông tin', bg:'#eff6ff', border:'#3b82f6' },
+  warning:  { icon:'⚠️', label:'Cảnh báo',  bg:'#fffbeb', border:'#f59e0b' },
+  critical: { icon:'🚨', label:'Khẩn cấp',  bg:'#fef2f2', border:'#ef4444' },
+};
+
+// Phiên bản gốc trước khi có Feature Flags (v1.0/v1.01/v1.2) — không có flag nào trong DB
+// nên phải khai báo cứng, luôn coi là đã active. Từ v1.3 trở đi, "phiên bản hiện tại" hiển thị
+// ở modal Giới thiệu được tính TỰ ĐỘNG từ dữ liệu FeatureFlags (xem computeCurrentVersion trong
+// app.js) — mỗi khi admin bật đủ flag của 1 phiên bản mới trong Admin > Tính năng, modal tự cập
+// nhật theo, không cần sửa code ở đây nữa.
+const BASELINE_VERSIONS = [
+  { version:'v1.0',  title:'Ra mắt ứng dụng' },
+  { version:'v1.01', title:'Hoàn thiện nền tảng' },
+  { version:'v1.2',  title:'Giữ chân & Nâng cấp trải nghiệm' },
 ];
 
 const ARTICLES = [

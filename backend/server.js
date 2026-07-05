@@ -64,8 +64,8 @@ const apiLimiter = rateLimit({
   keyGenerator: safeKeyGenerator,
 });
 
-// 3mb — đủ cho payload nhật ký kèm bản ghi âm base64 ~30 giây (chặn kích thước thật ở routes/diary.js)
-app.use(express.json({ limit: '3mb' }));
+// 26mb — đủ cho worst-case 4 ảnh x 4MB + audio 8MB (~24MB) cộng dồn (chặn kích thước thật/cụ thể ở routes/diary.js)
+app.use(express.json({ limit: '26mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // ── Routes ────────────────────────────────────────────────────────────────
@@ -94,6 +94,7 @@ app.use('/api/habits',      apiLimiter, require('./routes/habits'));
 app.use('/api/quotes',      apiLimiter, require('./routes/quotes'));
 app.use('/api/notes',          apiLimiter, require('./routes/notes'));
 app.use('/api/notifications',  apiLimiter, require('./routes/notifications'));
+app.use('/api/announcements',  apiLimiter, require('./routes/announcements'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -311,7 +312,7 @@ cron.schedule('0 1 * * *', async () => {
     const db = await getPool();
     const result = await db.request().query(`
       SELECT fl.id, fl.title, fl.content, fl.send_date,
-             u.email, u.fullname
+             u.email
       FROM FutureLetters fl
       JOIN Users u ON u.id = fl.user_id
       WHERE fl.sent = 0

@@ -38,9 +38,69 @@ const API = (() => {
       return data;
     } catch (err) {
       clearTimeout(timeoutId);
-      if (err.name === 'AbortError') throw new Error('Yêu cầu quá thời gian chờ. Vui lòng thử lại.');
+      if (err.name === 'AbortError') {
+        const timeoutErr = new Error('Yêu cầu quá thời gian chờ. Vui lòng thử lại.');
+        timeoutErr.isNetworkError = true; // timeout cũng tính là lỗi kết nối, không phải lỗi hợp lệ từ server
+        throw timeoutErr;
+      }
+      if (err instanceof TypeError) err.isNetworkError = true; // fetch() thất bại thẳng (mất mạng/DNS/CORS)
       throw err;
     }
+  }
+
+  // ── Hàng đợi thao tác offline (v3.3, flag offline_draft_queue) ──────────
+  // Khi mất mạng, nhật ký mới/xoá nhật ký được lưu tạm ở localStorage thay vì báo lỗi mất trắng,
+  // và tự đồng bộ lên server khi có mạng lại (App.js gọi flushPendingEntries/flushPendingDeletes
+  // qua sự kiện 'online'). Không áp dụng cho sửa nhật ký (updateEntry) vì tính năng đó hiện chưa
+  // có UI nào gọi tới.
+  const PENDING_ENTRIES_KEY = 'nhk_pending_entries';
+  const PENDING_DELETES_KEY = 'nhk_pending_deletes';
+
+  function _getPending(key) {
+    try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch (_) { return []; }
+  }
+  function _savePending(key, list) {
+    try { localStorage.setItem(key, JSON.stringify(list)); return true; }
+    catch (_) { return false; } // vd QuotaExceededError khi localStorage đầy
+  }
+  function _queuePendingEntry(body) {
+    const list = _getPending(PENDING_ENTRIES_KEY);
+    const tempId = 'pending-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+    list.push({ tempId, body, ts: Date.now() });
+    if (!_savePending(PENDING_ENTRIES_KEY, list))
+      throw new Error('Không thể lưu nháp offline (bộ nhớ đầy). Vui lòng thử lại khi có mạng.');
+    return { queued: true, tempId };
+  }
+  function _queuePendingDelete(id) {
+    const list = _getPending(PENDING_DELETES_KEY);
+    list.push({ id, ts: Date.now() });
+    if (!_savePending(PENDING_DELETES_KEY, list))
+      throw new Error('Không thể lưu thao tác xoá offline (bộ nhớ đầy). Vui lòng thử lại khi có mạng.');
+    return { queued: true };
+  }
+  async function flushPendingEntries() {
+    const list = _getPending(PENDING_ENTRIES_KEY);
+    if (!list.length || !navigator.onLine) return { synced: 0, remaining: list.length };
+    let synced = 0;
+    const remaining = [];
+    for (const item of list) {
+      try { await request('/diary', { method: 'POST', body: item.body }); synced++; }
+      catch (_) { remaining.push(item); } // vẫn lỗi (mất mạng giữa chừng hoặc lỗi thật) — giữ lại thử sau
+    }
+    _savePending(PENDING_ENTRIES_KEY, remaining);
+    return { synced, remaining: remaining.length };
+  }
+  async function flushPendingDeletes() {
+    const list = _getPending(PENDING_DELETES_KEY);
+    if (!list.length || !navigator.onLine) return { synced: 0, remaining: list.length };
+    let synced = 0;
+    const remaining = [];
+    for (const item of list) {
+      try { await request(`/diary/${item.id}`, { method: 'DELETE' }); synced++; }
+      catch (_) { remaining.push(item); }
+    }
+    _savePending(PENDING_DELETES_KEY, remaining);
+    return { synced, remaining: remaining.length };
   }
 
   return {
@@ -89,9 +149,31 @@ const API = (() => {
     shareEntry:       (id)                   => request(`/diary/${id}/share`, { method: 'POST' }),
     revokeShare:      (id)                   => request(`/diary/${id}/share`, { method: 'DELETE' }),
     getSharedEntry:   (token)                => request(`/diary/share/${token}`),
-    createEntry:      (body)                 => request('/diary',       { method: 'POST',   body }),
+    createEntry:      async (body) => {
+      const offlineQueueOn = window.FEATURES && window.FEATURES.offline_draft_queue;
+      if (offlineQueueOn && !navigator.onLine) return _queuePendingEntry(body);
+      try {
+        return await request('/diary', { method: 'POST', body });
+      } catch (err) {
+        if (offlineQueueOn && err.isNetworkError) return _queuePendingEntry(body);
+        throw err;
+      }
+    },
+    flushPendingEntries:    flushPendingEntries,
+    getPendingEntryCount:   () => _getPending(PENDING_ENTRIES_KEY).length,
+    flushPendingDeletes:    flushPendingDeletes,
+    getPendingDeleteCount:  () => _getPending(PENDING_DELETES_KEY).length,
     updateEntry:      (id, body)             => request(`/diary/${id}`,  { method: 'PUT',    body }),
-    deleteEntry:      (id)                   => request(`/diary/${id}`,  { method: 'DELETE' }),
+    deleteEntry:      async (id) => {
+      const offlineQueueOn = window.FEATURES && window.FEATURES.offline_draft_queue;
+      if (offlineQueueOn && !navigator.onLine) return _queuePendingDelete(id);
+      try {
+        return await request(`/diary/${id}`, { method: 'DELETE' });
+      } catch (err) {
+        if (offlineQueueOn && err.isNetworkError) return _queuePendingDelete(id);
+        throw err;
+      }
+    },
 
     // Web Push
     getPushVapidKey:  ()    => request('/push/vapid-public-key'),
@@ -108,6 +190,13 @@ const API = (() => {
     releaseVersion:   (body)       => request('/features/admin-list/release',       { method: 'POST',   body }),
     scheduleVersion:  (body)       => request('/features/admin-list/schedule',      { method: 'POST',   body }),
     revokeVersion:    (body)       => request('/features/admin-list/revoke',        { method: 'POST',   body }),
+
+    // Thông báo hệ thống (banner)
+    getActiveAnnouncements:  ()          => request('/announcements/active'),
+    getAdminAnnouncements:   ()          => request('/announcements/admin-list'),
+    createAnnouncement:      (body)      => request('/announcements',      { method: 'POST',   body }),
+    updateAnnouncement:      (id, body)  => request(`/announcements/${id}`, { method: 'PUT',    body }),
+    deleteAnnouncement:      (id)        => request(`/announcements/${id}`, { method: 'DELETE' }),
 
     // Check-in Sức khỏe Tinh thần hàng tuần
     getCheckinStatus:  ()        => request('/check-in/status'),

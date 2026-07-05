@@ -13,7 +13,7 @@ router.get('/export', async (req, res) => {
 
     const [userR, entriesR, checkinsR, lettersR, goalsR] = await Promise.all([
       db.request().input('uid', sql.Int, uid)
-        .query('SELECT id, username, email, fullname, created_at, streak, max_streak FROM Users WHERE id = @uid'),
+        .query('SELECT id, username, email, full_name, created_at, streak, max_streak FROM Users WHERE id = @uid'),
       db.request().input('uid', sql.Int, uid)
         .query('SELECT id, mood_score, event_text, thoughts, gratitude, tags, created_at FROM DiaryEntries WHERE user_id = @uid ORDER BY created_at DESC'),
       db.request().input('uid', sql.Int, uid)

@@ -20,6 +20,8 @@ const App = (() => {
   let recordSeconds = 0;
   let recordedAudioData = null;   // data URI base64 của bản ghi âm hiện tại — gửi kèm khi lưu nhật ký
   let MAX_RECORD_SECONDS = 30;  // được cập nhật theo flag long_recording khi init
+  let speechRecognizer = null;  // Web Speech API — chuyển giọng nói thành văn bản song song lúc ghi âm (flag voice_transcript)
+  let speechFinalText  = '';    // phần transcript đã "final" (không đổi nữa) tích luỹ qua các đoạn onresult
   let uploadedPhotos= [];
   let lastWeeklySummary = null; // { thisDays, thisAvg, diff, topTags } — dữ liệu tuần gần nhất, dùng để vẽ thẻ Mood Wrapped
   let musicTracks     = [];
@@ -703,9 +705,10 @@ const App = (() => {
     else selectedTags = selectedTags.filter(t=>t!==tag);
   }
 
-  // Photo upload — tối đa MAX_PHOTOS ảnh, mỗi ảnh tối đa 2MB (giới hạn khớp với backend)
+  // Photo upload — tối đa MAX_PHOTOS ảnh. Giới hạn file gốc nới rộng vì ảnh luôn được resize/nén
+  // qua canvas trước khi gửi lên (compressImage) — dung lượng lưu trữ thực tế không phụ thuộc file gốc.
   const MAX_PHOTOS = 4;
-  const MAX_PHOTO_FILE_SIZE = 2 * 1024 * 1024;
+  const MAX_PHOTO_FILE_SIZE = 10 * 1024 * 1024;
   const PHOTO_MAX_DIM      = 1280; // resize cạnh dài nhất xuống tối đa 1280px trước khi gửi lên server
   const PHOTO_JPEG_QUALITY = 0.72; // nén JPEG — giảm phần lớn dung lượng so với ảnh gốc từ camera điện thoại
 
@@ -741,7 +744,7 @@ const App = (() => {
         return;
       }
       if (file.size > MAX_PHOTO_FILE_SIZE) {
-        showToast(`⚠️ Ảnh "${file.name}" quá lớn (tối đa 2MB).`);
+        showToast(`⚠️ Ảnh "${file.name}" quá lớn (tối đa 10MB).`);
         return;
       }
       const compressed = await compressImage(file);
@@ -787,6 +790,7 @@ const App = (() => {
         document.getElementById('record-btn').classList.add('recording');
         document.getElementById('record-label').textContent = 'Đang ghi... Nhấn để dừng';
         document.getElementById('record-timer').style.display = 'flex';
+        if (window.FEATURES && window.FEATURES.voice_transcript) startSpeechRecognition();
         recordInterval = setInterval(() => {
           recordSeconds++;
           const m = Math.floor(recordSeconds/60), s = recordSeconds%60;
@@ -839,6 +843,59 @@ const App = (() => {
     document.getElementById('record-btn').classList.remove('recording');
     document.getElementById('record-label').textContent = 'Ghi âm xong ✅';
     document.getElementById('record-timer').style.display = 'none';
+    if (window.FEATURES && window.FEATURES.voice_transcript) stopSpeechRecognition();
+  }
+
+  // ── Speech-to-text (v3.3, flag voice_transcript) — chạy song song lúc ghi âm, ────
+  // tự điền văn bản nhận diện được vào ô "Bắt đầu viết nhật ký" khi dừng ghi âm.
+  function startSpeechRecognition() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const hintEl = document.getElementById('voice-transcript-hint');
+    if (!SR) { if (hintEl) { hintEl.style.display = 'block'; hintEl.textContent = '🎙️ Trình duyệt này chưa hỗ trợ chuyển giọng nói thành văn bản.'; } return; }
+    speechFinalText = '';
+    speechRecognizer = new SR();
+    speechRecognizer.lang = 'vi-VN';
+    speechRecognizer.continuous = true;
+    speechRecognizer.interimResults = true;
+    speechRecognizer.onresult = e => {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) speechFinalText += t + ' ';
+        else interim += t;
+      }
+      if (hintEl) hintEl.textContent = '🎙️ ' + (speechFinalText + interim).trim();
+    };
+    speechRecognizer.onerror = () => {};
+    speechRecognizer.onend = () => {
+      // Một số trình duyệt tự dừng recognition sau khoảng lặng dài — khởi động lại nếu vẫn đang ghi âm
+      if (isRecording && speechRecognizer) { try { speechRecognizer.start(); } catch(_) {} }
+    };
+    try {
+      speechRecognizer.start();
+      if (hintEl) { hintEl.style.display = 'block'; hintEl.textContent = '🎙️ Đang nghe...'; }
+    } catch(_) {}
+  }
+
+  function stopSpeechRecognition() {
+    const hintEl = document.getElementById('voice-transcript-hint');
+    if (speechRecognizer) {
+      const rec = speechRecognizer;
+      speechRecognizer = null; // xoá trước để onend không tự khởi động lại
+      rec.onend = null;
+      try { rec.stop(); } catch(_) {}
+    }
+    const finalText = speechFinalText.trim();
+    if (finalText) {
+      const ta = document.getElementById('diary-event');
+      if (ta) {
+        ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + finalText;
+        ta.dispatchEvent(new Event('input'));
+      }
+      if (hintEl) hintEl.textContent = '✅ Đã tự điền văn bản từ giọng nói vào nhật ký.';
+    } else if (hintEl && hintEl.style.display === 'block') {
+      hintEl.textContent = '⚠️ Không nhận diện được giọng nói.';
+    }
   }
 
   // Đưa form nhật ký về trạng thái trống — tạo hiệu ứng "đã lưu" rõ ràng sau khi bấm Lưu
@@ -912,6 +969,12 @@ const App = (() => {
       // #2: save success pulse on form card
       const card = document.getElementById('diary-form-card');
       if (card) { card.classList.add('save-success-flash'); setTimeout(() => card.classList.remove('save-success-flash'), 700); }
+      if (res && res.queued) {
+        // v3.3: mất mạng — nhật ký đã lưu tạm ở máy, sẽ tự đồng bộ khi có mạng lại (xem initOfflineDetection)
+        _clearDraft();
+        showToast('📥 Không có mạng — đã lưu nháp, sẽ tự động đồng bộ khi có mạng trở lại.');
+        return;
+      }
       const user = Auth.getUser();
       if (user) {
         user.streak = res.streak;
@@ -950,7 +1013,16 @@ const App = (() => {
     const row = btn?.closest('.entry-item');
     if (row) { row.classList.add('deleting'); await new Promise(r => setTimeout(r, 240)); }
     btn.textContent = '...';
-    try { await API.deleteEntry(id); await loadDiaryEntries(); showToast('🗑 Đã xóa.'); }
+    try {
+      const res = await API.deleteEntry(id);
+      if (res && res.queued) {
+        // v3.3: mất mạng — server chưa xoá, giữ dòng đã ẩn optimistic thay vì load lại (sẽ vẫn thấy entry cũ)
+        showToast('📥 Không có mạng — sẽ xoá khi có mạng trở lại.');
+        return;
+      }
+      await loadDiaryEntries();
+      showToast('🗑 Đã xóa.');
+    }
     catch(err) { if (row) row.classList.remove('deleting'); showToast('❌ Không thể xóa: '+err.message); }
   }
 
@@ -2982,24 +3054,91 @@ const App = (() => {
     }
   }
 
+  // ── v3.1: Thông báo hệ thống (banner toàn app, mọi trang) ────────────────
+  // Bảng màu/icon severity dùng chung từ data.js (ANNOUNCEMENT_SEVERITIES) — xem admin.js cho form tạo/sửa.
+  async function loadAnnouncementBanner() {
+    const el = document.getElementById('global-announcement-banner');
+    if (!el || !window.FEATURES || !window.FEATURES.system_announcements) return;
+    try {
+      const { announcements } = await API.getActiveAnnouncements();
+      if (!announcements || !announcements.length) return;
+      el.innerHTML = announcements.map(a => {
+        const s = ANNOUNCEMENT_SEVERITIES[a.severity] || ANNOUNCEMENT_SEVERITIES.info;
+        return `
+          <div class="announcement-banner" id="announcement-${a.id}" style="display:flex;align-items:flex-start;gap:10px;padding:12px 16px;background:${s.bg};border-bottom:3px solid ${s.border}">
+            <span style="font-size:18px;flex-shrink:0">${s.icon}</span>
+            <div style="flex:1;font-size:13px;line-height:1.5;white-space:pre-wrap">${escapeHtml(a.message)}</div>
+            <button onclick="document.getElementById('announcement-${a.id}').remove()" style="flex-shrink:0;background:none;border:none;font-size:16px;cursor:pointer;color:var(--text-muted);line-height:1;padding:2px 6px" aria-label="Đóng thông báo">✕</button>
+          </div>`;
+      }).join('');
+    } catch (e) { /* im lặng — banner không phải tính năng thiết yếu */ }
+  }
+
+  // ── Accessibility tools (v3.3, flag accessibility_tools) ────────────────
+  const A11Y_FONT_SIZES = ['large', 'xlarge']; // 'normal' = mặc định, không cần class riêng
+  function applyA11ySettings() {
+    const size = localStorage.getItem('nhk_a11y_fontsize') || 'normal';
+    A11Y_FONT_SIZES.forEach(s => document.body.classList.remove('a11y-font-' + s));
+    if (A11Y_FONT_SIZES.includes(size)) document.body.classList.add('a11y-font-' + size);
+    document.body.classList.toggle('a11y-high-contrast', localStorage.getItem('nhk_a11y_contrast') === '1');
+  }
+  function setA11yFontSize(size) {
+    localStorage.setItem('nhk_a11y_fontsize', size);
+    applyA11ySettings();
+    document.querySelectorAll('.a11y-fontsize-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.size === size));
+  }
+  function toggleHighContrast(on) {
+    localStorage.setItem('nhk_a11y_contrast', on ? '1' : '0');
+    applyA11ySettings();
+  }
+
   // ── Feature flags — tải tại khởi động, các tính năng mới dùng window.FEATURES.xxx ──
   async function loadFeatures() {
     try {
       const data = await API.getFeatures();
       window.FEATURES = {};
-      (data.features || []).forEach(f => { window.FEATURES[f.key] = !!f.enabled; });
-    } catch(e) { window.FEATURES = {}; }
+      window.FEATURE_LIST = data.features || [];
+      window.FEATURE_LIST.forEach(f => { window.FEATURES[f.key] = !!f.enabled; });
+    } catch(e) { window.FEATURES = {}; window.FEATURE_LIST = []; }
     window.CURRENT_VERSION = computeCurrentVersion();
   }
 
-  // Phiên bản hiện tại = mốc cao nhất trong VERSION_LADDER mà TẤT CẢ flag của nó đã bật
-  // (mốc không có flags coi như baseline, luôn tính là active).
+  function _versionSortNum(v) {
+    const m = /v(\d+)\.(\d+)/.exec(v || '');
+    return m ? parseInt(m[1]) * 1000 + parseInt(m[2]) : 0;
+  }
+
+  // Phiên bản hiện tại hiển thị ở modal Giới thiệu = mốc cao nhất mà TẤT CẢ flag của MỘT ĐỢT
+  // phát hành (cùng version + cùng version_title) đã được bật trong Admin > Tính năng. Tự động
+  // suy ra từ window.FEATURE_LIST — không cần sửa code mỗi khi ra bản mới, chỉ cần seed flag
+  // đúng version rồi bật trong admin panel. BASELINE_VERSIONS chỉ dùng cho các bản trước khi có
+  // Feature Flags (không có flag nào để soi từ DB).
+  //
+  // Nhóm theo cặp (version, version_title) thay vì chỉ version: một version có thể gồm nhiều
+  // đợt phát hành con với title khác nhau (vd v1.7 có 3 title, v1.8 có 2 title) — nhóm theo cặp
+  // để chỉ cần MỘT đợt con được bật đủ là version đó coi như "đã đạt", và title hiển thị luôn
+  // khớp đúng đợt đó thay vì bị ghi đè bởi title của đợt khác cùng version.
   function computeCurrentVersion() {
-    let current = VERSION_LADDER[0];
-    for (const v of VERSION_LADDER) {
-      const allOn = v.flags.length === 0 || v.flags.every(k => window.FEATURES && window.FEATURES[k]);
-      if (allOn) current = v;
-    }
+    let current    = BASELINE_VERSIONS[BASELINE_VERSIONS.length - 1];
+    let currentNum = _versionSortNum(current.version);
+
+    const groups = {};
+    (window.FEATURE_LIST || []).forEach(f => {
+      if (!f.version) return;
+      const title = f.version_title || f.version;
+      const key   = f.version + '||' + title;
+      if (!groups[key]) groups[key] = { version: f.version, title, allOn: true };
+      if (!f.enabled) groups[key].allOn = false;
+    });
+
+    Object.values(groups).forEach(g => {
+      const num = _versionSortNum(g.version);
+      if (g.allOn && num > currentNum) {
+        current = { version: g.version, title: g.title };
+        currentNum = num;
+      }
+    });
     return current;
   }
 
@@ -3028,6 +3167,14 @@ const App = (() => {
     if (un) un.value = user.username  || '';
     if (em) em.value = user.email     || '';
     if (fn) fn.value = user.full_name || '';
+
+    // Trợ năng — cỡ chữ + tương phản cao (gated)
+    const a11yTab = document.getElementById('settings-tab-accessibility');
+    if (a11yTab) a11yTab.style.display = (window.FEATURES && window.FEATURES.accessibility_tools) ? '' : 'none';
+    const curSize = localStorage.getItem('nhk_a11y_fontsize') || 'normal';
+    document.querySelectorAll('.a11y-fontsize-btn').forEach(b => b.classList.toggle('active', b.dataset.size === curSize));
+    const contrastToggle = document.getElementById('a11y-contrast-toggle');
+    if (contrastToggle) contrastToggle.checked = localStorage.getItem('nhk_a11y_contrast') === '1';
 
     // Bio + avatar (gated)
     const hasAvatarBio = !!(window.FEATURES && window.FEATURES.avatar_bio);
@@ -3568,11 +3715,15 @@ const App = (() => {
 
   // ── Tổng kết Năm (v1.8) ───────────────────────────────────────────────
   let yearReviewYear = new Date().getFullYear();
+  let _lastYearReviewData = null; // dữ liệu năm đang xem — dùng lại cho Xuất ảnh tổng kết (v3.3) thay vì gọi API lần nữa
+  let _yearReviewReqId = 0; // tăng dần mỗi lần gọi loadYearReview — bỏ qua response đến muộn/sai thứ tự khi bấm đổi năm liên tục
 
   async function initYearReviewPage() {
     yearReviewYear = new Date().getFullYear();
     const yearEl = document.getElementById('year-review-year');
     if (yearEl) yearEl.textContent = yearReviewYear;
+    const wrapBtn = document.getElementById('year-wrap-card-btn');
+    if (wrapBtn) wrapBtn.style.display = (window.FEATURES && window.FEATURES.year_wrap_card) ? '' : 'none';
     await loadYearReview();
   }
 
@@ -3586,11 +3737,24 @@ const App = (() => {
   async function loadYearReview() {
     const el = document.getElementById('year-review-content');
     if (!el) return;
+    // reqId chặn race khi bấm đổi năm liên tục: nếu 1 request cũ hơn trả về sau 1 request mới hơn
+    // (network resolve không theo thứ tự gọi), response cũ bị bỏ qua thay vì ghi đè dữ liệu đúng.
+    const reqId = ++_yearReviewReqId;
+    const requestedYear = yearReviewYear;
+    // Xoá dữ liệu năm cũ ngay khi bắt đầu tải năm mới — tránh trường hợp bấm "Xuất ảnh tổng kết"
+    // trong lúc đang chuyển năm thì ảnh bị dán nhãn năm mới nhưng số liệu vẫn là của năm cũ.
+    _lastYearReviewData = null;
     el.innerHTML = '<div class="loading-text">Đang tải...</div>';
     try {
-      const data = await API.getYearReview(yearReviewYear);
-      renderYearReview(data, yearReviewYear);
-    } catch(e) { el.innerHTML = '<div class="loading-text">Không thể tải dữ liệu.</div>'; }
+      const data = await API.getYearReview(requestedYear);
+      if (reqId !== _yearReviewReqId) return; // đã có request mới hơn chạy sau — bỏ qua kết quả này
+      _lastYearReviewData = data;
+      renderYearReview(data, requestedYear);
+    } catch(e) {
+      if (reqId !== _yearReviewReqId) return;
+      _lastYearReviewData = null;
+      el.innerHTML = '<div class="loading-text">Không thể tải dữ liệu.</div>';
+    }
   }
 
   function renderYearReview(data, year) {
@@ -3838,6 +4002,89 @@ const App = (() => {
     a.href = canvas.toDataURL('image/png');
     a.click();
     showToast('✅ Đã tạo Memory Card!');
+  }
+
+  // ── Sổ tổng kết cuối năm — Canvas → PNG (v3.3, flag year_wrap_card) ──────
+  // Tái dùng đúng pattern vẽ + font của showMemoryCard(), nguồn dữ liệu lấy lại
+  // từ _lastYearReviewData đã fetch sẵn ở trang Tổng kết Năm, không gọi API lần nữa.
+  function showYearInReviewCard() {
+    const data = _lastYearReviewData;
+    if (!data || !data.summary || !data.summary.total_entries) {
+      showToast('⚠️ Chưa có dữ liệu năm này để tạo sổ tổng kết.');
+      return;
+    }
+    const { summary, topTags, bestMonth } = data;
+    const theme = localStorage.getItem('nhk_theme') || '';
+    const themeGrads = {
+      '':         ['#2563eb','#8b5cf6'],
+      lavender:   ['#7C3AED','#6366F1'],
+      rose:       ['#DB2777','#9333EA'],
+      emerald:    ['#059669','#0D9488'],
+      warm:       ['#B45309','#D97706'],
+      ocean:      ['#0891B2','#0D9488'],
+      midnight:   ['#4338CA','#6366F1'],
+    };
+    const [c1, c2] = themeGrads[theme] || themeGrads[''];
+    const VN_FONT = '"Segoe UI", "Noto Sans", system-ui, -apple-system, Arial, sans-serif';
+    const topTag = topTags && topTags.length ? topTags[0].tag : null;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 900; canvas.height = 540;
+    const ctx = canvas.getContext('2d');
+
+    const grad = ctx.createLinearGradient(0, 0, 900, 540);
+    grad.addColorStop(0, c1); grad.addColorStop(1, c2);
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.roundRect(0, 0, 900, 540, 24); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.beginPath(); ctx.roundRect(0, 0, 900, 540, 24); ctx.fill();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.beginPath(); ctx.arc(780, 80, 130, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(820, 460, 90, 0, Math.PI * 2); ctx.fill();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.96)';
+    ctx.font = `bold 40px ${VN_FONT}`;
+    ctx.fillText(`Sổ tổng kết ${yearReviewYear}`, 60, 90);
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = `17px ${VN_FONT}`;
+    ctx.fillText('Hành trình cảm xúc của bạn — Soul Diary', 60, 118);
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(60, 140); ctx.lineTo(840, 140); ctx.stroke();
+
+    const stats = [
+      { val: summary.total_entries + ' trang',  lbl: '📖 Nhật ký đã viết',     x: 60,  y: 240 },
+      { val: (summary.avg_mood ? parseFloat(summary.avg_mood).toFixed(1) : '—'), lbl: '😊 Mood trung bình', x: 320, y: 240 },
+      { val: (summary.max_streak || 0) + ' ngày', lbl: '🔥 Chuỗi dài nhất',    x: 580, y: 240 },
+      { val: (summary.active_months || 0) + ' tháng', lbl: '📅 Tháng có nhật ký', x: 60,  y: 330 },
+      { val: topTag ? '#' + topTag : '—',       lbl: '🏷️ Tag nổi bật nhất',    x: 320, y: 330 },
+      { val: bestMonth ? 'Tháng ' + bestMonth.month : '—', lbl: '🌟 Tháng tốt nhất', x: 580, y: 330 },
+    ];
+    stats.forEach(s => {
+      ctx.fillStyle = 'rgba(255,255,255,0.96)';
+      ctx.font = `bold 34px ${VN_FONT}`;
+      ctx.fillText(s.val, s.x, s.y);
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.font = `14px ${VN_FONT}`;
+      ctx.fillText(s.lbl, s.x, s.y + 26);
+    });
+
+    ctx.fillStyle = 'rgba(255,255,255,0.72)';
+    ctx.font = `italic 19px ${VN_FONT}`;
+    ctx.fillText('"Mỗi trang nhật ký là một bước chữa lành."', 60, 430);
+
+    const today = new Date().toLocaleDateString('vi-VN', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.font = `13px ${VN_FONT}`;
+    ctx.fillText(today, 60, 498);
+
+    const a = document.createElement('a');
+    a.download = `soul-diary-tong-ket-${yearReviewYear}.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+    showToast('✅ Đã tạo sổ tổng kết năm!');
   }
 
   // ── Weekly Missions (v2.0) ──────────────────────────────────────────
@@ -4320,12 +4567,29 @@ const App = (() => {
     window.addEventListener('online',  update);
     window.addEventListener('offline', update);
     update();
+
+    // v3.3 (flag offline_draft_queue): khi có mạng trở lại, tự đồng bộ nhật ký + thao tác xoá đã lưu tạm lúc mất mạng
+    if (window.FEATURES && window.FEATURES.offline_draft_queue) {
+      const flushAll = async () => {
+        const [created, deleted] = await Promise.all([API.flushPendingEntries(), API.flushPendingDeletes()]);
+        if (created.synced > 0 || deleted.synced > 0) {
+          if (created.synced > 0) showToast(`✅ Đã đồng bộ ${created.synced} nhật ký viết lúc mất mạng.`);
+          if (deleted.synced > 0) showToast(`🗑 Đã đồng bộ ${deleted.synced} thao tác xoá lúc mất mạng.`);
+          if (document.getElementById('page-diary')?.classList.contains('active')) loadDiaryEntries();
+        }
+        if (created.remaining > 0 || deleted.remaining > 0)
+          showToast(`⚠️ Còn ${created.remaining + deleted.remaining} thao tác chưa đồng bộ được, sẽ thử lại sau.`);
+      };
+      window.addEventListener('online', flushAll);
+      if (navigator.onLine && (API.getPendingEntryCount() > 0 || API.getPendingDeleteCount() > 0)) flushAll();
+    }
   }
 
   // ── Init ─────────────────────────────────────────────────────────────
   async function init() {
     applyDarkMode(localStorage.getItem('nhk_dark') === '1');
     applyTheme(localStorage.getItem('nhk_theme') || '');
+    applyA11ySettings();
     document.querySelectorAll('.nav-item').forEach(btn => btn.addEventListener('click', () => {
       nav(btn.dataset.page);
       closeSidebar();
@@ -4368,6 +4632,7 @@ const App = (() => {
     document.getElementById('template-picker-modal')?.addEventListener('click',e=>{if(e.target===e.currentTarget)closeTemplatePicker();});
     document.getElementById('photo-lightbox').addEventListener('click',e=>{if(e.target===e.currentTarget)closeLightbox();});
     await loadFeatures();
+    loadAnnouncementBanner();
     const navInbox = document.getElementById('nav-inbox');
     if (navInbox && window.FEATURES && window.FEATURES.inbox_support) {
       navInbox.style.display = '';
@@ -4976,8 +5241,13 @@ const App = (() => {
   async function quickLogMood(score) {
     const el = document.getElementById('quick-mood-widget');
     try {
-      await API.createEntry({ mood_score: score, event_text: '', tags: '', gratitude: '' });
+      const res = await API.createEntry({ mood_score: score, event_text: '', tags: '', gratitude: '' });
       const m = QUICK_MOODS.find(x => x.score === score);
+      if (res && res.queued) {
+        // v3.3: mất mạng — chưa lưu lên server nên KHÔNG đổi widget thành "đã ghi", tránh log trùng khi mở lại
+        showToast('📥 Không có mạng — đã lưu nháp, sẽ tự động đồng bộ khi có mạng trở lại.');
+        return;
+      }
       showToast(`${m.emoji} Đã ghi mood ${score}/10!`);
       if (el) el.innerHTML = `<div class="card" style="text-align:center;padding:16px 12px">
         <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">Mood hôm nay</div>
@@ -5993,7 +6263,7 @@ const App = (() => {
   }
 
   return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,toggleAdvancedSearch,applyTheme,toggleThemePicker,loadMoreDiary,
-    pinInput,pinDelete,setPinLock,managePinLock,installPWA,showMemoryCard,createFutureLetter,deleteFutureLetter,exportUserData,
+    pinInput,pinDelete,setPinLock,managePinLock,installPWA,showMemoryCard,showYearInReviewCard,setA11yFontSize,toggleHighContrast,createFutureLetter,deleteFutureLetter,exportUserData,
     openPMRModal,openBodyScanModal,openGroundingModal,startGrounding,toggleGroundingItem,nextGroundingStep,openGratitudeModal,gratitudeNext,gratitudeBack,
     handleAvatarUpload,removeAvatar,_applyWritingHour,renderEmotionRadar,
     shareCurrentEntry,closeShareModal,copyShareLink,revokeCurrentShare,

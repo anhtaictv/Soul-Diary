@@ -1285,6 +1285,63 @@ async function initSchema() {
       `);
   }
 
+  // ── v3.1: Bảng Announcements — thông báo toàn hệ thống (banner) ────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Announcements' AND xtype='U')
+    CREATE TABLE Announcements (
+      id         INT IDENTITY(1,1) PRIMARY KEY,
+      message    NVARCHAR(MAX) NOT NULL,
+      severity   NVARCHAR(20)  NOT NULL DEFAULT 'info',
+      is_active  BIT NOT NULL DEFAULT 0,
+      created_by INT REFERENCES Users(id),
+      created_at DATETIME2 DEFAULT GETDATE(),
+      updated_at DATETIME2 DEFAULT GETDATE()
+    )
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_Announcements_active')
+    CREATE INDEX IX_Announcements_active ON Announcements(is_active, created_at DESC)
+  `);
+
+  // ── v3.1: Feature flags (enabled=0 — bật qua admin panel) ───────────────
+  const v31flags = [
+    { key: 'system_announcements', label: 'Thông báo hệ thống', desc: 'Banner thông báo toàn hệ thống do admin đăng (bảo trì, tin khẩn) hiển thị cho mọi người dùng', ver: 'v3.1', title: 'Thông báo hệ thống', sort: 310 },
+  ];
+  for (const f of v31flags) {
+    await db.request()
+      .input('k', sql.NVarChar, f.key).input('l', sql.NVarChar, f.label)
+      .input('d', sql.NVarChar, f.desc).input('v', sql.NVarChar, f.ver)
+      .input('vt', sql.NVarChar, f.title).input('s', sql.Int, f.sort)
+      .query(`
+        IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key = @k)
+        INSERT INTO FeatureFlags (flag_key, label, description, version, version_title, enabled, sort_order)
+        VALUES (@k, @l, @d, @v, @vt, 0, @s)
+      `);
+  }
+
+  // ── v3.3: Feature flags (enabled=0 — bật qua admin panel) ───────────────
+  const v33flags = [
+    { key: 'voice_transcript', label: 'Chuyển giọng nói thành văn bản', desc: 'Tự động chuyển bản ghi âm nhật ký thành văn bản khi đang ghi âm, giúp tìm kiếm được và hỗ trợ người khó nghe/khó đọc', ver: 'v3.3', title: 'Trợ năng & Bền vững', sort: 330 },
+    { key: 'year_wrap_card', label: 'Sổ tổng kết cuối năm', desc: 'Tạo ảnh tổng kết hành trình cảm xúc trong năm (số ngày viết, mood phổ biến, huy hiệu) để lưu hoặc chia sẻ', ver: 'v3.3', title: 'Trợ năng & Bền vững', sort: 331 },
+    { key: 'offline_draft_queue', label: 'Hàng đợi nháp khi mất mạng', desc: 'Lưu tạm nhật ký viết lúc mất mạng, tự động đồng bộ lên server khi có mạng trở lại', ver: 'v3.3', title: 'Trợ năng & Bền vững', sort: 332 },
+    { key: 'accessibility_tools', label: 'Công cụ trợ năng', desc: 'Tùy chỉnh cỡ chữ và chế độ tương phản cao trong Cài đặt', ver: 'v3.3', title: 'Trợ năng & Bền vững', sort: 333 },
+  ];
+  for (const f of v33flags) {
+    await db.request()
+      .input('k', sql.NVarChar, f.key).input('l', sql.NVarChar, f.label)
+      .input('d', sql.NVarChar, f.desc).input('v', sql.NVarChar, f.ver)
+      .input('vt', sql.NVarChar, f.title).input('s', sql.Int, f.sort)
+      .query(`
+        IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key = @k)
+        INSERT INTO FeatureFlags (flag_key, label, description, version, version_title, enabled, sort_order)
+        VALUES (@k, @l, @d, @v, @vt, 0, @s)
+      `);
+  }
+
+  // Dọn flag 'offline_mode' (v2.0) — bị bỏ hoang từ lâu, không có code nào tham chiếu tới,
+  // trùng ý nghĩa với flag 'offline_draft_queue' (v3.3) mới là flag thực sự điều khiển tính năng này.
+  await db.request().query(`DELETE FROM FeatureFlags WHERE flag_key='offline_mode'`);
+
   console.log('✅ Schema đã sẵn sàng');
 }
 
