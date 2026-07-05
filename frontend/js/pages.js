@@ -162,7 +162,7 @@ const PAGES = {
               <div class="photo-upload-area" id="photo-upload-area" onclick="document.getElementById('photo-input').click()">
                 <div class="photo-upload-icon">📷</div>
                 <div class="photo-upload-text">Nhấn để thêm ảnh</div>
-                <div class="photo-upload-sub">JPG, PNG — tối đa 2MB/ảnh, 4 ảnh</div>
+                <div class="photo-upload-sub">JPG, PNG — tối đa 10MB/ảnh, 4 ảnh</div>
                 <input type="file" id="photo-input" accept="image/*" multiple style="display:none" onchange="App.handlePhotoUpload(event)" />
               </div>
               <div class="photo-preview-row" id="photo-preview-row"></div>
@@ -177,6 +177,7 @@ const PAGES = {
                   <span id="record-label">Nhấn để ghi âm</span>
                 </button>
                 <div class="record-timer" id="record-timer" style="display:none">⏱ <span id="record-time">0:00</span></div>
+                <div class="voice-transcript-hint" id="voice-transcript-hint" style="display:none"></div>
                 <audio id="audio-playback" controls style="display:none;width:100%;margin-top:8px"></audio>
               </div>
             </div>
@@ -475,6 +476,7 @@ const PAGES = {
         <button class="tag"     data-panel="report"    onclick="Admin.switchPanel('report',this)">📈 Báo cáo</button>
         <button class="tag"     data-panel="settings"  onclick="Admin.switchPanel('settings',this)">⚙️ Cài đặt</button>
         <button class="tag"     data-panel="features"  onclick="Admin.switchPanel('features',this)">🚀 Tính năng</button>
+        <button class="tag"     data-panel="announcements" onclick="Admin.switchPanel('announcements',this)">📢 Thông báo</button>
       </div>
 
       <!-- Dashboard panel -->
@@ -559,6 +561,9 @@ const PAGES = {
 
       <!-- Features panel -->
       <div class="panel" id="adm-panel-features"></div>
+
+      <!-- Announcements panel -->
+      <div class="panel" id="adm-panel-announcements"></div>
 
       <!-- Settings panel -->
       <div class="panel" id="adm-panel-settings">
@@ -700,6 +705,7 @@ const PAGES = {
         <button class="btn-outline" style="padding:6px 12px" onclick="App.yearReviewNav(-1)">←</button>
         <span id="year-review-year" style="font-size:18px;font-weight:700"></span>
         <button class="btn-outline" style="padding:6px 12px" onclick="App.yearReviewNav(1)">→</button>
+        <button class="btn-outline" id="year-wrap-card-btn" style="padding:6px 12px;margin-left:auto;display:none" onclick="App.showYearInReviewCard()">🖼️ Xuất ảnh tổng kết</button>
       </div>
       <div id="year-review-content"><div class="loading-text">Đang tải...</div></div>
     </div>`,
@@ -722,6 +728,7 @@ const PAGES = {
         '<button class="settings-tab" onclick="App.switchSettingsTab(\'security\',this)">&#128272; Bảo mật</button>' +
         '<button class="settings-tab" onclick="App.switchSettingsTab(\'notifications\',this)">&#128276; Thông báo</button>' +
         '<button class="settings-tab" onclick="App.switchSettingsTab(\'account\',this)">&#9888;&#65039; Tài khoản</button>' +
+        '<button class="settings-tab" id="settings-tab-accessibility" style="display:none" onclick="App.switchSettingsTab(\'accessibility\',this)">&#9877;&#65039; Trợ năng</button>' +
       '</div>' +
       '<div id="settings-panel-profile" class="settings-panel card">' +
         '<div class="settings-section-title">Thông tin cá nhân</div>' +
@@ -754,8 +761,8 @@ const PAGES = {
       '</div>' +
       '<div id="settings-panel-security" class="settings-panel card" style="display:none">' +
         '<div class="settings-section-title">Đổi mật khẩu</div>' +
-        '<div class="form-group"><label class="form-label">Mật khẩu hiện tại</label><div class="input-wrap"><input class="text-input" type="password" id="set-current-pw" placeholder="Nhập mật khẩu hiện tại" autocomplete="current-password" /><button class="eye-btn" onclick="Auth.togglePwd(\'set-current-pw\',this)">&#128065;</button></div></div>' +
-        '<div class="form-group"><label class="form-label">Mật khẩu mới (ít nhất 6 ký tự)</label><div class="input-wrap"><input class="text-input" type="password" id="set-new-pw" placeholder="Mật khẩu mới" autocomplete="new-password" /><button class="eye-btn" onclick="Auth.togglePwd(\'set-new-pw\',this)">&#128065;</button></div></div>' +
+        '<div class="form-group"><label class="form-label">Mật khẩu hiện tại</label><div class="input-wrap"><input class="text-input" type="password" id="set-current-pw" placeholder="Nhập mật khẩu hiện tại" autocomplete="current-password" /><button class="eye-btn" onclick="Auth.togglePwd(\'set-current-pw\',this)" aria-label="Hiện/ẩn mật khẩu">&#128065;</button></div></div>' +
+        '<div class="form-group"><label class="form-label">Mật khẩu mới (ít nhất 6 ký tự)</label><div class="input-wrap"><input class="text-input" type="password" id="set-new-pw" placeholder="Mật khẩu mới" autocomplete="new-password" /><button class="eye-btn" onclick="Auth.togglePwd(\'set-new-pw\',this)" aria-label="Hiện/ẩn mật khẩu">&#128065;</button></div></div>' +
         '<div class="form-group"><label class="form-label">Xác nhận mật khẩu mới</label><input class="text-input" type="password" id="set-confirm-pw" placeholder="Nhập lại mật khẩu mới" autocomplete="new-password" /></div>' +
         '<button class="btn-primary" style="max-width:220px" onclick="App.changePasswordSettings()">&#128272; Đổi mật khẩu</button>' +
         '<div id="set-security-msg" class="settings-msg" style="display:none"></div>' +
@@ -796,6 +803,20 @@ const PAGES = {
         '<div class="form-group"><label class="form-label">Nhập mật khẩu để xác nhận xóa tài khoản</label><input class="text-input" type="password" id="set-delete-pw" placeholder="Mật khẩu của bạn" style="max-width:300px" /></div>' +
         '<button class="btn-danger" onclick="App.deleteAccountSettings()">&#128465;&#65039; Xóa tài khoản vĩnh viễn</button>' +
         '<div id="set-account-msg" class="settings-msg" style="display:none"></div></div>' +
+      '</div>' +
+      '<div id="settings-panel-accessibility" class="settings-panel card" style="display:none">' +
+        '<div class="settings-section-title" style="margin-bottom:12px">Cỡ chữ</div>' +
+        '<div class="a11y-fontsize-row">' +
+          '<button class="btn-outline a11y-fontsize-btn" data-size="normal" onclick="App.setA11yFontSize(\'normal\')">Bình thường</button>' +
+          '<button class="btn-outline a11y-fontsize-btn" data-size="large" onclick="App.setA11yFontSize(\'large\')">Lớn</button>' +
+          '<button class="btn-outline a11y-fontsize-btn" data-size="xlarge" onclick="App.setA11yFontSize(\'xlarge\')">Rất lớn</button>' +
+        '</div>' +
+        '<hr style="border:none;border-top:1px solid var(--border);margin:20px 0"/>' +
+        '<div class="settings-section-title" style="margin-bottom:8px">Độ tương phản</div>' +
+        '<label class="a11y-toggle-row">' +
+          '<input type="checkbox" id="a11y-contrast-toggle" onchange="App.toggleHighContrast(this.checked)" />' +
+          '<span>Bật chế độ tương phản cao (chữ và viền rõ hơn, dễ đọc hơn)</span>' +
+        '</label>' +
       '</div>' +
     '</div>';
   },

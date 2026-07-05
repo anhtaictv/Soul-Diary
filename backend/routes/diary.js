@@ -11,7 +11,9 @@ const router = express.Router();
 
 // ── Hằng số ──────────────────────────────────────────────────────────────
 const MAX_PHOTOS    = 4;
-const MAX_PHOTO_SIZE = 3_000_000;
+// Ảnh đã được resize/nén ở frontend (compressImage) trước khi gửi lên — cap này chỉ để chặn lạm dụng,
+// không phải giới hạn ảnh gốc (giới hạn ảnh gốc 10MB nằm ở frontend, xử lý bởi compressImage).
+const MAX_PHOTO_SIZE = 4_000_000;
 
 // ── Helper: validate ảnh đính kèm ────────────────────────────────────────
 function validatePhotos(photos) {
@@ -21,7 +23,7 @@ function validatePhotos(photos) {
   if (validPhotos.length > MAX_PHOTOS) return { error: `Chỉ được đính kèm tối đa ${MAX_PHOTOS} ảnh.` };
   for (const p of validPhotos) {
     if (typeof p !== 'string' || !p.startsWith('data:image/')) return { error: 'Định dạng ảnh không hợp lệ.' };
-    if (p.length > MAX_PHOTO_SIZE) return { error: 'Ảnh quá lớn (mỗi ảnh tối đa khoảng 2MB).' };
+    if (p.length > MAX_PHOTO_SIZE) return { error: 'Ảnh quá lớn sau khi nén, vui lòng chọn ảnh khác.' };
   }
   return { photos: validPhotos };
 }
@@ -219,8 +221,8 @@ router.post('/', async (req, res) => {
     if (audio_data) {
       if (typeof audio_data !== 'string' || !audio_data.startsWith('data:audio/'))
         return res.status(400).json({ message: 'Định dạng bản ghi âm không hợp lệ.' });
-      if (audio_data.length > 2_000_000)
-        return res.status(400).json({ message: 'Bản ghi âm quá lớn (tối đa khoảng 30 giây).' });
+      if (audio_data.length > 8_000_000)
+        return res.status(400).json({ message: 'Bản ghi âm quá lớn (tối đa khoảng 2 phút).' });
       audioData = audio_data;
     }
 
@@ -346,8 +348,8 @@ router.put('/:id', async (req, res) => {
     if (audio_data) {
       if (typeof audio_data !== 'string' || !audio_data.startsWith('data:audio/'))
         return res.status(400).json({ message: 'Định dạng bản ghi âm không hợp lệ.' });
-      if (audio_data.length > 2_000_000)
-        return res.status(400).json({ message: 'Bản ghi âm quá lớn (tối đa khoảng 30 giây).' });
+      if (audio_data.length > 8_000_000)
+        return res.status(400).json({ message: 'Bản ghi âm quá lớn (tối đa khoảng 2 phút).' });
       audioData = audio_data;
     }
 

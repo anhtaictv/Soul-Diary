@@ -143,6 +143,7 @@ const Admin = (() => {
     if (name === 'report')    loadReport();
     if (name === 'settings')  loadSettingsPanel();
     if (name === 'features')  loadFeaturesPanel();
+    if (name === 'announcements') loadAnnouncementsPanel();
   }
 
   // ── Dashboard ─────────────────────────────────────────────────────────
@@ -822,6 +823,105 @@ const Admin = (() => {
     } catch (err) { showToast('❌ ' + err.message); }
   }
 
+  // ── v3.1: Thông báo hệ thống ───────────────────────────────────────────
+  // Bảng màu/icon/label severity dùng chung từ data.js (ANNOUNCEMENT_SEVERITIES) — xem app.js cho banner người dùng.
+  async function loadAnnouncementsPanel() {
+    const el = document.getElementById('adm-panel-announcements');
+    if (!el) return;
+    el.innerHTML = '<div style="text-align:center;padding:60px;color:var(--text-hint)">⏳ Đang tải...</div>';
+    try {
+      const { announcements } = await API.getAdminAnnouncements();
+      renderAnnouncementsPanel(el, announcements || []);
+    } catch (e) {
+      el.innerHTML = `<div style="color:var(--rose);padding:20px">Lỗi: ${e.message}</div>`;
+    }
+  }
+
+  function renderAnnouncementsPanel(el, items) {
+    const row = a => `
+      <tr>
+        <td style="max-width:360px;white-space:pre-wrap">${escapeHtml(a.message)}</td>
+        <td>${ANNOUNCEMENT_SEVERITIES[a.severity] ? ANNOUNCEMENT_SEVERITIES[a.severity].icon + ' ' + ANNOUNCEMENT_SEVERITIES[a.severity].label : a.severity}</td>
+        <td>${a.is_active ? '✅ Đang hiện' : '⏸ Tắt'}</td>
+        <td>${fmtDate(a.created_at)}</td>
+        <td>
+          <button class="adm-btn adm-btn-outline feat-btn-sm" onclick="Admin.toggleAnnouncement(${a.id}, ${a.is_active ? 'false' : 'true'})">${a.is_active ? 'Tắt' : 'Bật'}</button>
+          <button class="adm-btn adm-btn-danger feat-btn-sm" onclick="Admin.deleteAnnouncementConfirm(${a.id})">Xóa</button>
+        </td>
+      </tr>`;
+
+    el.innerHTML = `
+      <div class="adm-panel-header">
+        <div>
+          <div style="font-size:15px;font-weight:700">Thông báo hệ thống</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Banner hiển thị cho mọi người dùng — cần bật flag <code>system_announcements</code> ở tab 🚀 Tính năng để có hiệu lực</div>
+        </div>
+        <button class="adm-btn adm-btn-primary" onclick="Admin.showNewAnnouncementForm()">+ Thông báo mới</button>
+      </div>
+      <div id="adm-announce-form-wrap"></div>
+      <div class="card">
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>Nội dung</th><th>Mức độ</th><th>Trạng thái</th><th>Ngày tạo</th><th>Thao tác</th></tr></thead>
+            <tbody>${items.length ? items.map(row).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">Chưa có thông báo nào</td></tr>'}</tbody>
+          </table>
+        </div>
+      </div>`;
+  }
+
+  function showNewAnnouncementForm() {
+    const wrap = document.getElementById('adm-announce-form-wrap');
+    if (!wrap) return;
+    if (wrap.innerHTML) { wrap.innerHTML = ''; return; }
+    wrap.innerHTML = `
+      <div class="feat-form-card">
+        <div class="feat-form-title">Tạo thông báo mới</div>
+        <textarea class="text-input" id="an-message" rows="3" placeholder="Nội dung thông báo (vd: Hệ thống bảo trì 22h-23h tối nay, có thể gián đoạn vài phút)" style="margin-bottom:10px;width:100%"></textarea>
+        <div class="feat-form-row">
+          <select class="text-input" id="an-severity" style="max-width:200px">
+            ${Object.entries(ANNOUNCEMENT_SEVERITIES).map(([key, s]) => `<option value="${key}">${s.icon} ${s.label}</option>`).join('')}
+          </select>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px">
+            <input type="checkbox" id="an-active" checked> Bật hiển thị ngay
+          </label>
+        </div>
+        <div class="feat-form-actions">
+          <button class="adm-btn adm-btn-primary" onclick="Admin.submitNewAnnouncement()">Tạo thông báo</button>
+          <button class="adm-btn adm-btn-outline" onclick="document.getElementById('adm-announce-form-wrap').innerHTML=''">Hủy</button>
+        </div>
+      </div>`;
+  }
+
+  async function submitNewAnnouncement() {
+    const message  = document.getElementById('an-message')?.value.trim();
+    const severity = document.getElementById('an-severity')?.value;
+    const isActive = document.getElementById('an-active')?.checked;
+    if (!message) return showToast('⚠️ Nhập nội dung thông báo');
+    try {
+      await API.createAnnouncement({ message, severity, is_active: !!isActive });
+      showToast('✅ Đã tạo thông báo');
+      document.getElementById('adm-announce-form-wrap').innerHTML = '';
+      loadAnnouncementsPanel();
+    } catch (e) { showToast('❌ ' + e.message); }
+  }
+
+  async function toggleAnnouncement(id, active) {
+    try {
+      await API.updateAnnouncement(id, { is_active: active });
+      showToast(active ? '✅ Đã bật thông báo' : '⏸ Đã tắt thông báo');
+      loadAnnouncementsPanel();
+    } catch (e) { showToast('❌ ' + e.message); }
+  }
+
+  async function deleteAnnouncementConfirm(id) {
+    if (!confirm('Xóa thông báo này?')) return;
+    try {
+      await API.deleteAnnouncement(id);
+      showToast('🗑️ Đã xóa');
+      loadAnnouncementsPanel();
+    } catch (e) { showToast('❌ ' + e.message); }
+  }
+
   return {
     initPage, switchPanel, filterArticles,
     openEditor, editArticle, closeEditor, saveArticle,
@@ -835,5 +935,6 @@ const Admin = (() => {
     showNewVersionForm, submitNewVersion,
     showAddFlagForm, submitAddFlag,
     toggleFlag, deleteFlag, releaseAll, scheduleRelease, revokeAll,
+    showNewAnnouncementForm, submitNewAnnouncement, toggleAnnouncement, deleteAnnouncementConfirm,
   };
 })();

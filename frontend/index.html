@@ -2,14 +2,17 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Soul Diary - Nhật ký cảm xúc</title>
   <link rel="icon" href="app-icon.jpg" />
   <link rel="apple-touch-icon" href="app-icon.jpg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#2563eb" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Soul Diary" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="apple-touch-startup-image" href="app-icon.jpg" />
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet" />
   <!-- Markdown editor (dùng trong trang Quản trị) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.css" />
@@ -50,7 +53,7 @@
           <label class="form-label">Mật khẩu</label>
           <div class="input-wrap">
             <input class="text-input" type="password" id="login-password" placeholder="Nhập mật khẩu" autocomplete="current-password" />
-            <button class="eye-btn" onclick="Auth.togglePwd('login-password',this)">👁</button>
+            <button class="eye-btn" onclick="Auth.togglePwd('login-password',this)" aria-label="Hiện/ẩn mật khẩu">👁</button>
           </div>
         </div>
         <button class="btn-auth" id="btn-login" onclick="Auth.login()"><span>Đăng nhập</span></button>
@@ -79,7 +82,7 @@
           <label class="form-label">Mật khẩu (ít nhất 6 ký tự)</label>
           <div class="input-wrap">
             <input class="text-input" type="password" id="reg-password" placeholder="Tạo mật khẩu" />
-            <button class="eye-btn" onclick="Auth.togglePwd('reg-password',this)">👁</button>
+            <button class="eye-btn" onclick="Auth.togglePwd('reg-password',this)" aria-label="Hiện/ẩn mật khẩu">👁</button>
           </div>
         </div>
         <div class="form-group">
@@ -114,7 +117,7 @@
           <label class="form-label">Mật khẩu mới</label>
           <div class="input-wrap">
             <input class="text-input" type="password" id="reset-password-input" placeholder="Ít nhất 6 ký tự" autocomplete="new-password" />
-            <button class="eye-btn" onclick="Auth.togglePwd('reset-password-input',this)">👁</button>
+            <button class="eye-btn" onclick="Auth.togglePwd('reset-password-input',this)" aria-label="Hiện/ẩn mật khẩu">👁</button>
           </div>
         </div>
         <div class="form-group">
@@ -133,6 +136,7 @@
   <div id="app-screen" style="display:none">
     <button id="sidebar-hamburger" onclick="App.toggleSidebar()" aria-label="Mở menu">☰</button>
     <div id="sidebar-overlay" onclick="App.closeSidebar()"></div>
+    <div id="global-announcement-banner"></div>
     <div class="app">
       <aside class="sidebar">
         <div class="sidebar-logo">
@@ -141,7 +145,7 @@
             <div class="logo-title">Soul Diary</div>
             <div class="logo-sub">Nhật ký cảm xúc</div>
           </div>
-          <button class="logo-about-btn" onclick="App.openAboutModal()">!</button>
+          <button class="logo-about-btn" onclick="App.openAboutModal()" aria-label="Giới thiệu ứng dụng">!</button>
         </div>
         <nav class="nav">
           <button class="nav-item active" data-page="dashboard"><span class="nav-icon">🏠</span> Tổng quan</button>
@@ -256,7 +260,7 @@
     <div class="modal" style="max-width:420px">
       <div class="modal-header">
         <div class="modal-title">💌 Gửi tin hỗ trợ</div>
-        <button class="modal-close" onclick="Admin.closeOutreachModal()">✕</button>
+        <button class="modal-close" onclick="Admin.closeOutreachModal()" aria-label="Đóng">✕</button>
       </div>
       <div style="padding:4px 0 8px">
         <div style="font-size:13px;color:var(--text-muted);margin-bottom:14px">Đến: <strong id="outreach-target-name">—</strong></div>
@@ -307,7 +311,7 @@
     <div class="modal">
       <div class="modal-header">
         <div class="modal-title">🌬️ Thở 4-7-8</div>
-        <button class="modal-close" id="close-breath-modal">✕</button>
+        <button class="modal-close" id="close-breath-modal" aria-label="Đóng">✕</button>
       </div>
       <div style="text-align:center;padding:10px 0">
         <div class="breath-circle" id="breath-circle">Sẵn sàng</div>
@@ -326,7 +330,7 @@
     <div class="modal">
       <div class="modal-header">
         <div class="modal-title">🔲 Hộp Thở (Box Breathing)</div>
-        <button class="modal-close" id="close-box-breath-modal">✕</button>
+        <button class="modal-close" id="close-box-breath-modal" aria-label="Đóng">✕</button>
       </div>
       <div style="text-align:center;padding:10px 0">
         <div class="box-breath-square" id="box-breath-square">
@@ -351,7 +355,7 @@
     <div class="modal" style="max-width:520px">
       <div class="modal-header">
         <div class="modal-title">✉️ Bức thư chưa gửi</div>
-        <button class="modal-close" id="close-letter-modal">✕</button>
+        <button class="modal-close" id="close-letter-modal" aria-label="Đóng">✕</button>
       </div>
       <div class="letter-paper" id="letter-paper">
         <div class="letter-flame" id="letter-flame">🔥</div>
@@ -369,7 +373,7 @@
     <div class="modal" style="max-width:560px">
       <div class="modal-header">
         <div class="modal-title">⚖️ Thử thách Bằng chứng</div>
-        <button class="modal-close" id="close-evidence-modal">✕</button>
+        <button class="modal-close" id="close-evidence-modal" aria-label="Đóng">✕</button>
       </div>
       <div class="form-group">
         <label class="form-label">1. Suy nghĩ độc hại hiện tại <span class="cbt-step-hint">VD: "Mình là một kẻ bất tài"</span></label>
@@ -399,7 +403,7 @@
     <div class="modal">
       <div class="modal-header">
         <div class="modal-title">💪 Thư giãn cơ tiến triển (PMR)</div>
-        <button class="modal-close" id="close-pmr-modal">✕</button>
+        <button class="modal-close" id="close-pmr-modal" aria-label="Đóng">✕</button>
       </div>
       <div style="text-align:center;padding:6px 0">
         <svg id="pmr-svg" viewBox="0 0 100 200" style="width:80px;height:auto;margin:0 auto 10px;display:block;overflow:visible">
@@ -428,7 +432,7 @@
     <div class="modal">
       <div class="modal-header">
         <div class="modal-title">🌊 Quét Cơ thể (Body Scan)</div>
-        <button class="modal-close" id="close-bodyscan-modal">✕</button>
+        <button class="modal-close" id="close-bodyscan-modal" aria-label="Đóng">✕</button>
       </div>
       <div style="text-align:center;padding:6px 0">
         <svg id="bodyscan-svg" viewBox="0 0 100 200" style="width:80px;height:auto;margin:0 auto 10px;display:block;overflow:visible">
@@ -457,7 +461,7 @@
     <div class="modal">
       <div class="modal-header">
         <div class="modal-title">🧘 Chánh niệm 5-4-3-2-1</div>
-        <button class="modal-close" id="close-grounding-modal">✕</button>
+        <button class="modal-close" id="close-grounding-modal" aria-label="Đóng">✕</button>
       </div>
       <div style="text-align:center;padding:6px 0">
         <div class="grounding-sense-num" id="grounding-num">5</div>
@@ -479,7 +483,7 @@
     <div class="modal">
       <div class="modal-header">
         <div class="modal-title">🙏 Nhật ký biết ơn</div>
-        <button class="modal-close" id="close-gratitude-modal">✕</button>
+        <button class="modal-close" id="close-gratitude-modal" aria-label="Đóng">✕</button>
       </div>
       <div class="breath-cycle" id="gratitude-step-label" style="font-size:13px;margin-bottom:12px;text-align:center">Câu 1 / 3</div>
       <div class="form-group">
@@ -505,7 +509,7 @@
           <div class="modal-title" id="article-modal-title">—</div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:4px" id="article-modal-meta"></div>
         </div>
-        <button class="modal-close" onclick="App.closeArticleModal()">✕</button>
+        <button class="modal-close" onclick="App.closeArticleModal()" aria-label="Đóng">✕</button>
       </div>
       <div id="article-modal-body" style="color:var(--text-muted);line-height:1.7"></div>
     </div>
@@ -519,7 +523,7 @@
           <div class="modal-title" id="entry-modal-title">—</div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:4px" id="entry-modal-date"></div>
         </div>
-        <button class="modal-close" onclick="App.closeEntryModal()">✕</button>
+        <button class="modal-close" onclick="App.closeEntryModal()" aria-label="Đóng">✕</button>
       </div>
       <div id="entry-modal-body" style="color:var(--text-muted);line-height:1.7"></div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
@@ -534,7 +538,7 @@
     <div class="modal" style="max-width:460px">
       <div class="modal-header">
         <div class="modal-title">🔗 Chia sẻ nhật ký</div>
-        <button class="modal-close" onclick="App.closeShareModal()">✕</button>
+        <button class="modal-close" onclick="App.closeShareModal()" aria-label="Đóng">✕</button>
       </div>
       <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Bất kỳ ai có liên kết này đều có thể xem nhật ký của bạn (chỉ nội dung văn bản).</p>
       <div style="display:flex;gap:8px;margin-bottom:16px">
@@ -550,7 +554,7 @@
     <div class="modal" style="max-width:480px">
       <div class="modal-header">
         <div class="modal-title">📋 Chọn template</div>
-        <button class="modal-close" onclick="App.closeTemplatePicker()">✕</button>
+        <button class="modal-close" onclick="App.closeTemplatePicker()" aria-label="Đóng">✕</button>
       </div>
       <div id="template-picker-list" style="display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto"></div>
     </div>
@@ -566,7 +570,7 @@
     <div class="modal" style="max-width:380px">
       <div class="modal-header">
         <div class="modal-title">ℹ️ Giới thiệu</div>
-        <button class="modal-close" onclick="App.closeAboutModal()">✕</button>
+        <button class="modal-close" onclick="App.closeAboutModal()" aria-label="Đóng">✕</button>
       </div>
       <div style="text-align:center;padding:6px 0">
         <img src="soul-diary-logo.jpg" alt="Soul Diary" style="width:56px;height:56px;border-radius:14px;object-fit:contain;margin-bottom:10px" />
@@ -584,7 +588,7 @@
     <div class="adm-editor-card">
       <div class="adm-editor-header">
         <div class="adm-editor-title" id="adm-editor-mode-title">✏️ Viết bài mới</div>
-        <button class="adm-btn-ghost" onclick="Admin.closeEditor()">✕</button>
+        <button class="adm-btn-ghost" onclick="Admin.closeEditor()" aria-label="Đóng">✕</button>
       </div>
 
       <input type="hidden" id="adm-editing-id" value="" />
@@ -676,7 +680,7 @@
   <!-- Offline Banner -->
   <div id="offline-banner" class="offline-banner" style="display:none">
     <span>📡 Mất kết nối mạng — Một số tính năng sẽ không khả dụng.</span>
-    <button onclick="this.parentElement.style.display='none'" style="background:none;border:none;color:inherit;font-size:18px;cursor:pointer;padding:0;margin-left:8px">✕</button>
+    <button onclick="this.parentElement.style.display='none'" style="background:none;border:none;color:inherit;font-size:18px;cursor:pointer;padding:0;margin-left:8px" aria-label="Đóng">✕</button>
   </div>
 
   <!-- PIN Lock Overlay -->
