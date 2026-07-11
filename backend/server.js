@@ -355,6 +355,86 @@ cron.schedule('0 1 * * *', async () => {
   }
 });
 
+// ── Cron: Nhắc quay lại cho user không hoạt động (10h sáng giờ VN = 3h UTC, v3.4) ──
+cron.schedule('0 3 * * *', async () => {
+  try {
+    const db = await getPool();
+    const flagRes = await db.request().query(
+      `SELECT enabled FROM FeatureFlags WHERE flag_key='winback_reengagement'`
+    );
+    if (!flagRes.recordset.length || !flagRes.recordset[0].enabled) return;
+
+    const { createTransporter } = require('./utils/mailer');
+    const transporter = createTransporter();
+
+    const result = await db.request().query(`
+      SELECT u.id, u.email, u.max_streak,
+             DATEDIFF(day, ISNULL(u.last_entry, CAST(u.created_at AS DATE)), GETDATE()) AS inactive_days,
+             ps.endpoint, ps.p256dh, ps.auth
+      FROM Users u
+      LEFT JOIN PushSubscriptions ps ON ps.user_id = u.id
+      WHERE DATEDIFF(day, ISNULL(u.last_entry, CAST(u.created_at AS DATE)), GETDATE()) BETWEEN 5 AND 60
+        AND (u.last_winback_notif_at IS NULL OR DATEDIFF(day, u.last_winback_notif_at, GETDATE()) >= 7)
+    `);
+
+    const notifiedIds = [];
+    const expiredEps  = [];
+    for (const u of result.recordset) {
+      const body = u.max_streak > 0
+        ? `Bạn từng đạt streak ${u.max_streak} ngày! Đã ${u.inactive_days} ngày rồi, quay lại viết một dòng thôi 💙`
+        : `Đã ${u.inactive_days} ngày bạn chưa ghé Soul Diary. Một dòng nhật ký ngắn cũng đủ để bắt đầu lại 🌱`;
+      let delivered = false;
+      if (u.endpoint && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+        try {
+          await webpush.sendNotification(
+            { endpoint: u.endpoint, keys: { p256dh: u.p256dh, auth: u.auth } },
+            JSON.stringify({ title: 'Soul Diary 📖', body }),
+          );
+          delivered = true;
+        } catch (pushErr) {
+          if (pushErr.statusCode === 410 || pushErr.statusCode === 404) expiredEps.push(u.endpoint);
+        }
+      }
+      if (!delivered && u.email && transporter) {
+        try {
+          const from = process.env.SMTP_FROM || `Soul Diary <${process.env.SMTP_USER}>`;
+          await transporter.sendMail({
+            from, to: u.email,
+            subject: 'Soul Diary nhớ bạn 💙',
+            html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+              <h2 style="color:#7c3aed">Soul Diary nhớ bạn!</h2>
+              <p>${body}</p>
+              <p style="margin:24px 0">
+                <a href="${process.env.APP_URL || 'https://souldiary.work.gd'}"
+                   style="background:#7c3aed;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
+                  Viết nhật ký ngay
+                </a>
+              </p>
+            </div>`,
+          });
+          delivered = true;
+        } catch (mailErr) {
+          console.error('[winback-cron] Lỗi gửi email:', mailErr.message);
+        }
+      }
+      if (delivered) notifiedIds.push(u.id);
+    }
+    if (notifiedIds.length) {
+      await db.request().query(
+        `UPDATE Users SET last_winback_notif_at = GETDATE() WHERE id IN (${notifiedIds.join(',')})`
+      );
+    }
+    if (expiredEps.length) {
+      const r = db.request();
+      expiredEps.forEach((ep, i) => r.input('ep' + i, sql.NVarChar, ep));
+      await r.query(`DELETE FROM PushSubscriptions WHERE endpoint IN (${expiredEps.map((_, i) => '@ep' + i).join(',')})`);
+    }
+    if (notifiedIds.length > 0) console.log(`💙 Đã gửi nhắc quay lại cho ${notifiedIds.length} người dùng`);
+  } catch (err) {
+    console.error('[winback-cron] Lỗi:', err.message);
+  }
+});
+
 // ── Cron: Tự động phát hành tính năng theo lịch hẹn (chạy lúc 00:05 giờ VN = 17:05 UTC) ──
 cron.schedule('5 17 * * *', async () => {
   try {

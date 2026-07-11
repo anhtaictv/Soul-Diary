@@ -209,6 +209,7 @@ const App = (() => {
     renderStreakCalendar('streak-calendar-card');
     if (totalEntries) renderLevelBar(totalEntries);
     if (user && window.FEATURES && window.FEATURES.soul_seed) renderSoulSeed(user);
+    if (user && window.FEATURES && window.FEATURES.on_this_day) renderOnThisDay();
     renderRecommendations(todayEntry ? todayEntry.mood_score : null);
     initPushOptIn();
     if (user && window.FEATURES && window.FEATURES.custom_reminder) renderCustomReminderCard(user);
@@ -273,6 +274,34 @@ const App = (() => {
       {emoji:'😊',title:'Ghi lại khoảnh khắc đẹp',sub:'Nhật ký cảm xúc',nav:'diary'},
       {emoji:'📊',title:'Xem biểu đồ tâm trạng',sub:'Theo dõi xu hướng cảm xúc',nav:'chart'},
     ];
+  }
+
+  // ── Hôm nay năm ngoái (v3.4, on_this_day) ───────────────────────────
+  async function renderOnThisDay() {
+    const el = document.getElementById('on-this-day-section');
+    if (!el) return;
+    try {
+      const d = await API.getOnThisDay();
+      const entries = d.entries || [];
+      if (!entries.length) { el.style.display = 'none'; return; }
+      el.style.display = '';
+      el.innerHTML = `
+        <div class="card" style="padding:16px">
+          <div style="font-size:14px;font-weight:700;margin-bottom:10px">📅 Hôm nay năm ngoái</div>
+          ${entries.map(e => `
+            <div class="entry-item" onclick="App.openEntry(${e.id})" style="margin-bottom:8px">
+              <div class="entry-meta">
+                <div class="mood-dot" style="background:${MOOD_DATA[e.mood_score].color}">${MOOD_DATA[e.mood_score].emoji}</div>
+                <div>
+                  <div style="font-size:13px;font-weight:600;color:var(--text)">${e.years_ago} năm trước · ${MOOD_DATA[e.mood_score].label}</div>
+                  <div class="entry-date">${new Date(e.created_at).toLocaleDateString('vi-VN')}</div>
+                </div>
+              </div>
+              ${e.event_text ? `<div class="entry-preview">${escapeHtml(e.event_text)}</div>` : ''}
+            </div>`).join('')}
+        </div>
+      `;
+    } catch (e) { el.style.display = 'none'; }
   }
 
   function renderRecentEntries(containerId, entries) {
@@ -1495,6 +1524,41 @@ const App = (() => {
       await API.updateNotifPrefs(hour, days);
       showToast('✅ Đã lưu cài đặt nhắc nhở!');
     } catch (e) { showToast('❌ ' + e.message); }
+  }
+
+  // ── Giới thiệu bạn bè (v3.4, referral_program) ──────────────────────
+  async function renderReferralSection() {
+    const sec = document.getElementById('referral-section');
+    if (!sec) return;
+    try {
+      const d = await API.getReferral();
+      const link = `${window.location.origin}/?ref=${encodeURIComponent(d.referral_code)}`;
+      sec.innerHTML = `
+        <hr style="border:none;border-top:1px solid var(--border);margin:24px 0"/>
+        <div class="settings-section-title" style="margin-bottom:6px">🎁 Giới thiệu bạn bè</div>
+        <p style="color:var(--text-muted);font-size:13px;margin-bottom:12px">Chia sẻ link mời — khi bạn của bạn duy trì streak 7 ngày, bạn nhận thêm 1 lượt 🛡️ cứu streak.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <input class="text-input" id="referral-link-input" readonly value="${link}" style="flex:1;min-width:200px;font-size:13px" />
+          <button class="btn-outline" style="max-width:120px" onclick="App.copyReferralLink()">📋 Sao chép</button>
+        </div>
+        <div style="display:flex;gap:16px;font-size:13px;color:var(--text-muted)">
+          <div>👥 Đã mời: <strong style="color:var(--text)">${d.referredCount}</strong></div>
+          <div>🛡️ Lượt thưởng nhận: <strong style="color:var(--text)">${d.rewardsEarned}</strong></div>
+        </div>
+      `;
+    } catch (e) {
+      sec.innerHTML = `<div style="color:var(--text-muted);font-size:13px">Không tải được thông tin giới thiệu.</div>`;
+    }
+  }
+
+  function copyReferralLink() {
+    const input = document.getElementById('referral-link-input');
+    if (!input) return;
+    input.select();
+    navigator.clipboard?.writeText(input.value).then(
+      () => showToast('✅ Đã sao chép link mời!'),
+      () => document.execCommand('copy')
+    );
   }
 
   // ── Thử thách Sức khỏe Tâm thần ─────────────────────────────────────
@@ -3207,6 +3271,14 @@ const App = (() => {
     const hasPinMgmt = !!(window.FEATURES && window.FEATURES.pin_management);
     if (pinWrap) pinWrap.style.display = hasPinMgmt ? '' : 'none';
     if (hasPinMgmt) refreshPinStatus();
+
+    // Giới thiệu bạn bè (v3.4, gated)
+    const referralSec = document.getElementById('referral-section');
+    if (referralSec) {
+      const hasReferral = !!(window.FEATURES && window.FEATURES.referral_program);
+      referralSec.style.display = hasReferral ? '' : 'none';
+      if (hasReferral) renderReferralSection();
+    }
 
     // Đồng bộ notif prefs từ DB
     try {
@@ -6281,5 +6353,6 @@ const App = (() => {
     toggleSidebar,closeSidebar,scrollToTop,animateCount,haptic,
     _loadReflectionHistory,_loadHabitsList,
     _addRecentTag,_renderRecentTags,
+    copyReferralLink,
     _confirmResolve: (val) => _confirmResolve && _confirmResolve(val)};
 })();

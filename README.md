@@ -4,7 +4,7 @@
 
 **Không gian riêng tư để lắng nghe tâm hồn mình**
 
-[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v3.3.1-6366f1?style=for-the-badge&logo=github)](https://github.com/anhtaictv/Soul-Diary)
+[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v3.4-6366f1?style=for-the-badge&logo=github)](https://github.com/anhtaictv/Soul-Diary)
 [![Stack](https://img.shields.io/badge/Node.js_+_MSSQL-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)]()
 [![Vanilla JS](https://img.shields.io/badge/Vanilla_JS-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)]()
 [![License](https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge)]()
@@ -253,7 +253,8 @@ pm2 restart souldiary-api
 | v3.1 | UX | 40 cải tiến UX: skeleton, animation, swipe, ripple, focus trap, reduced motion… |
 | v3.2 | Đa thiết bị | Tối ưu iOS PWA (safe-area, status bar), breakpoint tablet, touch target 44px, hover chỉ áp dụng khi có chuột thật |
 | v3.3 | Trợ năng & Bền vững | Speech-to-text ghi âm, Sổ tổng kết cuối năm (ảnh), Hàng đợi nháp offline, cỡ chữ & tương phản cao, phiên bản Giới thiệu tự cập nhật theo Feature Flags |
-| **v3.3.1** | **Bản vá** | **Sửa 10 lỗi từ code review: timeout offline queue, mất dữ liệu âm thầm khi đầy bộ nhớ, log mood trùng khi mất mạng, sai version hiển thị, race condition xuất ảnh năm, cỡ chữ lớn không phủ modal/toast, giới hạn dung lượng không khớp, mở rộng hàng đợi sang xoá nhật ký, dọn flag trùng, gộp bảng màu thông báo** |
+| v3.3.1 | Bản vá | Sửa 10 lỗi từ code review: timeout offline queue, mất dữ liệu âm thầm khi đầy bộ nhớ, log mood trùng khi mất mạng, sai version hiển thị, race condition xuất ảnh năm, cỡ chữ lớn không phủ modal/toast, giới hạn dung lượng không khớp, mở rộng hàng đợi sang xoá nhật ký, dọn flag trùng, gộp bảng màu thông báo |
+| **v3.4** | **Giữ chân người dùng** | **Nhắc quay lại (push/email tự động cho user không hoạt động 5–60 ngày), Giới thiệu bạn bè (link mời + thưởng lượt cứu streak khi bạn được mời đạt 7 ngày), Hôm nay năm ngoái (hồi tưởng nhật ký cùng ngày các năm trước trên trang chủ)** |
 
 ---
 

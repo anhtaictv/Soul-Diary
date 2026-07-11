@@ -146,6 +146,27 @@ router.get('/search', async (req, res) => {
   }
 });
 
+// ── GET /api/diary/on-this-day — nhật ký cùng ngày các năm trước (v3.4) ──
+router.get('/on-this-day', async (req, res) => {
+  try {
+    const db = await getPool();
+    const r  = await db.request().input('user_id', sql.Int, req.user.id).query(`
+      SELECT id, mood_score, event_text, tags, created_at,
+             YEAR(GETDATE()) - YEAR(created_at) AS years_ago
+      FROM DiaryEntries
+      WHERE user_id = @user_id
+        AND MONTH(created_at) = MONTH(GETDATE())
+        AND DAY(created_at) = DAY(GETDATE())
+        AND YEAR(created_at) < YEAR(GETDATE())
+      ORDER BY created_at DESC
+    `);
+    res.json({ entries: r.recordset.map(e => ({ ...e, tags: e.tags ? e.tags.split('|') : [] })) });
+  } catch (err) {
+    console.error('On this day error:', err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
 // ── Mount sub-routers (trước /:id để tránh conflict) ─────────────────────
 router.use(require('./diary-stats'));
 router.use(require('./diary-ai'));
@@ -252,8 +273,8 @@ router.post('/', async (req, res) => {
 
     // Cập nhật streak
     const streakResult = await db.request().input('user_id', sql.Int, req.user.id)
-      .query(`SELECT streak, last_entry, streak_freeze, max_streak FROM Users WHERE id = @user_id`);
-    const { streak, last_entry, streak_freeze, max_streak } = streakResult.recordset[0];
+      .query(`SELECT streak, last_entry, streak_freeze, max_streak, referred_by, referral_rewarded FROM Users WHERE id = @user_id`);
+    const { streak, last_entry, streak_freeze, max_streak, referred_by, referral_rewarded } = streakResult.recordset[0];
     const today      = new Date(); today.setHours(0,0,0,0);
     const yesterday  = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
     const twoDaysAgo = new Date(today); twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
@@ -292,6 +313,20 @@ router.post('/', async (req, res) => {
         .input('max_streak', sql.Int,  newMaxStreak)
         .input('new_freeze', sql.Int,  newFreezeCount)
         .query(`UPDATE Users SET streak=@streak, last_entry=@last_entry, max_streak=@max_streak, streak_freeze=@new_freeze, updated_at=GETDATE() WHERE id=@user_id`);
+
+      // Thưởng người mời khi bạn được mời duy trì streak 7 ngày (v3.4, chỉ 1 lần/người được mời)
+      if (newStreak === 7 && referred_by && !referral_rewarded) {
+        await db.request().input('rid', sql.Int, referred_by)
+          .query(`UPDATE Users SET streak_freeze = streak_freeze + 1 WHERE id=@rid`);
+        await db.request().input('user_id', sql.Int, req.user.id)
+          .query(`UPDATE Users SET referral_rewarded=1 WHERE id=@user_id`);
+        const { createNotification } = require('../utils/notifier');
+        setImmediate(() => createNotification(referred_by, 'referral_reward',
+          '🎁 Bạn nhận được 1 lượt cứu streak!',
+          'Người bạn bạn mời đã duy trì streak 7 ngày liên tiếp — cảm ơn bạn đã lan tỏa Soul Diary!',
+          '/settings'
+        ).catch(() => {}));
+      }
     }
 
     // Kiểm tra chuỗi 7 ngày tâm trạng thấp

@@ -18,6 +18,9 @@ const PAGES = {
       <!-- Weekly streak calendar -->
       <div class="streak-calendar-card" id="streak-calendar-card"></div>
 
+      <!-- Hôm nay năm ngoái (v3.4, ẩn cho đến khi flag on_this_day được bật) -->
+      <div id="on-this-day-section" style="display:none;margin-bottom:16px"></div>
+
       <!-- Thanh cấp độ cảm xúc -->
       <div id="dash-level-bar"></div>
 
@@ -758,6 +761,7 @@ const PAGES = {
         '</div>' +
         '<button class="btn-primary" style="max-width:200px" onclick="App.saveProfileSettings()">&#128190; Lưu thay đổi</button>' +
         '<div id="set-profile-msg" class="settings-msg" style="display:none"></div>' +
+        '<div id="referral-section" style="display:none"></div>' +
       '</div>' +
       '<div id="settings-panel-security" class="settings-panel card" style="display:none">' +
         '<div class="settings-section-title">Đổi mật khẩu</div>' +

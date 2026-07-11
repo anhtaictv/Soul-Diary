@@ -110,6 +110,7 @@ const API = (() => {
     getMe:    ()     => request('/auth/me'),
     updateProfile:      (body) => request('/auth/profile',        { method: 'PUT', body }),
     getWritingPattern:  ()     => request('/auth/writing-pattern'),
+    getReferral:        ()     => request('/user/referral'),
 
     // Articles
     getArticles:    (cat='', search='', type='') => request(`/articles?category=${cat}&search=${encodeURIComponent(search)}&type=${type}`),
@@ -146,6 +147,7 @@ const API = (() => {
     getMentalHealth:  ()                     => request('/diary/mental-health'),
     getEntryEmotion:  (id)                   => request(`/diary/${id}/emotion`),
     getEmotionRadar:  ()                     => request('/diary/emotion-radar'),
+    getOnThisDay:     ()                     => request('/diary/on-this-day'),
     shareEntry:       (id)                   => request(`/diary/${id}/share`, { method: 'POST' }),
     revokeShare:      (id)                   => request(`/diary/${id}/share`, { method: 'DELETE' }),
     getSharedEntry:   (token)                => request(`/diary/share/${token}`),
