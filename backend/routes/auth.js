@@ -31,7 +31,7 @@ function signToken(user) {
 // ── POST /api/auth/register ──────────────────────────────────────────────
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, password, full_name } = req.body;
+    const { username, email, password, full_name, ref } = req.body;
 
     // Validate
     if (!username || !email || !password) {
@@ -78,6 +78,28 @@ router.post('/register', async (req, res) => {
       `);
 
     const user  = result.recordset[0];
+
+    // Sinh mã giới thiệu riêng + gắn người mời nếu có (v3.4, cần flag referral_program)
+    const referralCode = 'SD' + String(user.id).padStart(6, '0');
+    let referredBy = null;
+    if (ref) {
+      const flagRes = await db.request().query(
+        `SELECT enabled FROM FeatureFlags WHERE flag_key='referral_program'`
+      );
+      if (flagRes.recordset.length && flagRes.recordset[0].enabled) {
+        const refRes = await db.request()
+          .input('rc', sql.NVarChar, String(ref).trim())
+          .query('SELECT id FROM Users WHERE referral_code=@rc');
+        if (refRes.recordset.length) referredBy = refRes.recordset[0].id;
+      }
+    }
+    await db.request()
+      .input('id', sql.Int, user.id)
+      .input('rc', sql.NVarChar, referralCode)
+      .input('rb', sql.Int, referredBy)
+      .query('UPDATE Users SET referral_code=@rc, referred_by=@rb WHERE id=@id');
+    user.referral_code = referralCode;
+
     const token = signToken(user);
 
     // Thông báo chào mừng (notification_center) — fire-and-forget
@@ -105,6 +127,7 @@ router.post('/register', async (req, res) => {
         streak:        user.streak,
         streak_freeze: user.streak_freeze,
         max_streak:    user.max_streak,
+        referral_code: user.referral_code,
       },
     });
   } catch (err) {

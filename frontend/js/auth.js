@@ -110,7 +110,9 @@ const Auth = (() => {
 
     setLoading('btn-register', true);
     try {
-      const data = await API.register({ full_name, username, email, password });
+      const ref  = localStorage.getItem('nhk_ref') || undefined;
+      const data = await API.register({ full_name, username, email, password, ref });
+      localStorage.removeItem('nhk_ref');
       saveSession(data.token, data.user);
       showApp(data.user);
     } catch (err) {
@@ -221,6 +223,13 @@ const Auth = (() => {
     if (resetToken) {
       showReset(resetToken);
       return;
+    }
+
+    // Mã giới thiệu (v3.4, referral_program) — lưu lại để gắn khi đăng ký
+    const refCode = urlParams.get('ref');
+    if (refCode) {
+      localStorage.setItem('nhk_ref', refCode.trim());
+      if (!isLoggedIn()) showTab('register');
     }
 
     if (!isLoggedIn()) return; // Hiển thị auth screen (mặc định)

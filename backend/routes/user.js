@@ -41,4 +41,20 @@ router.get('/export', async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
+// GET /api/user/referral — mã giới thiệu + thống kê (v3.4, flag referral_program)
+router.get('/referral', async (req, res) => {
+  try {
+    const db  = await getPool();
+    const uid = req.user.id;
+    const r = await db.request().input('uid', sql.Int, uid).query(`
+      SELECT referral_code,
+        (SELECT COUNT(*) FROM Users WHERE referred_by=@uid) AS referredCount,
+        (SELECT COUNT(*) FROM Users WHERE referred_by=@uid AND referral_rewarded=1) AS rewardsEarned
+      FROM Users WHERE id=@uid
+    `);
+    if (!r.recordset.length) return res.status(404).json({ message: 'Không tìm thấy người dùng.' });
+    res.json(r.recordset[0]);
+  } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
 module.exports = router;

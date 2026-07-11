@@ -2,14 +2,14 @@ const sql = require('mssql');
 const { dataUriToBuffer } = require('../utils/media');
 
 const config = {
-  server:   'localhost',
-  port:     1433,
-  user:     'sa',
-  password: 'Anhtai99@',
-  database: 'NhatKyCamXuc',
+  server:   process.env.DB_SERVER || 'localhost',
+  port:     Number(process.env.DB_PORT) || 1433,
+  user:     process.env.DB_USER || 'sa',
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME || 'NhatKyCamXuc',
   options: {
-    encrypt: false,
-    trustServerCertificate: true,
+    encrypt: process.env.DB_ENCRYPT === 'true',
+    trustServerCertificate: process.env.DB_TRUST_SERVER_CERT !== 'false',
     enableArithAbort: true,
   },
   pool: {
@@ -1341,6 +1341,51 @@ async function initSchema() {
   // Dọn flag 'offline_mode' (v2.0) — bị bỏ hoang từ lâu, không có code nào tham chiếu tới,
   // trùng ý nghĩa với flag 'offline_draft_queue' (v3.3) mới là flag thực sự điều khiển tính năng này.
   await db.request().query(`DELETE FROM FeatureFlags WHERE flag_key='offline_mode'`);
+
+  // ── v3.4: Cột giới thiệu bạn bè & nhắc quay lại vào Users ────────────────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Users' AND COLUMN_NAME='last_winback_notif_at')
+    ALTER TABLE Users ADD last_winback_notif_at DATETIME2 NULL
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Users' AND COLUMN_NAME='referral_code')
+    ALTER TABLE Users ADD referral_code NVARCHAR(20) NULL
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Users' AND COLUMN_NAME='referred_by')
+    ALTER TABLE Users ADD referred_by INT NULL REFERENCES Users(id)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Users' AND COLUMN_NAME='referral_rewarded')
+    ALTER TABLE Users ADD referral_rewarded BIT NOT NULL DEFAULT 0
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='UQ_Users_referral_code')
+    CREATE UNIQUE INDEX UQ_Users_referral_code ON Users(referral_code) WHERE referral_code IS NOT NULL
+  `);
+  // Backfill mã giới thiệu cho user đã tồn tại trước v3.4
+  await db.request().query(`
+    UPDATE Users SET referral_code = 'SD' + RIGHT('000000' + CAST(id AS VARCHAR(6)), 6)
+    WHERE referral_code IS NULL
+  `);
+
+  // ── v3.4: Feature flags (enabled=0 — bật qua admin panel) ───────────────
+  const v34flags = [
+    { key: 'winback_reengagement', label: 'Nhắc quay lại',        desc: 'Gửi push/email nhắc nhở cá nhân hoá cho người dùng không hoạt động sau 5 ngày, tối đa 1 lần/tuần', ver: 'v3.4', title: 'Giữ chân người dùng', sort: 340 },
+    { key: 'referral_program',     label: 'Giới thiệu bạn bè',    desc: 'Link mời bạn bè kèm mã giới thiệu — khi bạn được mời duy trì streak 7 ngày, người mời nhận 1 lượt cứu streak', ver: 'v3.4', title: 'Giữ chân người dùng', sort: 341 },
+    { key: 'on_this_day',          label: 'Hôm nay năm ngoái',    desc: 'Hiển thị lại nhật ký cùng ngày các năm trước ngay trên trang chủ', ver: 'v3.4', title: 'Giữ chân người dùng', sort: 342 },
+  ];
+  for (const f of v34flags) {
+    await db.request()
+      .input('k', sql.NVarChar, f.key).input('l', sql.NVarChar, f.label)
+      .input('d', sql.NVarChar, f.desc).input('v', sql.NVarChar, f.ver)
+      .input('vt', sql.NVarChar, f.title).input('s', sql.Int, f.sort)
+      .query(`
+        IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key = @k)
+        INSERT INTO FeatureFlags (flag_key, label, description, version, version_title, enabled, sort_order)
+        VALUES (@k, @l, @d, @v, @vt, 0, @s)
+      `);
+  }
 
   console.log('✅ Schema đã sẵn sàng');
 }
