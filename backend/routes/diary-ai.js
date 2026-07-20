@@ -3,6 +3,7 @@
 const express = require('express');
 const { getPool, sql } = require('../db');
 const { genai, DAILY_PROMPTS, dayOfYear } = require('../utils/diary-helpers');
+const { decryptRows } = require('../utils/diary-crypto');
 
 const router = express.Router();
 
@@ -121,7 +122,7 @@ router.get('/ai-coach', async (req, res) => {
       SELECT TOP 30 mood_score, event_text, tags, created_at
       FROM DiaryEntries WHERE user_id = @uid ORDER BY created_at DESC
     `);
-    const entries = entriesR.recordset;
+    const entries = decryptRows(entriesR.recordset, ['event_text']);
     if (entries.length < 3)
       return res.json({ advice: null, message: 'Cần ít nhất 3 nhật ký để phân tích.' });
 

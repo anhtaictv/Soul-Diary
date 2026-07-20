@@ -2,6 +2,7 @@ const express        = require('express');
 const router         = express.Router();
 const { getPool, sql } = require('../db');
 const authMiddleware   = require('../middleware/auth');
+const { decryptRows }  = require('../utils/diary-crypto');
 
 router.use(authMiddleware);
 
@@ -28,7 +29,7 @@ router.get('/export', async (req, res) => {
       exported_at: new Date().toISOString(),
       version: 'v2.0',
       user:     userR.recordset[0],
-      diary:    entriesR.recordset,
+      diary:    decryptRows(entriesR.recordset, ['event_text', 'thoughts', 'gratitude']),
       checkins: checkinsR.recordset,
       future_letters: lettersR.recordset,
       goals:    goalsR.recordset,

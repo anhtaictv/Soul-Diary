@@ -6,6 +6,7 @@ const { getPool, sql }  = require('../db');
 const authMiddleware    = require('../middleware/auth');
 const { analyzeEntry, companionMessage } = require('../utils/diary-helpers');
 const { dataUriToBuffer, bufferToDataUri } = require('../utils/media');
+const { encryptField, decryptRow, decryptRows } = require('../utils/diary-crypto');
 
 const router = express.Router();
 
@@ -90,7 +91,7 @@ router.get('/share/:token', async (req, res) => {
       `);
     if (!r.recordset.length)
       return res.status(404).json({ message: 'Liên kết không hợp lệ hoặc đã bị thu hồi.' });
-    res.json({ entry: r.recordset[0] });
+    res.json({ entry: decryptRow(r.recordset[0], ['event_text', 'gratitude']) });
   } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
 });
 
@@ -112,23 +113,23 @@ router.get('/search', async (req, res) => {
 
     const db = await getPool();
     const r  = db.request().input('user_id', sql.Int, req.user.id);
-    if (q)              r.input('q',        sql.NVarChar, `%${q}%`);
     if (from)           r.input('from',     sql.Date,     from);
     if (to)             r.input('to',       sql.Date,     to);
     if (moodMin !== null) r.input('mood_min', sql.Int, moodMin);
     if (moodMax !== null) r.input('mood_max', sql.Int, moodMax);
 
+    // event_text/thoughts/gratitude đã mã hoá at-rest → không thể LIKE trong SQL. Lọc theo mọi
+    // tiêu chí khác ở SQL (không đổi), rồi nếu có `q` thì giải mã + lọc substring phía Node.
     const result = await r.query(`
-      SELECT TOP 50 d.id, d.mood_score, d.event_text, d.tags, d.cbt_data, d.created_at,
+      SELECT d.id, d.mood_score, d.event_text, d.thoughts, d.gratitude, d.tags, d.cbt_data, d.created_at,
                     d.has_photos, d.photo_count, d.has_audio
       FROM (
-        SELECT e.id, e.mood_score, e.event_text, e.tags, e.cbt_data, e.created_at,
-               (SELECT COUNT(*) FROM EntryPhotos WHERE entry_id=e.id) AS photo_count,
-               CAST(CASE WHEN EXISTS(SELECT 1 FROM EntryPhotos WHERE entry_id=e.id) THEN 1 ELSE 0 END AS BIT) AS has_photos,
+        SELECT e.id, e.mood_score, e.event_text, e.thoughts, e.gratitude, e.tags, e.cbt_data, e.created_at,
+               (SELECT COUNT(*) FROM DiaryMedia WHERE entry_id=e.id AND kind='photo') AS photo_count,
+               CAST(CASE WHEN EXISTS(SELECT 1 FROM DiaryMedia WHERE entry_id=e.id AND kind='photo') THEN 1 ELSE 0 END AS BIT) AS has_photos,
                CAST(CASE WHEN e.audio_data IS NOT NULL THEN 1 ELSE 0 END AS BIT) AS has_audio
         FROM DiaryEntries e
         WHERE e.user_id = @user_id
-          ${q       ? 'AND (e.event_text LIKE @q OR e.thoughts LIKE @q OR e.gratitude LIKE @q OR e.tags LIKE @q)' : ''}
           ${from    ? 'AND CAST(e.created_at AS DATE) >= @from' : ''}
           ${to      ? 'AND CAST(e.created_at AS DATE) <= @to'   : ''}
           ${moodMin !== null ? 'AND e.mood_score >= @mood_min' : ''}
@@ -139,7 +140,19 @@ router.get('/search', async (req, res) => {
       ORDER BY d.created_at DESC
     `);
 
-    res.json({ entries: result.recordset.map(e => ({ ...e, tags: e.tags ? e.tags.split('|') : [] })) });
+    let entries = decryptRows(result.recordset, ['event_text', 'thoughts', 'gratitude', 'cbt_data']);
+    if (q) {
+      const needle = q.toLowerCase();
+      entries = entries.filter(e =>
+        (e.event_text && e.event_text.toLowerCase().includes(needle)) ||
+        (e.thoughts   && e.thoughts.toLowerCase().includes(needle))   ||
+        (e.gratitude  && e.gratitude.toLowerCase().includes(needle))  ||
+        (e.tags       && e.tags.toLowerCase().includes(needle))
+      );
+    }
+    entries = entries.slice(0, 50).map(({ thoughts, gratitude, ...e }) => ({ ...e, tags: e.tags ? e.tags.split('|') : [] }));
+
+    res.json({ entries });
   } catch (err) {
     console.error('Search diary error:', err);
     res.status(500).json({ message: 'Lỗi server.' });
@@ -160,7 +173,7 @@ router.get('/on-this-day', async (req, res) => {
         AND YEAR(created_at) < YEAR(GETDATE())
       ORDER BY created_at DESC
     `);
-    res.json({ entries: r.recordset.map(e => ({ ...e, tags: e.tags ? e.tags.split('|') : [] })) });
+    res.json({ entries: decryptRows(r.recordset, ['event_text']).map(e => ({ ...e, tags: e.tags ? e.tags.split('|') : [] })) });
   } catch (err) {
     console.error('On this day error:', err);
     res.status(500).json({ message: 'Lỗi server.' });
@@ -209,8 +222,9 @@ router.get('/', async (req, res) => {
       mR.recordset.forEach(r => mediaCountMap.set(r.entry_id, { photo_count: r.photo_count, has_audio: r.has_audio === 1 }));
     }
 
+    const decrypted = decryptRows(dataResult.recordset, ['event_text', 'thoughts', 'gratitude', 'cbt_data', 'ai_emotion', 'ai_companion_message']);
     res.json({
-      entries: dataResult.recordset.map(e => {
+      entries: decrypted.map(e => {
         const mc = mediaCountMap.get(e.id) || { photo_count: 0, has_audio: false };
         return { ...e, tags: e.tags ? e.tags.split('|') : [], has_photos: mc.photo_count > 0, photo_count: mc.photo_count, has_audio: mc.has_audio };
       }),
@@ -256,19 +270,20 @@ router.post('/', async (req, res) => {
     const result = await db.request()
       .input('user_id',    sql.Int,      req.user.id)
       .input('mood_score', sql.TinyInt,  mood_score)
-      .input('event_text', sql.NVarChar, event_text  || '')
-      .input('thoughts',   sql.NVarChar, thoughts    || '')
-      .input('gratitude',  sql.NVarChar, gratitude   || '')
+      .input('event_text', sql.NVarChar, encryptField(event_text  || ''))
+      .input('thoughts',   sql.NVarChar, encryptField(thoughts    || ''))
+      .input('gratitude',  sql.NVarChar, encryptField(gratitude   || ''))
       .input('tags',       sql.NVarChar, tagsStr)
-      .input('cbt_data',   sql.NVarChar, cbtJson)
+      .input('cbt_data',   sql.NVarChar, encryptField(cbtJson))
       .query(`
         INSERT INTO DiaryEntries (user_id, mood_score, event_text, thoughts, gratitude, tags, cbt_data)
-        OUTPUT INSERTED.id, INSERTED.mood_score, INSERTED.event_text, INSERTED.thoughts,
-               INSERTED.gratitude, INSERTED.tags, INSERTED.cbt_data, INSERTED.created_at
+        OUTPUT INSERTED.id, INSERTED.mood_score, INSERTED.tags, INSERTED.created_at
         VALUES (@user_id, @mood_score, @event_text, @thoughts, @gratitude, @tags, @cbt_data)
       `);
 
-    const entry = result.recordset[0];
+    // event_text/thoughts/gratitude/cbt_data đã mã hoá trong OUTPUT INSERTED — dùng lại giá trị
+    // plaintext gốc còn trong biến JS cho response, khỏi phải giải mã lại.
+    const entry = { ...result.recordset[0], event_text: event_text || '', thoughts: thoughts || '', gratitude: gratitude || '', cbt_data: cbtJson };
     await saveMedia(db, entry.id, validPhotos, audioData);
 
     // Cập nhật streak
@@ -351,8 +366,8 @@ router.post('/', async (req, res) => {
           ]);
           await db2.request()
             .input('id', sql.Int,      entry.id)
-            .input('ae', sql.NVarChar, JSON.stringify(analysis))
-            .input('cm', sql.NVarChar, msg)
+            .input('ae', sql.NVarChar, encryptField(JSON.stringify(analysis)))
+            .input('cm', sql.NVarChar, encryptField(msg))
             .query(`UPDATE DiaryEntries SET ai_emotion=@ae, ai_companion_message=@cm WHERE id=@id`);
         }
       } catch {}
@@ -399,25 +414,24 @@ router.put('/:id', async (req, res) => {
       .input('id',         sql.Int,      req.params.id)
       .input('user_id',    sql.Int,      req.user.id)
       .input('mood_score', sql.TinyInt,  mood_score)
-      .input('event_text', sql.NVarChar, event_text || '')
-      .input('thoughts',   sql.NVarChar, thoughts   || '')
-      .input('gratitude',  sql.NVarChar, gratitude  || '')
+      .input('event_text', sql.NVarChar, encryptField(event_text || ''))
+      .input('thoughts',   sql.NVarChar, encryptField(thoughts   || ''))
+      .input('gratitude',  sql.NVarChar, encryptField(gratitude  || ''))
       .input('tags',       sql.NVarChar, tagsStr)
-      .input('cbt_data',   sql.NVarChar, cbtJson)
+      .input('cbt_data',   sql.NVarChar, encryptField(cbtJson))
       .query(`
         UPDATE DiaryEntries
         SET mood_score=@mood_score, event_text=@event_text, thoughts=@thoughts,
             gratitude=@gratitude, tags=@tags, cbt_data=@cbt_data,
             audio_data=NULL, photos=NULL, updated_at=GETDATE()
-        OUTPUT INSERTED.id, INSERTED.mood_score, INSERTED.event_text, INSERTED.thoughts,
-               INSERTED.gratitude, INSERTED.tags, INSERTED.cbt_data, INSERTED.created_at
+        OUTPUT INSERTED.id, INSERTED.mood_score, INSERTED.tags, INSERTED.created_at
         WHERE id=@id AND user_id=@user_id
       `);
 
     if (!result.recordset.length)
       return res.status(404).json({ message: 'Không tìm thấy nhật ký.' });
 
-    const entry = result.recordset[0];
+    const entry = { ...result.recordset[0], event_text: event_text || '', thoughts: thoughts || '', gratitude: gratitude || '', cbt_data: cbtJson };
     await db.request().input('id', sql.Int, entry.id).query('DELETE FROM DiaryMedia WHERE entry_id = @id');
     await saveMedia(db, entry.id, validPhotos, audioData);
 
@@ -436,14 +450,14 @@ router.get('/:id/emotion', async (req, res) => {
       .input('id', sql.Int, req.params.id).input('user_id', sql.Int, req.user.id)
       .query(`SELECT id, mood_score, event_text, thoughts, gratitude, ai_emotion FROM DiaryEntries WHERE id=@id AND user_id=@user_id`);
     if (!row.recordset.length) return res.status(404).json({ message: 'Không tìm thấy.' });
-    const entry = row.recordset[0];
+    const entry = decryptRow(row.recordset[0], ['event_text', 'thoughts', 'gratitude', 'ai_emotion']);
     if (entry.ai_emotion) {
       try { return res.json({ analysis: JSON.parse(entry.ai_emotion), cached: true }); } catch {}
     }
     const text = [entry.event_text, entry.thoughts, entry.gratitude].filter(Boolean).join('\n');
     if (!text.trim()) return res.json({ analysis: null });
     const analysis = await analyzeEntry(text, entry.mood_score);
-    await db.request().input('id', sql.Int, req.params.id).input('ae', sql.NVarChar, JSON.stringify(analysis))
+    await db.request().input('id', sql.Int, req.params.id).input('ae', sql.NVarChar, encryptField(JSON.stringify(analysis)))
       .query(`UPDATE DiaryEntries SET ai_emotion=@ae WHERE id=@id`);
     res.json({ analysis, cached: false });
   } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
@@ -457,12 +471,12 @@ router.get('/:id/companion', async (req, res) => {
       .input('id', sql.Int, req.params.id).input('user_id', sql.Int, req.user.id)
       .query(`SELECT id, mood_score, event_text, thoughts, gratitude, ai_companion_message FROM DiaryEntries WHERE id=@id AND user_id=@user_id`);
     if (!row.recordset.length) return res.status(404).json({ message: 'Không tìm thấy.' });
-    const entry = row.recordset[0];
+    const entry = decryptRow(row.recordset[0], ['event_text', 'thoughts', 'gratitude', 'ai_companion_message']);
     if (entry.ai_companion_message) return res.json({ message: entry.ai_companion_message, cached: true });
     const text = [entry.event_text, entry.thoughts, entry.gratitude].filter(Boolean).join('\n');
     if (!text.trim()) return res.json({ message: null });
     const message = await companionMessage(text, entry.mood_score);
-    await db.request().input('id', sql.Int, req.params.id).input('m', sql.NVarChar, message)
+    await db.request().input('id', sql.Int, req.params.id).input('m', sql.NVarChar, encryptField(message))
       .query(`UPDATE DiaryEntries SET ai_companion_message=@m WHERE id=@id`);
     res.json({ message, cached: false });
   } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
@@ -540,7 +554,7 @@ router.get('/:id', async (req, res) => {
       FROM DiaryEntries WHERE id=@id AND user_id=@uid
     `);
     if (!r.recordset.length) return res.status(404).json({ message: 'Không tìm thấy nhật ký.' });
-    const entry    = r.recordset[0];
+    const entry    = decryptRow(r.recordset[0], ['event_text', 'thoughts', 'gratitude', 'ai_emotion', 'ai_companion_message', 'cbt_data']);
     const mediaMap = await loadMediaForEntries(db, [entry.id]);
     res.json({ entry: { ...entry, tags: entry.tags ? entry.tags.split('|') : [], photos: mediaMap.get(entry.id)?.photos || [], audio_data: mediaMap.get(entry.id)?.audio_data || null } });
   } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
