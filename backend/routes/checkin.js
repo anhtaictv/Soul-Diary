@@ -4,6 +4,7 @@ const { getPool, sql } = require('../db');
 const authMiddleware    = require('../middleware/auth');
 const { getCheckinWeek } = require('../utils/checkinWeek');
 const { GoogleGenerativeAI, SchemaType } = require('@google/generative-ai');
+const { decryptRows } = require('../utils/diary-crypto');
 
 const genai = process.env.GEMINI_API_KEY
   ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
@@ -305,7 +306,7 @@ router.post('/submit', async (req, res) => {
         WHERE user_id=@user_id AND created_at >= DATEADD(DAY, -7, GETDATE())
         ORDER BY created_at ASC
       `);
-    const diaryEntries = diaryRes.recordset
+    const diaryEntries = decryptRows(diaryRes.recordset, ['event_text', 'thoughts', 'gratitude'])
       .map(r => ({
         date: new Date(r.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
         content: summarizeDiaryEntry(r),

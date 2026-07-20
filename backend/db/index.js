@@ -1,5 +1,6 @@
 const sql = require('mssql');
 const { dataUriToBuffer } = require('../utils/media');
+const { encryptField } = require('../utils/diary-crypto');
 
 const config = {
   server:   process.env.DB_SERVER || 'localhost',
@@ -91,6 +92,33 @@ async function migrateLegacyMedia() {
       .query(`UPDATE DiaryEntries SET photos = NULL, audio_data = NULL WHERE id = @id`);
   }
   console.log(`✅ Đã chuyển ${rows.recordset.length} nhật ký sang lưu ảnh/audio dạng nhị phân (DiaryMedia)`);
+}
+
+// Mã hoá at-rest nội dung nhật ký cũ còn ở dạng plaintext (AES-256-GCM, xem utils/diary-crypto.js).
+// Idempotent: chỉ những giá trị chưa có tiền tố "enc1:" mới được mã hoá lại, nên chạy lại nhiều lần
+// (mỗi lần server khởi động) không gây hại — giống hệt cách migrateLegacyMedia() ở trên hoạt động.
+const ENCRYPTED_DIARY_FIELDS = ['event_text', 'thoughts', 'gratitude', 'cbt_data', 'ai_emotion', 'ai_companion_message'];
+
+async function encryptLegacyDiaryText() {
+  const db = await getPool();
+  const rows = await db.request().query(`
+    SELECT id, ${ENCRYPTED_DIARY_FIELDS.join(', ')} FROM DiaryEntries
+  `);
+  let migrated = 0;
+  for (const row of rows.recordset) {
+    const set = [];
+    const req = db.request().input('id', sql.Int, row.id);
+    for (const field of ENCRYPTED_DIARY_FIELDS) {
+      const value = row[field];
+      if (value === null || value === '' || value.startsWith('enc1:')) continue;
+      set.push(`${field}=@${field}`);
+      req.input(field, sql.NVarChar, encryptField(value));
+    }
+    if (!set.length) continue;
+    await req.query(`UPDATE DiaryEntries SET ${set.join(', ')} WHERE id=@id`);
+    migrated++;
+  }
+  if (migrated) console.log(`✅ Đã mã hoá at-rest nội dung của ${migrated} nhật ký cũ`);
 }
 
 async function initSchema() {
@@ -300,6 +328,9 @@ async function initSchema() {
   // Idempotent: chỉ những entry còn photos/audio_data NOT NULL mới được xử lý; sau khi xong
   // cột cũ được set NULL nên lần khởi động sau sẽ không còn gì để xử lý.
   await migrateLegacyMedia();
+
+  // Mã hoá at-rest nội dung nhật ký cũ (chạy 1 lần cho các row còn plaintext, xem hàm phía trên)
+  await encryptLegacyDiaryText();
 
   // Articles table
   await db.request().query(`

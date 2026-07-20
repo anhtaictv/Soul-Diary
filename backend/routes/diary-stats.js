@@ -3,6 +3,7 @@
 const express    = require('express');
 const { getPool, sql } = require('../db');
 const { bufferToDataUri } = require('../utils/media');
+const { decryptField, decryptRow, decryptRows } = require('../utils/diary-crypto');
 
 const router = express.Router();
 
@@ -177,7 +178,7 @@ router.get('/mental-health', async (req, res) => {
     for (const row of emotionRes.recordset) {
       if (row.ai_emotion) {
         try {
-          const ae = JSON.parse(row.ai_emotion);
+          const ae = JSON.parse(decryptField(row.ai_emotion));
           if (ae.emotions) ae.emotions.forEach(e => { emotionCount[e.name] = (emotionCount[e.name] || 0) + e.percent; });
         } catch {}
       } else if (row.tags) {
@@ -193,7 +194,7 @@ router.get('/mental-health', async (req, res) => {
     for (const row of themeRes.recordset) {
       if (row.ai_emotion) {
         try {
-          const ae = JSON.parse(row.ai_emotion);
+          const ae = JSON.parse(decryptField(row.ai_emotion));
           if (ae.themes) ae.themes.forEach(t => { themeCount[t] = (themeCount[t]||0)+1; });
         } catch {}
       }
@@ -225,7 +226,7 @@ router.get('/emotion-radar', async (req, res) => {
     let entryCount = 0;
     for (const row of r.recordset) {
       try {
-        const data = JSON.parse(row.ai_emotion);
+        const data = JSON.parse(decryptField(row.ai_emotion));
         if (Array.isArray(data.emotions)) {
           entryCount++;
           for (const em of data.emotions)
@@ -428,8 +429,7 @@ router.get('/gallery', async (req, res) => {
   try {
     const db = await getPool();
     const r  = await db.request().input('uid', sql.Int, req.user.id).query(`
-      SELECT TOP 50 e.id, e.mood_score, e.created_at,
-             SUBSTRING(ISNULL(e.event_text,''), 1, 80) AS event_text,
+      SELECT TOP 50 e.id, e.mood_score, e.created_at, e.event_text,
              m.mime_type, m.data
       FROM DiaryEntries e
       INNER JOIN DiaryMedia m ON m.entry_id = e.id AND m.kind = 'photo' AND m.sort_order = 0
@@ -437,7 +437,7 @@ router.get('/gallery', async (req, res) => {
     `);
     const entries = r.recordset.map(row => ({
       id: row.id, mood_score: row.mood_score, created_at: row.created_at,
-      event_text: row.event_text, photo: bufferToDataUri(row.mime_type, row.data),
+      event_text: decryptField(row.event_text || '').slice(0, 80), photo: bufferToDataUri(row.mime_type, row.data),
     }));
     res.json({ entries });
   } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
@@ -463,13 +463,14 @@ router.get('/export', async (req, res) => {
         WHERE user_id = @uid AND created_at >= @from AND CAST(created_at AS DATE) <= @to
         ORDER BY created_at DESC
       `);
-    if (fmt === 'json') return res.json({ entries: result.recordset, from, to });
+    const decrypted = decryptRows(result.recordset, ['event_text', 'thoughts', 'gratitude']);
+    if (fmt === 'json') return res.json({ entries: decrypted, from, to });
 
     const BOM  = '﻿';
     const CRLF = '\r\n';
     const esc  = s => `"${String(s || '').replace(/"/g, '""')}"`;
     const hdr  = ['Ngày','Giờ','Tâm trạng','Sự kiện / Cảm xúc','Suy nghĩ','Lòng biết ơn','Tags'].join(',');
-    const rows = result.recordset.map(r => {
+    const rows = decrypted.map(r => {
       let tags = ''; try { tags = JSON.parse(r.tags).join('; '); } catch(_) {}
       return [r.entry_date, r.entry_time, r.mood_score, esc(r.event_text), esc(r.thoughts), esc(r.gratitude), esc(tags)].join(',');
     });
