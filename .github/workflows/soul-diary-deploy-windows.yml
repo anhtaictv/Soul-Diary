@@ -1,0 +1,50 @@
+name: Deploy (VPS via PM2)
+
+# Manual only — chạy từ tab Actions khi thực sự muốn deploy.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-windows
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, souldiary-vps]
+    environment: production
+    steps:
+      # Checkout vào workspace riêng của runner (không phải thẳng vào nhat-ky-fullstack).
+      - uses: actions/checkout@v4
+
+      - name: Sync code into place
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $dest = "C:\Users\Administrator\Desktop\nhat-ky-fullstack\backend"
+
+          # Xoá trước từng entry cùng tên ở đích (không đụng .env hay node_modules —
+          # 2 thứ đó không nằm trong git repo nên không có trong danh sách $source).
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Get-ChildItem "backend" -Name | ForEach-Object {
+            $target = Join-Path $dest $_
+            if (Test-Path $target) { Remove-Item $target -Recurse -Force }
+          }
+          Copy-Item -Path "backend\*" -Destination $dest -Recurse -Force
+
+      - name: Install deps, migrate, restart via pm2
+        shell: powershell
+        working-directory: C:\Users\Administrator\Desktop\nhat-ky-fullstack\backend
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          # pm2 stop trước khi npm ci — process đang chạy giữ file .node/native addon
+          # đang dùng, unlink sẽ lỗi EPERM.
+          pm2 stop souldiary-api
+
+          npm ci --omit=dev
+
+          pm2 restart souldiary-api
+          pm2 save
