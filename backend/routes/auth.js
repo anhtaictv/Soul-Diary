@@ -221,6 +221,11 @@ router.put('/profile', authMiddleware, async (req, res) => {
     const { full_name, bio, avatar_url } = req.body;
     if (!full_name) return res.status(400).json({ message: 'Tên không được để trống.' });
     if (bio && bio.length > 300) return res.status(400).json({ message: 'Bio tối đa 300 ký tự.' });
+    // Chỉ chấp nhận data URI ảnh do canvas client tạo ra (xem handleAvatarUpload) — chặn XSS
+    // qua avatar_url nếu có client khác gọi thẳng API với giá trị tùy ý.
+    if (avatar_url && !/^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(avatar_url)) {
+      return res.status(400).json({ message: 'Ảnh đại diện không hợp lệ.' });
+    }
 
     const avatarText = full_name.substring(0, 2).toUpperCase();
     const db = await getPool();

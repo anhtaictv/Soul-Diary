@@ -338,7 +338,7 @@ const App = (() => {
         ${withDelete ? `<button onclick="event.stopPropagation();App.deleteEntry(${e.id},this)" data-tooltip="Xóa nhật ký" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-hint);padding:4px">🗑</button>` : ''}
       </div>
       ${(cbtPreview || e.event_text) ? `<div class="entry-preview">${_searchActive && _lastSearchQ ? _highlightTerm(cbtPreview || e.event_text, _lastSearchQ) : escapeHtml(cbtPreview || e.event_text)}</div>` : ''}
-      ${tags.length ? `<div class="entry-tags">${tags.map(t=>`<span class="entry-tag">${t}</span>`).join('')}</div>` : ''}
+      ${tags.length ? `<div class="entry-tags">${tags.map(t=>`<span class="entry-tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
       ${mediaHints.length ? `<div style="font-size:12px;color:var(--text-hint);margin-top:6px">${mediaHints.join(' · ')}</div>` : ''}
     </div>`;
   }
@@ -3660,7 +3660,7 @@ const App = (() => {
     document.getElementById('lesson-modal-content').innerHTML = `
       <div style="font-size:11px;color:var(--text-hint);margin-bottom:6px">${escapeHtml(course.title)} · Bài ${lessonState.lessonIdx + 1}/${total}</div>
       <div style="font-weight:700;font-size:16px;margin-bottom:12px">${escapeHtml(lesson.title)}</div>
-      <div style="white-space:pre-wrap;font-size:13px;line-height:1.7;color:var(--text)">${escapeHtml(lesson.content)}</div>`;
+      <div style="white-space:pre-wrap;font-size:13px;line-height:1.7;color:var(--text)">${escapeHtml(lesson.body)}</div>`;
     const prevBtn = document.getElementById('lesson-prev-btn');
     const nextBtn = document.getElementById('lesson-next-btn');
     prevBtn.style.display = lessonState.lessonIdx > 0 ? '' : 'none';
@@ -3675,7 +3675,7 @@ const App = (() => {
     if (newIdx >= course.lessons.length) {
       // Đánh dấu hoàn thành
       try {
-        await API.saveCourseProgress(course.id, lessonState.lessonIdx);
+        await API.saveCourseProgress(course.id, newIdx);
         showToast('🎉 Bạn đã hoàn thành khóa học này!');
         closeLessonModal();
         initCoursesPage();
@@ -4869,8 +4869,8 @@ const App = (() => {
       const me = Auth.getUser();
       el.innerHTML = d.friends.map((f, i) => {
         const avatarHtml = f.avatar_url
-          ? `<img src="${f.avatar_url}" loading="lazy" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0">`
-          : `<div class="user-avatar" style="width:44px;height:44px;font-size:18px;flex-shrink:0">${f.avatar_text || f.username[0].toUpperCase()}</div>`;
+          ? `<img src="${escapeHtml(f.avatar_url)}" loading="lazy" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0">`
+          : `<div class="user-avatar" style="width:44px;height:44px;font-size:18px;flex-shrink:0">${escapeHtml(f.avatar_text || f.username[0].toUpperCase())}</div>`;
         const wroteToday = f.wrote_today ? '✅ Đã viết hôm nay' : '⏳ Chưa viết hôm nay';
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
         return `
@@ -5623,7 +5623,7 @@ const App = (() => {
       const lockedBadges  = BADGES.filter(b => !b.cond(d));
 
       const avatarHtml = d.avatarUrl
-        ? `<img src="${d.avatarUrl}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)">`
+        ? `<img src="${escapeHtml(d.avatarUrl)}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)">`
         : `<div class="user-avatar" style="width:80px;height:80px;font-size:28px">${escapeHtml(d.avatarText || 'SD')}</div>`;
 
       const moodDist  = d.moodDistribution || {};

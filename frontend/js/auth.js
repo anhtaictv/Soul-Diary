@@ -134,7 +134,7 @@ const Auth = (() => {
     const el = document.getElementById('user-avatar');
     if (el) {
       if (user.avatar_url) {
-        el.innerHTML = `<img src="${user.avatar_url}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover">`;
+        el.innerHTML = `<img src="${escapeHtml(user.avatar_url)}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover">`;
       } else {
         el.textContent = user.avatar_text || 'SV';
       }
