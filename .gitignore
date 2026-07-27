@@ -1,3 +1,11 @@
 node_modules/
 .env
 .env.*
+
+# Local tooling / editor / backup artifacts — not part of project source
+.claude/
+.vscode/
+.git-rewrite/
+_backup/
+monitoring/health-check.log
+monitoring/health-check-state.json
