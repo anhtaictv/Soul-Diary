@@ -48,6 +48,11 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
 
+          # Service chay LocalSystem, khong co PATH cua user Administrator — pm2
+          # global chi nam trong AppData\Roaming\npm cua Administrator, khong o
+          # PATH may chu (khac voi node/npm o Program Files da san co tren PATH).
+          $env:Path = "C:\Users\Administrator\AppData\Roaming\npm;$env:Path"
+
           # pm2 stop trước khi npm ci — process đang chạy giữ file .node/native addon
           # đang dùng, unlink sẽ lỗi EPERM.
           pm2 stop souldiary-api
