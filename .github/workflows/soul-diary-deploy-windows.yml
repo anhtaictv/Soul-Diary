@@ -1,7 +1,9 @@
 name: Deploy (VPS via PM2)
 
-# Manual only — chạy từ tab Actions khi thực sự muốn deploy.
+# Tu dong khi push vao master, hoac bam tay tu tab Actions khi can.
 on:
+  push:
+    branches: [master]
   workflow_dispatch: {}
 
 permissions:
@@ -10,6 +12,12 @@ permissions:
 concurrency:
   group: deploy-windows
   cancel-in-progress: false
+
+env:
+  # Runner service khong chay duoi user Administrator, nhung PM2 daemon dang
+  # chay (souldiary-api) lai thuoc PM2_HOME cua Administrator. Tro thang toi
+  # do de pm2 stop/restart trong job nay noi dung voi dung daemon.
+  PM2_HOME: C:\Users\Administrator\.pm2
 
 jobs:
   deploy:
@@ -48,3 +56,18 @@ jobs:
 
           pm2 restart souldiary-api
           pm2 save
+
+      - name: Sync frontend into IIS
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $dest = "C:\inetpub\wwwroot\souldiary"
+
+          # IIS phuc vu file tinh truc tiep tu dia, khong can recycle app pool
+          # sau khi thay noi dung — sync xong la ap dung ngay cho request tiep theo.
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Get-ChildItem "frontend" -Name | ForEach-Object {
+            $target = Join-Path $dest $_
+            if (Test-Path $target) { Remove-Item $target -Recurse -Force }
+          }
+          Copy-Item -Path "frontend\*" -Destination $dest -Recurse -Force
