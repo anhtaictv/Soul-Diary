@@ -4,14 +4,15 @@
 
 **Không gian riêng tư để lắng nghe tâm hồn mình**
 
-[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v3.4-6366f1?style=for-the-badge&logo=github)](https://github.com/anhtaictv/Soul-Diary)
+[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v3.7.6-6366f1?style=for-the-badge&logo=github)](https://github.com/anhtaictv/Soul-Diary)
+[![Deploy](https://img.shields.io/github/actions/workflow/status/anhtaictv/Soul-Diary/soul-diary-deploy-windows.yml?style=for-the-badge&label=Deploy&logo=githubactions&logoColor=white)](https://github.com/anhtaictv/Soul-Diary/actions/workflows/soul-diary-deploy-windows.yml)
 [![Stack](https://img.shields.io/badge/Node.js_+_MSSQL-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)]()
 [![Vanilla JS](https://img.shields.io/badge/Vanilla_JS-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)]()
 [![License](https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge)]()
 
 <br/>
 
-*Ứng dụng nhật ký cảm xúc dành cho học sinh — sinh viên Việt Nam.*  
+*Ứng dụng nhật ký cảm xúc dành cho học sinh — sinh viên Việt Nam.*
 *Ghi lại cảm xúc mỗi ngày, theo dõi sức khoẻ tinh thần, và lớn lên cùng AI đồng hành.*
 
 </div>
@@ -31,6 +32,7 @@
 - Tìm kiếm & bộ lọc nhật ký theo ngày
 - Đính kèm ảnh, ghi âm giọng nói 30s
 - Xuất nhật ký ra PDF
+- **Mã hoá at-rest AES-256-GCM** — nội dung nhật ký không đọc được kể cả khi truy cập thẳng DB
 
 </td>
 <td width="50%">
@@ -41,6 +43,7 @@
 - **Trợ lý Tâm hồn AI** — phản hồi ấm áp, câu hỏi gợi mở
 - **Bản đồ cảm xúc tháng** — lịch thời tiết tâm hồn ☀️🌤️⛈️
 - Bài tập thở 4-7-8, PMR, Body Scan, 5-4-3-2-1
+- **Thư viện kiến thức** — bài viết + bài tập có trích dẫn nghiên cứu khoa học
 
 </td>
 </tr>
@@ -53,6 +56,7 @@
 - **Hạt mầm tâm hồn** 🌰→🌱→🌿→🌳→🌳🌺
 - **Nhiệm vụ tuần** — 5 nhiệm vụ, thanh tiến độ
 - **Memory Card** — tạo ảnh kỷ niệm chia sẻ
+- **Giới thiệu bạn bè** — link mời, thưởng khi bạn được mời đạt streak 7 ngày
 
 </td>
 <td width="50%">
@@ -60,10 +64,32 @@
 ### 🚀 Công nghệ & UX
 - **7 theme màu sắc** — Tím Lavender, Hồng Đào, Xanh Rừng...
 - **Dark Mode** — dịu mắt ban đêm
-- **PWA & Offline** — dùng được khi mất mạng
+- **PWA & Offline** — dùng được khi mất mạng, hàng đợi nháp offline
 - **Thư gửi Tương lai** — viết thư gửi cho bản thân
 - **PIN Lock** — bảo vệ nhật ký riêng tư
 - **AI Pattern Insights** — xu hướng mood 90 ngày
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 🎮 Giải trí — 5 Mini Game
+- 🐱 **Mèo đuổi chuột** — chạy né chướng ngại vật kiểu Chrome Dino
+- 🐍 **Rắn săn mồi** (Snake)
+- 🔢 **2048**
+- ⭕ **Caro** (Gomoku) — chơi với máy
+- 🐦 **Flappy Mèo**
+- Mỗi game có **bảng xếp hạng điểm cao** riêng
+
+</td>
+<td width="50%">
+
+### 🔒 Bảo mật & Vận hành
+- Mã hoá at-rest **AES-256-GCM** cho nội dung nhật ký
+- **CI/CD tự động** — push vào `master` là tự deploy cả frontend & backend
+- Helmet, rate limiting, JWT + bcrypt
+- Re-verify quyền admin từ DB ở mọi request (không tin JWT payload)
 
 </td>
 </tr>
@@ -81,8 +107,6 @@
 <img width="1135" height="939" alt="image" src="https://github.com/user-attachments/assets/24c7b89b-51ab-4dbe-b0e2-938d70983d83" />
 <img width="1131" height="759" alt="image" src="https://github.com/user-attachments/assets/9210f2b1-a965-4208-9686-1152969196ca" />
 
-
-
 </div>
 
 <!-- Thêm ảnh chụp màn hình vào đây -->
@@ -96,11 +120,14 @@
 | **Backend** | Node.js 18+, Express 4, JWT, bcryptjs |
 | **Database** | Microsoft SQL Server (schema tự khởi tạo, không cần migration) |
 | **Frontend** | Vanilla JS (IIFE modules), HTML5, CSS3 — không framework, không build step |
+| **Mini Game** | Canvas 2D thuần, không dùng game engine — 5 game trong `game.js` + `games-extra.js` |
 | **AI** | Google Gemini 2.0 Flash (phân tích cảm xúc, trợ lý tâm hồn, recap tuần) |
+| **Bảo mật dữ liệu** | AES-256-GCM mã hoá at-rest nội dung nhật ký |
 | **Push** | Web Push API + VAPID (nhắc nhở thói quen) |
 | **Email** | Nodemailer + SMTP (thư gửi tương lai) |
+| **CI/CD** | GitHub Actions (self-hosted runner) — auto deploy khi push `master` |
 | **Process** | PM2 (production), Nodemon (dev) |
-| **Proxy** | IIS (Windows Server) hoặc Nginx (Linux) |
+| **Proxy** | IIS (Windows Server) |
 
 ---
 
@@ -110,12 +137,13 @@
 
 ```bash
 cd backend
-cp .env.example .env      # Điền thông tin DB + JWT_SECRET + GEMINI_API_KEY
+cp .env.example .env      # Điền DB + JWT_SECRET + ENCRYPTION_KEY + GEMINI_API_KEY
 npm install
 npm run dev               # http://localhost:3001  (nodemon, hot reload)
 ```
 
 > Schema DB tự tạo khi khởi động — không cần chạy script SQL tay.
+> `ENCRYPTION_KEY` là bắt buộc — server sẽ không start nếu thiếu (xem mục cấu hình bên dưới).
 
 ### 2. Frontend
 
@@ -124,12 +152,13 @@ cd frontend
 npx serve .               # http://localhost:3000
 ```
 
-Hoặc mở `frontend/index.html` bằng **VS Code Live Server**.  
+Hoặc mở `frontend/index.html` bằng **VS Code Live Server**.
 Đảm bảo `frontend/js/config.js` trỏ đúng `API_URL` về backend đang chạy.
 
 ---
 
-## ⚙️ Cấu hình `.env`
+<details>
+<summary><b>⚙️ Cấu hình <code>.env</code> đầy đủ</b> (bấm để xem)</summary>
 
 ```env
 PORT=3001
@@ -138,6 +167,12 @@ NODE_ENV=development
 # JWT
 JWT_SECRET=your_super_secret_key_change_this
 JWT_EXPIRES_IN=7d
+
+# Mã hoá at-rest nội dung nhật ký (AES-256-GCM) — BẮT BUỘC
+# Tạo bằng: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+# ⚠️ Mất key này = mất vĩnh viễn toàn bộ nội dung đã mã hoá, không khôi phục được.
+# Local và production PHẢI dùng cùng 1 giá trị.
+ENCRYPTION_KEY=change_this_generate_with_the_command_above
 
 # SQL Server
 DB_SERVER=localhost
@@ -159,12 +194,19 @@ SMTP_USER=your@gmail.com
 SMTP_PASS=your_app_password
 ```
 
+</details>
+
 ---
 
-## 🏗️ Kiến trúc
+<details>
+<summary><b>🏗️ Kiến trúc thư mục</b> (bấm để xem)</summary>
 
 ```
 nhat-ky-fullstack/
+├── .github/workflows/
+│   └── soul-diary-deploy-windows.yml   # CI/CD — auto deploy khi push master
+├── content/
+│   └── danh-sach-bai-da-dang.md        # Bảng đối chiếu bài viết thư viện (skill /dang-bai)
 ├── backend/
 │   ├── server.js              # Express entry point — helmet, cors, rate-limit, routes
 │   ├── db/
@@ -174,14 +216,17 @@ nhat-ky-fullstack/
 │   │   └── admin.js           # Re-query role từ DB, 403 nếu không phải admin
 │   ├── routes/
 │   │   ├── auth.js            # Đăng ký / đăng nhập / profile
-│   │   ├── diary.js           # CRUD nhật ký + AI emotion + AI companion + stats
-│   │   ├── articles.js        # Thư viện bài viết
+│   │   ├── diary.js           # CRUD nhật ký + AI emotion + AI companion + stats (mã hoá AES-256-GCM)
+│   │   ├── articles.js        # Thư viện bài viết + bài tập
+│   │   ├── game.js            # Điểm cao & bảng xếp hạng mini game
 │   │   ├── admin.js           # Dashboard admin
 │   │   ├── settings.js        # Cài đặt SOS (MERGE upsert)
 │   │   ├── features.js        # Feature flag CRUD + release/schedule
 │   │   ├── checkin.js         # Check-in sức khoẻ tuần
 │   │   ├── letters.js         # Thư gửi tương lai
 │   │   └── user.js            # Export dữ liệu
+│   ├── scripts/
+│   │   └── post-article.js    # Đăng bài (nháp) qua API — dùng bởi skill /dang-bai
 │   └── utils/
 │       └── mailer.js          # Nodemailer — gửi thư đến tương lai
 └── frontend/
@@ -196,6 +241,8 @@ nhat-ky-fullstack/
         ├── auth.js            # Login / register / logout
         ├── pages.js           # HTML templates (PAGES object)
         ├── admin.js           # Admin module — panel, CRUD, feature flags
+        ├── game.js            # Mini game: Mèo đuổi chuột (engine + leaderboard chung)
+        ├── games-extra.js     # 4 mini game: Rắn săn mồi, 2048, Caro, Flappy Mèo
         └── app.js             # App controller — nav, init, theme, dark mode
 ```
 
@@ -203,29 +250,46 @@ nhat-ky-fullstack/
 - Schema thay đổi → chỉ sửa `db/index.js`, dùng pattern `IF NOT EXISTS` idempotent
 - Tính năng mới → gate sau feature flag (`window.FEATURES.ten_flag`)
 - Frontend public method mới → phải thêm vào `return {}` của IIFE module
+- Mini game mới → module `{ start(canvasEl, onGameOver), stop() }` giống contract của `Game` (`game.js`)
+
+</details>
 
 ---
 
 ## 🌐 Deploy (production hiện tại)
 
-Production chạy trên **Windows Server** qua **IIS + PM2**. Deployed files là bản copy riêng, không phải working directory này.
+Production chạy trên **Windows Server** qua **IIS + PM2**, tại domain [`souldiary.work.gd`](https://souldiary.work.gd).
+
+**Push vào `master` là tự động deploy** — GitHub Actions (self-hosted runner đặt ngay trên VPS) sync code, chạy `npm ci`, restart PM2 cho backend và đồng bộ file tĩnh vào IIS cho frontend. Không cần copy tay hay SSH thủ công nữa.
 
 | Thành phần | Source | Serve từ |
 |---|---|---|
-| Frontend | `frontend/` | `C:\inetpub\wwwroot\souldiary` (IIS, domain `souldiary.work.gd`) |
-| Backend | `backend/` | PM2 process `souldiary-api` tại port 3001 |
+| Frontend | `frontend/` | `C:\inetpub\wwwroot\souldiary` (IIS) |
+| Backend | `backend/` | PM2 process `souldiary-api`, port 3001 |
 
-```bash
-# Sau khi sửa frontend — copy file vào IIS dir
-Copy-Item frontend\js\app.js C:\inetpub\wwwroot\souldiary\js\app.js
+<details>
+<summary>Chi tiết workflow / chạy tay khi cần</summary>
 
-# Sau khi sửa backend — restart PM2
+Xem toàn bộ pipeline tại [`.github/workflows/soul-diary-deploy-windows.yml`](.github/workflows/soul-diary-deploy-windows.yml). Có thể trigger tay từ tab **Actions** (`workflow_dispatch`).
+
+```powershell
+# Chỉ dùng khi cần chạy tay trực tiếp trên VPS (bỏ qua CI/CD)
 pm2 restart souldiary-api
 ```
+
+</details>
 
 ---
 
 ## 📋 Lịch sử phiên bản
+
+| Phiên bản | Tên | Tính năng chính |
+|-----------|-----|-----------------|
+| v3.5 | Bảo mật | Mã hoá at-rest nội dung nhật ký bằng AES-256-GCM, thêm CI/CD tự động deploy qua self-hosted runner |
+| **v3.6** | **Giải trí** | **5 mini game: Mèo đuổi chuột, Rắn săn mồi, 2048, Caro (vs máy), Flappy Mèo — đồ hoạ sprite thực tế, bảng xếp hạng điểm cao riêng từng game** |
+
+<details>
+<summary><b>Xem đầy đủ lịch sử từ v1.0</b> (bấm để xem)</summary>
 
 | Phiên bản | Tên | Tính năng chính |
 |-----------|-----|-----------------|
@@ -254,12 +318,17 @@ pm2 restart souldiary-api
 | v3.2 | Đa thiết bị | Tối ưu iOS PWA (safe-area, status bar), breakpoint tablet, touch target 44px, hover chỉ áp dụng khi có chuột thật |
 | v3.3 | Trợ năng & Bền vững | Speech-to-text ghi âm, Sổ tổng kết cuối năm (ảnh), Hàng đợi nháp offline, cỡ chữ & tương phản cao, phiên bản Giới thiệu tự cập nhật theo Feature Flags |
 | v3.3.1 | Bản vá | Sửa 10 lỗi từ code review: timeout offline queue, mất dữ liệu âm thầm khi đầy bộ nhớ, log mood trùng khi mất mạng, sai version hiển thị, race condition xuất ảnh năm, cỡ chữ lớn không phủ modal/toast, giới hạn dung lượng không khớp, mở rộng hàng đợi sang xoá nhật ký, dọn flag trùng, gộp bảng màu thông báo |
-| **v3.4** | **Giữ chân người dùng** | **Nhắc quay lại (push/email tự động cho user không hoạt động 5–60 ngày), Giới thiệu bạn bè (link mời + thưởng lượt cứu streak khi bạn được mời đạt 7 ngày), Hôm nay năm ngoái (hồi tưởng nhật ký cùng ngày các năm trước trên trang chủ)** |
+| v3.4 | Giữ chân người dùng | Nhắc quay lại (push/email tự động cho user không hoạt động 5–60 ngày), Giới thiệu bạn bè (link mời + thưởng lượt cứu streak khi bạn được mời đạt 7 ngày), Hôm nay năm ngoái (hồi tưởng nhật ký cùng ngày các năm trước trên trang chủ) |
+| v3.5 | Bảo mật | Mã hoá at-rest nội dung nhật ký bằng AES-256-GCM, CI/CD tự động deploy qua self-hosted GitHub Actions runner |
+| v3.6 | Giải trí | 5 mini game: Mèo đuổi chuột, Rắn săn mồi, 2048, Caro (vs máy), Flappy Mèo — đồ hoạ sprite thực tế, bảng xếp hạng điểm cao riêng từng game |
+
+</details>
 
 ---
 
 ## ⚠️ Lưu ý quan trọng
 
+- **`ENCRYPTION_KEY` là tối quan trọng**: mất key này = mất vĩnh viễn toàn bộ nội dung nhật ký đã mã hoá, không thể khôi phục. Lưu bản sao ở nơi an toàn ngoài server (password manager), không chỉ trong `.env`.
 - **Bảo mật**: Không dùng `sa` trong production — tạo SQL login riêng với quyền tối thiểu
 - **Gemini quota**: Free tier giới hạn — mọi endpoint AI đều có rule-based fallback
 - **PM2 restart loop**: Nếu thấy IIS 502 + restart count cao → `pm2 logs souldiary-api` tìm lỗi DB startup
@@ -269,7 +338,7 @@ pm2 restart souldiary-api
 
 <div align="center">
 
-*Ứng dụng không thay thế liệu pháp tâm lý chuyên môn.*  
+*Ứng dụng không thay thế liệu pháp tâm lý chuyên môn.*
 *Nếu bạn đang gặp khó khăn nghiêm trọng, hãy tìm đến chuyên gia.*
 
 **Made with ❤️ by Tài Đầu Bạc**
