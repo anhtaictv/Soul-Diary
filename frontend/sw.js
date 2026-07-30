@@ -1,5 +1,5 @@
 // sw.js — Soul Diary Service Worker v2.5 (v3.3.1 — security/bug review follow-up)
-const CACHE_NAME    = 'souldiary-v25';
+const CACHE_NAME    = 'souldiary-v27';
 const OFFLINE_URL   = '/offline.html';
 const STATIC_ASSETS = [
   '/', '/index.html',

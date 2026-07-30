@@ -155,34 +155,85 @@
           <button class="nav-item" data-page="exercises">      <span class="nav-icon">🧘</span> Bài tập</button>
           <button class="nav-item" data-page="music">          <span class="nav-icon">🎧</span> Nhạc thư giãn</button>
           <div class="nav-separator" id="nav-sep-features"></div>
-          <button class="nav-item" data-page="checkin" id="nav-checkin" style="display:none">
-            <span class="nav-icon">🧪</span> Check-in tâm lý<span id="checkin-badge" class="nav-badge-dot" style="display:none"></span>
-          </button>
-          <button class="nav-item" data-page="inbox" id="nav-inbox" style="display:none"><span class="nav-icon">💌</span> Hộp thư<span id="inbox-badge" class="nav-badge-dot" style="display:none"></span></button>
-          <button class="nav-item" data-page="challenges" id="nav-challenges" style="display:none"><span class="nav-icon">🏆</span> Thử thách</button>
-          <button class="nav-item" data-page="community"  id="nav-community"  style="display:none"><span class="nav-icon">💙</span> Góc tâm sự</button>
-          <button class="nav-item" data-page="chat"      id="nav-chat"    style="display:none"><span class="nav-icon">💬</span> Soul Chat</button>
-          <button class="nav-item" data-page="study"     id="nav-study"   style="display:none"><span class="nav-icon">📅</span> Lịch học tập</button>
-          <button class="nav-item" data-page="courses"   id="nav-courses" style="display:none"><span class="nav-icon">🎓</span> Khóa học</button>
-          <button class="nav-item" data-page="goals"     id="nav-goals"   style="display:none"><span class="nav-icon">🎯</span> Mục tiêu</button>
-          <button class="nav-item" data-page="year-review" id="nav-year-review" style="display:none"><span class="nav-icon">📆</span> Tổng kết năm</button>
-          <button class="nav-item" data-page="future-letter" id="nav-future-letter" style="display:none"><span class="nav-icon">💌</span> Thư tương lai</button>
-          <button class="nav-item" data-page="missions"      id="nav-missions"      style="display:none"><span class="nav-icon">🎯</span> Nhiệm vụ</button>
-          <button class="nav-item" data-page="friends"       id="nav-friends"       style="display:none"><span class="nav-icon">👥</span> Bạn bè<span id="friends-badge" class="nav-badge-dot" style="display:none"></span></button>
-          <button class="nav-item" data-page="templates"     id="nav-templates"     style="display:none"><span class="nav-icon">📋</span> Nhật ký định kỳ</button>
-          <button class="nav-item" data-page="habits"         id="nav-habits"        style="display:none"><span class="nav-icon">🌱</span> Thói quen</button>
-          <button class="nav-item" data-page="game"           id="nav-game"><span class="nav-icon">🎮</span> Giải trí</button>
-          <button class="nav-item" data-page="report"        id="nav-report"        style="display:none"><span class="nav-icon">📊</span> Báo cáo tháng</button>
-          <button class="nav-item" data-page="reflection"    id="nav-reflection"    style="display:none"><span class="nav-icon">🪞</span> Phản tư tuần<span id="reflection-badge" class="nav-badge-dot" style="display:none"></span></button>
-          <button class="nav-item" data-page="pomodoro"      id="nav-pomodoro"      style="display:none"><span class="nav-icon">⏱</span> Pomodoro</button>
-          <button class="nav-item" data-page="year-stats"    id="nav-year-stats"    style="display:none"><span class="nav-icon">📆</span> Thống kê năm</button>
-          <button class="nav-item" data-page="gallery"       id="nav-gallery"       style="display:none"><span class="nav-icon">🖼</span> Gallery ảnh</button>
-          <button class="nav-item" data-page="notes"         id="nav-notes"         style="display:none"><span class="nav-icon">📝</span> Ghi chú nhanh</button>
-          <button class="nav-item" data-page="mood-compare"  id="nav-mood-compare"  style="display:none"><span class="nav-icon">⚖️</span> So sánh mood</button>
-          <button class="nav-item" data-page="notifications" id="nav-notifications" style="display:none"><span class="nav-icon">🔔</span> Thông báo<span id="notif-badge" class="nav-badge-dot" style="display:none"></span></button>
-          <button class="nav-item" data-page="profile"       id="nav-profile"       style="display:none"><span class="nav-icon">👤</span> Hồ sơ cá nhân</button>
+
+          <div class="nav-group" data-group="wellbeing">
+            <button class="nav-item nav-group-header" onclick="App.toggleNavGroup(this)">
+              <span class="nav-icon">💙</span> Sức khoẻ tinh thần
+              <span class="nav-group-badge nav-badge-dot" style="display:none"></span>
+              <span class="nav-group-arrow">▸</span>
+            </button>
+            <div class="nav-group-items"><div class="nav-group-items-inner">
+              <button class="nav-item" data-page="checkin" id="nav-checkin" style="display:none">
+                <span class="nav-icon">🧪</span> Check-in tâm lý<span id="checkin-badge" class="nav-badge-dot" style="display:none"></span>
+              </button>
+              <button class="nav-item" data-page="reflection"   id="nav-reflection"   style="display:none"><span class="nav-icon">🪞</span> Phản tư tuần<span id="reflection-badge" class="nav-badge-dot" style="display:none"></span></button>
+              <button class="nav-item" data-page="mood-compare" id="nav-mood-compare" style="display:none"><span class="nav-icon">⚖️</span> So sánh mood</button>
+              <button class="nav-item" data-page="report"       id="nav-report"       style="display:none"><span class="nav-icon">📊</span> Báo cáo tháng</button>
+              <button class="nav-item" data-page="year-stats"   id="nav-year-stats"   style="display:none"><span class="nav-icon">📆</span> Thống kê năm</button>
+            </div></div>
+          </div>
+
+          <div class="nav-group" data-group="study">
+            <button class="nav-item nav-group-header" onclick="App.toggleNavGroup(this)">
+              <span class="nav-icon">📅</span> Học tập & Năng suất
+              <span class="nav-group-badge nav-badge-dot" style="display:none"></span>
+              <span class="nav-group-arrow">▸</span>
+            </button>
+            <div class="nav-group-items"><div class="nav-group-items-inner">
+              <button class="nav-item" data-page="study"     id="nav-study"     style="display:none"><span class="nav-icon">📅</span> Lịch học tập</button>
+              <button class="nav-item" data-page="courses"   id="nav-courses"   style="display:none"><span class="nav-icon">🎓</span> Khóa học</button>
+              <button class="nav-item" data-page="pomodoro"  id="nav-pomodoro"  style="display:none"><span class="nav-icon">⏱</span> Pomodoro</button>
+              <button class="nav-item" data-page="habits"    id="nav-habits"    style="display:none"><span class="nav-icon">🌱</span> Thói quen</button>
+              <button class="nav-item" data-page="goals"     id="nav-goals"     style="display:none"><span class="nav-icon">🎯</span> Mục tiêu</button>
+              <button class="nav-item" data-page="templates" id="nav-templates" style="display:none"><span class="nav-icon">📋</span> Nhật ký định kỳ</button>
+            </div></div>
+          </div>
+
+          <div class="nav-group" data-group="connect">
+            <button class="nav-item nav-group-header" onclick="App.toggleNavGroup(this)">
+              <span class="nav-icon">👥</span> Kết nối
+              <span class="nav-group-badge nav-badge-dot" style="display:none"></span>
+              <span class="nav-group-arrow">▸</span>
+            </button>
+            <div class="nav-group-items"><div class="nav-group-items-inner">
+              <button class="nav-item" data-page="inbox"      id="nav-inbox"      style="display:none"><span class="nav-icon">💌</span> Hộp thư<span id="inbox-badge" class="nav-badge-dot" style="display:none"></span></button>
+              <button class="nav-item" data-page="challenges" id="nav-challenges" style="display:none"><span class="nav-icon">🏆</span> Thử thách</button>
+              <button class="nav-item" data-page="community"  id="nav-community"  style="display:none"><span class="nav-icon">💙</span> Góc tâm sự</button>
+              <button class="nav-item" data-page="chat"       id="nav-chat"       style="display:none"><span class="nav-icon">💬</span> Soul Chat</button>
+              <button class="nav-item" data-page="friends"    id="nav-friends"    style="display:none"><span class="nav-icon">👥</span> Bạn bè<span id="friends-badge" class="nav-badge-dot" style="display:none"></span></button>
+              <button class="nav-item" data-page="missions"   id="nav-missions"   style="display:none"><span class="nav-icon">🎯</span> Nhiệm vụ</button>
+            </div></div>
+          </div>
+
+          <div class="nav-group" data-group="memories">
+            <button class="nav-item nav-group-header" onclick="App.toggleNavGroup(this)">
+              <span class="nav-icon">🎨</span> Kỷ niệm & Sáng tạo
+              <span class="nav-group-badge nav-badge-dot" style="display:none"></span>
+              <span class="nav-group-arrow">▸</span>
+            </button>
+            <div class="nav-group-items"><div class="nav-group-items-inner">
+              <button class="nav-item" data-page="year-review"    id="nav-year-review"    style="display:none"><span class="nav-icon">📆</span> Tổng kết năm</button>
+              <button class="nav-item" data-page="future-letter"  id="nav-future-letter"  style="display:none"><span class="nav-icon">💌</span> Thư tương lai</button>
+              <button class="nav-item" data-page="gallery"        id="nav-gallery"        style="display:none"><span class="nav-icon">🖼</span> Gallery ảnh</button>
+              <button class="nav-item" data-page="notes"          id="nav-notes"          style="display:none"><span class="nav-icon">📝</span> Ghi chú nhanh</button>
+              <button class="nav-item" data-page="game"           id="nav-game"><span class="nav-icon">🎮</span> Giải trí</button>
+            </div></div>
+          </div>
+
+          <div class="nav-group" data-group="personal">
+            <button class="nav-item nav-group-header" onclick="App.toggleNavGroup(this)">
+              <span class="nav-icon">👤</span> Cá nhân
+              <span class="nav-group-badge nav-badge-dot" style="display:none"></span>
+              <span class="nav-group-arrow">▸</span>
+            </button>
+            <div class="nav-group-items"><div class="nav-group-items-inner">
+              <button class="nav-item" data-page="notifications" id="nav-notifications" style="display:none"><span class="nav-icon">🔔</span> Thông báo<span id="notif-badge" class="nav-badge-dot" style="display:none"></span></button>
+              <button class="nav-item" data-page="profile"       id="nav-profile"        style="display:none"><span class="nav-icon">👤</span> Hồ sơ cá nhân</button>
+              <button class="nav-item" data-page="settings"><span class="nav-icon">⚙️</span> Cài đặt</button>
+            </div></div>
+          </div>
+
           <div class="nav-separator"></div>
-          <button class="nav-item" data-page="settings"><span class="nav-icon">⚙️</span> Cài đặt</button>
           <button class="nav-item" data-page="sos">            <span class="nav-icon">📞</span> Đường dây hỗ trợ</button>
           <button class="nav-item" data-page="admin" id="nav-admin" style="display:none"><span class="nav-icon">🛠️</span> Quản trị</button>
         </nav>
