@@ -84,7 +84,7 @@ const Game = (() => {
       S = H / 300; // baseline thiết kế cao 300px
       GROUND_Y = H - 40 * S;
       CAT_H = 70 * S; CAT_W = CAT_H * CAT_ASPECT; CAT_X = 20 * S;
-      GRAVITY = 0.9 * S; JUMP_V = -14 * S; BASE_SPEED = 3.2 * S;
+      GRAVITY = 0.9 * S; JUMP_V = -16 * S; BASE_SPEED = 3.2 * S;
       OBSTACLE_SIZE = 50 * S; DECOR_SPACING = 100 * S;
       if (state !== 'playing') cat.y = GROUND_Y - CAT_H;
     }
