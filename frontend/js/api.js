@@ -211,6 +211,12 @@ const API = (() => {
     submitCheckin:     (answers) => request('/check-in/submit', { method: 'POST', body: { answers } }),
     getCheckinHistory: ()        => request('/check-in/history'),
 
+    // Test tâm lý chuyên sâu (11 bài, on-demand)
+    getPsychTests:        ()          => request('/psych-tests'),
+    getPsychTestDetail:   (key)       => request(`/psych-tests/${key}`),
+    submitPsychTest:      (key, answers) => request(`/psych-tests/${key}/submit`, { method: 'POST', body: { answers } }),
+    getPsychTestHistory:  (key)       => request(`/psych-tests/${key}/history`),
+
     // Hộp thư hỗ trợ
     getInbox:       ()          => request('/inbox'),
     getInboxUnread: ()          => request('/inbox/unread-count'),

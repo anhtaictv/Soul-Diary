@@ -80,6 +80,7 @@ app.use('/api/music',    apiLimiter,  require('./routes/music'));
 app.use('/api/push',     apiLimiter,  require('./routes/push').router);
 app.use('/api/features', apiLimiter,  require('./routes/features'));
 app.use('/api/check-in',   apiLimiter, require('./routes/checkin'));
+app.use('/api/psych-tests', apiLimiter, require('./routes/psych-tests'));
 app.use('/api/inbox',      apiLimiter, require('./routes/inbox'));
 app.use('/api/challenges', apiLimiter, require('./routes/challenges'));
 app.use('/api/community',  apiLimiter, require('./routes/community'));
