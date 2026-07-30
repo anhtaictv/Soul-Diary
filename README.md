@@ -4,11 +4,11 @@
 
 **Không gian riêng tư để lắng nghe tâm hồn mình**
 
-[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v3.7.6-6366f1?style=for-the-badge&logo=github)](https://github.com/anhtaictv/Soul-Diary)
-[![Deploy](https://img.shields.io/github/actions/workflow/status/anhtaictv/Soul-Diary/soul-diary-deploy-windows.yml?style=for-the-badge&label=Deploy&logo=githubactions&logoColor=white)](https://github.com/anhtaictv/Soul-Diary/actions/workflows/soul-diary-deploy-windows.yml)
-[![Stack](https://img.shields.io/badge/Node.js_+_MSSQL-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)]()
-[![Vanilla JS](https://img.shields.io/badge/Vanilla_JS-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)]()
-[![License](https://img.shields.io/badge/License-MIT-f59e0b?style=for-the-badge)]()
+[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v3.7.6-6366f1?style=flat-square&logo=github&logoColor=white)](https://github.com/anhtaictv/Soul-Diary)
+[![Deploy](https://img.shields.io/github/actions/workflow/status/anhtaictv/Soul-Diary/soul-diary-deploy-windows.yml?style=flat-square&label=Deploy&logo=githubactions&logoColor=white)](https://github.com/anhtaictv/Soul-Diary/actions/workflows/soul-diary-deploy-windows.yml)
+[![Stack](https://img.shields.io/badge/Node.js_+_MSSQL-339933?style=flat-square&logo=nodedotjs&logoColor=white)]()
+[![Vanilla JS](https://img.shields.io/badge/Vanilla_JS-F7DF1E?style=flat-square&logo=javascript&logoColor=black)]()
+[![License](https://img.shields.io/badge/License-MIT-f59e0b?style=flat-square)]()
 
 <br/>
 
@@ -333,6 +333,22 @@ pm2 restart souldiary-api
 - **Gemini quota**: Free tier giới hạn — mọi endpoint AI đều có rule-based fallback
 - **PM2 restart loop**: Nếu thấy IIS 502 + restart count cao → `pm2 logs souldiary-api` tìm lỗi DB startup
 - **SQL reserved words**: `key`, `value`, `name`, `type`, `order`... phải bọc `[brackets]` nếu dùng làm tên cột
+
+---
+
+## 🗺️ Hướng phát triển bảo mật tương lai
+
+Các mục dưới đây **không ảnh hưởng trực tiếp** đến bảo mật hiện tại của app (đã xử lý các lỗ hổng thực tế: stored XSS qua media, CORS, rate limit + account lockout login, audit log nhật ký — xem lịch sử phiên bản). Đây là nâng cấp hạ tầng/quy trình để cân nhắc khi app lớn hơn quy mô cá nhân hiện tại — cần quyết định, chi phí, hoặc quyền truy cập hạ tầng, không phải sửa bằng code trong repo.
+
+| Hạng mục | Là gì | Cần gì để làm | Mức ưu tiên |
+|---|---|---|---|
+| **reCAPTCHA v3** | Chặn bot spam form login/đăng ký | Tài khoản Google (miễn phí) đăng ký site key tại [google.com/recaptcha](https://www.google.com/recaptcha/admin) | Thấp — rẻ, dễ, làm được sớm nếu muốn |
+| **OAuth2/OIDC + MFA** | Đăng nhập bằng Google/Facebook, xác thực 2 lớp (mã 6 số) | Đăng ký OAuth app (miễn phí) + code luồng login mới, thư viện MFA (`speakeasy`) | Trung bình — tính năng thật, vài giờ code |
+| **Windows Authentication cho SQL Server** | App xác thực bằng tài khoản Windows thay vì user/pass SQL trong `.env` | Cấu hình lại SQL Server + đổi driver kết nối, cần truy cập trực tiếp VPS | Trung bình — việc hạ tầng, cần quyền VPS |
+| **TDE (Transparent Data Encryption)** | SQL Server tự mã hoá file `.mdf`/`.ldf` trên đĩa | Nâng cấp license SQL Server (Standard/Enterprise) — **không khả dụng ở bản Express** đang dùng | Thấp — nội dung nhạy cảm đã mã hoá AES-256-GCM ở tầng app rồi |
+| **KMS/HSM** (AWS KMS, Azure Key Vault, HashiCorp Vault) | Dịch vụ/thiết bị chuyên quản lý key mã hoá thay vì file `.env` | Tài khoản cloud trả phí (~$1-5/key/tháng) hoặc tự vận hành Vault | Thấp — quy mô công ty có đội bảo mật riêng |
+| **Centralized logging** (ELK/Splunk/CloudWatch) | Gom log nhiều server vào 1 hệ thống tìm kiếm + cảnh báo tự động | Hạ tầng riêng (Elasticsearch cần vài GB RAM) hoặc SaaS trả phí | Thấp — quá nặng cho 1 VPS cá nhân, `pm2 logs` là đủ ở quy mô này |
+| **Pentest thuê ngoài định kỳ** | Chuyên gia chủ động tấn công thử để tìm lỗ hổng | Chi phí vài trăm–vài nghìn USD/lần | Thấp — thay thế miễn phí: bật GitHub Dependabot/CodeQL |
 
 ---
 

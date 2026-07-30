@@ -4,8 +4,22 @@ const bcrypt       = require('bcryptjs');
 const jwt          = require('jsonwebtoken');
 const crypto       = require('crypto');
 const nodemailer   = require('nodemailer');
+const rateLimit    = require('express-rate-limit');
 const { getPool, sql } = require('../db');
 const authMiddleware   = require('../middleware/auth');
+
+// baomat.txt #5: rate limit riêng cho /login (chặt hơn authLimiter chung 20/15p ở server.js)
+// + account lockout theo user sau nhiều lần sai — IP limiter dễ bị né qua nhiều IP,
+// lockout theo tài khoản chặn được cả trường hợp đó.
+const LOCKOUT_THRESHOLD = 5;
+const LOCKOUT_MINUTES   = 15;
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { message: 'Quá nhiều lần đăng nhập. Vui lòng thử lại sau 15 phút.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 function createMailTransporter() {
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) return null;
@@ -137,7 +151,7 @@ router.post('/register', async (req, res) => {
 });
 
 // ── POST /api/auth/login ─────────────────────────────────────────────────
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -152,7 +166,7 @@ router.post('/login', async (req, res) => {
       .input('username', sql.NVarChar, username)
       .query(`
         SELECT id, username, email, password, full_name, avatar_text, role,
-               streak, streak_freeze, max_streak
+               streak, streak_freeze, max_streak, failed_login_attempts, locked_until
         FROM Users
         WHERE username = @username OR email = @username
       `);
@@ -162,10 +176,31 @@ router.post('/login', async (req, res) => {
     }
 
     const user = result.recordset[0];
+
+    if (user.locked_until && new Date(user.locked_until) > new Date()) {
+      const minsLeft = Math.ceil((new Date(user.locked_until) - new Date()) / 60000);
+      return res.status(423).json({ message: `Tài khoản tạm khoá do đăng nhập sai nhiều lần. Thử lại sau ${minsLeft} phút.` });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
+      const attempts = (user.failed_login_attempts || 0) + 1;
+      const lockNow  = attempts >= LOCKOUT_THRESHOLD;
+      await db.request()
+        .input('id', sql.Int, user.id)
+        .input('attempts', sql.Int, lockNow ? 0 : attempts)
+        .input('locked_until', sql.DateTime2, lockNow ? new Date(Date.now() + LOCKOUT_MINUTES * 60000) : null)
+        .query(`UPDATE Users SET failed_login_attempts=@attempts, locked_until=@locked_until WHERE id=@id`);
+      if (lockNow) {
+        return res.status(423).json({ message: `Đăng nhập sai quá ${LOCKOUT_THRESHOLD} lần. Tài khoản tạm khoá ${LOCKOUT_MINUTES} phút.` });
+      }
       return res.status(401).json({ message: 'Tên đăng nhập hoặc mật khẩu không đúng.' });
+    }
+
+    if (user.failed_login_attempts > 0 || user.locked_until) {
+      await db.request().input('id', sql.Int, user.id)
+        .query(`UPDATE Users SET failed_login_attempts=0, locked_until=NULL WHERE id=@id`);
     }
 
     const token = signToken(user);

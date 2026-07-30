@@ -244,6 +244,22 @@ async function initSchema() {
     ALTER TABLE Users ADD last_lowmood_notif_at DATETIME2 NULL
   `);
 
+  // Account lockout chống brute-force login (baomat.txt: khuyến nghị #5)
+  await db.request().query(`
+    IF NOT EXISTS (
+      SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME='Users' AND COLUMN_NAME='failed_login_attempts'
+    )
+    ALTER TABLE Users ADD failed_login_attempts INT NOT NULL DEFAULT 0
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (
+      SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME='Users' AND COLUMN_NAME='locked_until'
+    )
+    ALTER TABLE Users ADD locked_until DATETIME2 NULL
+  `);
+
   // DiaryEntries table
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='DiaryEntries' AND xtype='U')
@@ -257,6 +273,21 @@ async function initSchema() {
       tags        NVARCHAR(500),
       created_at  DATETIME2     DEFAULT GETDATE(),
       updated_at  DATETIME2     DEFAULT GETDATE()
+    )
+  `);
+
+  // Audit log CRUD nhật ký (baomat.txt: khuyến nghị #6 — audit trail cho bảng diaries).
+  // entry_id/user_id KHÔNG đặt FK cascade — log phải sống sót sau khi entry/tài khoản
+  // bị xoá, để vẫn truy vết được hành vi xoá dữ liệu.
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='DiaryAuditLog' AND xtype='U')
+    CREATE TABLE DiaryAuditLog (
+      id          INT           IDENTITY(1,1) PRIMARY KEY,
+      entry_id    INT           NULL,
+      user_id     INT           NOT NULL,
+      action      NVARCHAR(20)  NOT NULL,
+      ip_address  NVARCHAR(64)  NULL,
+      created_at  DATETIME2     DEFAULT GETDATE()
     )
   `);
 
