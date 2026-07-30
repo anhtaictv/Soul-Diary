@@ -4,7 +4,7 @@
 
 **Không gian riêng tư để lắng nghe tâm hồn mình**
 
-[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v3.6.1-6366f1?style=flat-square&logo=github&logoColor=white)](https://github.com/anhtaictv/Soul-Diary)
+[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v3.6.2-6366f1?style=flat-square&logo=github&logoColor=white)](https://github.com/anhtaictv/Soul-Diary)
 [![Deploy](https://img.shields.io/github/actions/workflow/status/anhtaictv/Soul-Diary/soul-diary-deploy-windows.yml?style=flat-square&label=Deploy&logo=githubactions&logoColor=white)](https://github.com/anhtaictv/Soul-Diary/actions/workflows/soul-diary-deploy-windows.yml)
 [![Stack](https://img.shields.io/badge/Node.js_+_MSSQL-339933?style=flat-square&logo=nodedotjs&logoColor=white)]()
 [![Vanilla JS](https://img.shields.io/badge/Vanilla_JS-F7DF1E?style=flat-square&logo=javascript&logoColor=black)]()
@@ -287,7 +287,8 @@ pm2 restart souldiary-api
 |-----------|-----|-----------------|
 | v3.5 | Bảo mật | Mã hoá at-rest nội dung nhật ký bằng AES-256-GCM, thêm CI/CD tự động deploy qua self-hosted runner |
 | v3.6 | Giải trí | 5 mini game: Mèo đuổi chuột, Rắn săn mồi, 2048, Caro (vs máy), Flappy Mèo — đồ hoạ sprite thực tế, bảng xếp hạng điểm cao riêng từng game |
-| **v3.6.1** | **Bảo mật & UX** | **Fix stored XSS qua media nhật ký, CORS fail-safe, rate limit + khoá tài khoản sau 5 lần đăng nhập sai, audit log CRUD nhật ký · Gom 24 mục sidebar thành 5 nhóm thu gọn được, animation trượt mượt** |
+| v3.6.1 | Bảo mật & UX | Fix stored XSS qua media nhật ký, CORS fail-safe, rate limit + khoá tài khoản sau 5 lần đăng nhập sai, audit log CRUD nhật ký · Gom 24 mục sidebar thành 5 nhóm thu gọn được, animation trượt mượt |
+| **v3.6.2** | **Bản vá** | **Fix Mèo đuổi chuột: tăng tầm nhảy (JUMP_V) để mèo qua được chướng ngại vật ở tốc độ cao, khoảng cách chướng ngại tự giãn theo đúng công thức vật lý** |
 
 <details>
 <summary><b>Xem đầy đủ lịch sử từ v1.0</b> (bấm để xem)</summary>
@@ -323,6 +324,7 @@ pm2 restart souldiary-api
 | v3.5 | Bảo mật | Mã hoá at-rest nội dung nhật ký bằng AES-256-GCM, CI/CD tự động deploy qua self-hosted GitHub Actions runner |
 | v3.6 | Giải trí | 5 mini game: Mèo đuổi chuột, Rắn săn mồi, 2048, Caro (vs máy), Flappy Mèo — đồ hoạ sprite thực tế, bảng xếp hạng điểm cao riêng từng game |
 | v3.6.1 | Bảo mật & UX | Fix stored XSS qua mime ảnh/audio đính kèm nhật ký, CORS fail-safe khi thiếu `CORS_ORIGIN`, rate limit riêng + khoá tài khoản 15 phút sau 5 lần đăng nhập sai, audit log CRUD nhật ký (`DiaryAuditLog`) · Gom 24/33 mục sidebar thành 5 nhóm bấm-để-mở (nhớ trạng thái, tự mở theo trang đang xem, badge thông báo không "mất tích" khi thu gọn), animation trượt bằng CSS Grid mượt hơn |
+| v3.6.2 | Bản vá | Fix Mèo đuổi chuột: tăng `JUMP_V` từ -14 lên -16 để mèo nhảy xa hơn, qua được chướng ngại vật ở tốc độ cao — khoảng cách tối thiểu giữa chướng ngại vật tự giãn theo vì tính từ cùng công thức `JUMP_V`/`GRAVITY` |
 
 </details>
 
