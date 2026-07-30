@@ -54,6 +54,7 @@ const App = (() => {
       return;
     }
     document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === page));
+    document.querySelector('.nav-item.active')?.closest('.nav-group')?.classList.add('expanded');
     document.querySelector('.nav-item.active')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     document.querySelector('.main')?.scrollTo({ top: 0, behavior: 'instant' });
     doneProgress();
@@ -109,6 +110,45 @@ const App = (() => {
       case 'mood-compare':    initMoodComparePage();       break;
       case 'notifications':   initNotificationsPage();    break;
       case 'profile':         initProfilePage();           break;
+    }
+  }
+
+  // ── Nhóm điều hướng thu gọn được (v3.8) ──────────────────────────────
+  // Sidebar đã có tới 33 mục — gom 24 mục vào 5 nhóm bấm-để-mở, giữ trạng thái
+  // mở/đóng qua localStorage, tự mở nhóm chứa trang đang xem (xem nav() ở trên).
+  let navGroupObserver = null;
+
+  function toggleNavGroup(headerEl) {
+    const group = headerEl.closest('.nav-group');
+    if (!group) return;
+    group.classList.toggle('expanded');
+    try {
+      const expanded = Array.from(document.querySelectorAll('.nav-group.expanded')).map(g => g.dataset.group);
+      localStorage.setItem('nhk_nav_groups', JSON.stringify(expanded));
+    } catch (_) {}
+  }
+
+  function syncNavGroupBadges() {
+    document.querySelectorAll('.nav-group').forEach(g => {
+      const groupBadge = g.querySelector('.nav-group-badge');
+      if (!groupBadge) return;
+      const anyActive = Array.from(g.querySelectorAll('.nav-group-items .nav-badge-dot'))
+        .some(b => b.style.display !== 'none');
+      groupBadge.style.display = anyActive ? '' : 'none';
+    });
+  }
+
+  function initNavGroups() {
+    let expanded = [];
+    try { expanded = JSON.parse(localStorage.getItem('nhk_nav_groups') || '[]'); } catch (_) {}
+    document.querySelectorAll('.nav-group').forEach(g => {
+      if (expanded.includes(g.dataset.group)) g.classList.add('expanded');
+    });
+    syncNavGroupBadges();
+    const navEl = document.querySelector('.nav');
+    if (navEl && !navGroupObserver) {
+      navGroupObserver = new MutationObserver(syncNavGroupBadges);
+      navGroupObserver.observe(navEl, { attributes: true, attributeFilter: ['style'], subtree: true });
     }
   }
 
@@ -4713,10 +4753,11 @@ const App = (() => {
     applyDarkMode(localStorage.getItem('nhk_dark') === '1');
     applyTheme(localStorage.getItem('nhk_theme') || '');
     applyA11ySettings();
-    document.querySelectorAll('.nav-item').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item:not(.nav-group-header)').forEach(btn => btn.addEventListener('click', () => {
       nav(btn.dataset.page);
       closeSidebar();
     }));
+    initNavGroups();
     document.addEventListener('keydown', _handleKeyboard);
     // Auto-resize tất cả .diary-textarea khi gõ (event delegation)
     document.addEventListener('input', e => {
@@ -6477,7 +6518,7 @@ const App = (() => {
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   }
 
-  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,toggleExerciseTimer,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,toggleAdvancedSearch,applyTheme,toggleThemePicker,loadMoreDiary,
+  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,toggleExerciseTimer,toggleNavGroup,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,toggleAdvancedSearch,applyTheme,toggleThemePicker,loadMoreDiary,
     pinInput,pinDelete,setPinLock,managePinLock,installPWA,showMemoryCard,showYearInReviewCard,setA11yFontSize,toggleHighContrast,createFutureLetter,deleteFutureLetter,exportUserData,
     openPMRModal,openBodyScanModal,openGroundingModal,startGrounding,toggleGroundingItem,nextGroundingStep,openGratitudeModal,gratitudeNext,gratitudeBack,
     handleAvatarUpload,removeAvatar,_applyWritingHour,renderEmotionRadar,

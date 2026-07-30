@@ -80,6 +80,29 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#f1f5f9;color:var(--text
 .nav-item.active{background:linear-gradient(135deg,rgba(37,99,235,.4),rgba(139,92,246,.3));color:#e0e7ff}
 .nav-icon{font-size:18px;width:20px;text-align:center}
 .nav-badge-dot{width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;margin-left:auto}
+
+/* Nhóm điều hướng thu gọn được (v3.8) — gom bớt sidebar dài, xem CHANGELOG.
+   Trượt bằng CSS Grid (0fr→1fr) thay vì max-height đoán số — luôn khớp đúng
+   chiều cao thật của từng nhóm (3 hay 6 mục đều mượt như nhau), kèm fade+slide
+   nhẹ cho phần nội dung để cảm giác mềm mại hơn là "bật/tắt" khô khan. */
+.nav-group-header{margin-bottom:2px}
+.nav-group-arrow{margin-left:auto;font-size:11px;transition:transform .3s cubic-bezier(.4,0,.2,1);color:#8892c9}
+.nav-group.expanded .nav-group-arrow{transform:rotate(90deg)}
+.nav-group-badge{margin-left:6px}
+.nav-group-items{
+  display:grid;
+  grid-template-rows:0fr;
+  transition:grid-template-rows .32s cubic-bezier(.4,0,.2,1);
+}
+.nav-group.expanded .nav-group-items{grid-template-rows:1fr}
+.nav-group-items-inner{
+  overflow:hidden;
+  opacity:0;
+  transform:translateY(-6px);
+  transition:opacity .22s ease .02s,transform .22s ease .02s;
+}
+.nav-group.expanded .nav-group-items-inner{opacity:1;transform:translateY(0)}
+.nav-group-items .nav-item{padding-left:32px;font-size:12.5px}
 .sidebar-footer{padding:14px;border-top:1px solid rgba(255,255,255,.08);position:relative}
 .user-badge{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .user-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#f97316,#ec4899);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px;flex-shrink:0}
