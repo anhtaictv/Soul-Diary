@@ -40,8 +40,10 @@ process.on('unhandledRejection', (err) => {
 app.use(compression());
 app.use(helmet());
 
+// baomat.txt #4: không fallback '*' ở production nếu CORS_ORIGIN thiếu — thà chặn nhầm
+// còn hơn vô tình mở CORS cho mọi domain. Dev/local vẫn giữ '*' cho tiện.
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
+  origin: process.env.CORS_ORIGIN || (process.env.NODE_ENV === 'production' ? false : '*'),
   credentials: false,
   methods: ['GET', 'POST','PATCH', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

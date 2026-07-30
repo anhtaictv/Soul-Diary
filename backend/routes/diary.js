@@ -5,7 +5,7 @@ const crypto       = require('crypto');
 const { getPool, sql }  = require('../db');
 const authMiddleware    = require('../middleware/auth');
 const { analyzeEntry, companionMessage } = require('../utils/diary-helpers');
-const { dataUriToBuffer, bufferToDataUri } = require('../utils/media');
+const { dataUriToBuffer, bufferToDataUri, SAFE_MIME_RE } = require('../utils/media');
 const { encryptField, decryptRow, decryptRows } = require('../utils/diary-crypto');
 
 const router = express.Router();
@@ -25,8 +25,38 @@ function validatePhotos(photos) {
   for (const p of validPhotos) {
     if (typeof p !== 'string' || !p.startsWith('data:image/')) return { error: 'Định dạng ảnh không hợp lệ.' };
     if (p.length > MAX_PHOTO_SIZE) return { error: 'Ảnh quá lớn sau khi nén, vui lòng chọn ảnh khác.' };
+    const idx = p.indexOf(';base64,');
+    if (idx === -1 || !SAFE_MIME_RE.test(p.slice(5, idx))) return { error: 'Định dạng ảnh không hợp lệ.' };
   }
   return { photos: validPhotos };
+}
+
+// ── Helper: validate bản ghi âm đính kèm ─────────────────────────────────
+function validateAudio(audioData) {
+  if (!audioData) return { audio: null };
+  if (typeof audioData !== 'string' || !audioData.startsWith('data:audio/'))
+    return { error: 'Định dạng bản ghi âm không hợp lệ.' };
+  if (audioData.length > 8_000_000)
+    return { error: 'Bản ghi âm quá lớn (tối đa khoảng 2 phút).' };
+  const idx = audioData.indexOf(';base64,');
+  if (idx === -1 || !SAFE_MIME_RE.test(audioData.slice(5, idx)))
+    return { error: 'Định dạng bản ghi âm không hợp lệ.' };
+  return { audio: audioData };
+}
+
+// ── Helper: ghi audit log CRUD nhật ký (baomat.txt: khuyến nghị #6) ──────
+// Không throw nếu ghi log lỗi — audit trail không được phép làm hỏng thao tác chính của user.
+async function logAudit(db, entryId, userId, action, req) {
+  try {
+    await db.request()
+      .input('entry_id', sql.Int,      entryId)
+      .input('user_id',  sql.Int,      userId)
+      .input('action',   sql.NVarChar, action)
+      .input('ip',       sql.NVarChar, (req.ip || '').slice(0, 64))
+      .query(`INSERT INTO DiaryAuditLog (entry_id, user_id, action, ip_address) VALUES (@entry_id, @user_id, @action, @ip)`);
+  } catch (err) {
+    console.error('[diary-audit] Lỗi ghi log:', err.message);
+  }
 }
 
 // ── Helper: lưu ảnh/audio vào DiaryMedia ─────────────────────────────────
@@ -252,14 +282,8 @@ router.post('/', async (req, res) => {
     let cbtJson = null;
     if (cbt_data && typeof cbt_data === 'object') cbtJson = JSON.stringify(cbt_data);
 
-    let audioData = null;
-    if (audio_data) {
-      if (typeof audio_data !== 'string' || !audio_data.startsWith('data:audio/'))
-        return res.status(400).json({ message: 'Định dạng bản ghi âm không hợp lệ.' });
-      if (audio_data.length > 8_000_000)
-        return res.status(400).json({ message: 'Bản ghi âm quá lớn (tối đa khoảng 2 phút).' });
-      audioData = audio_data;
-    }
+    const { audio: audioData, error: audioError } = validateAudio(audio_data);
+    if (audioError) return res.status(400).json({ message: audioError });
 
     const { photos: validPhotos, error: photosError } = validatePhotos(photos);
     if (photosError) return res.status(400).json({ message: photosError });
@@ -285,6 +309,7 @@ router.post('/', async (req, res) => {
     // plaintext gốc còn trong biến JS cho response, khỏi phải giải mã lại.
     const entry = { ...result.recordset[0], event_text: event_text || '', thoughts: thoughts || '', gratitude: gratitude || '', cbt_data: cbtJson };
     await saveMedia(db, entry.id, validPhotos, audioData);
+    await logAudit(db, entry.id, req.user.id, 'create', req);
 
     // Cập nhật streak
     const streakResult = await db.request().input('user_id', sql.Int, req.user.id)
@@ -394,14 +419,8 @@ router.put('/:id', async (req, res) => {
     const { mood_score, event_text, thoughts, gratitude, tags, audio_data, cbt_data, photos } = req.body;
     const tagsStr = Array.isArray(tags) ? tags.join('|') : '';
 
-    let audioData = null;
-    if (audio_data) {
-      if (typeof audio_data !== 'string' || !audio_data.startsWith('data:audio/'))
-        return res.status(400).json({ message: 'Định dạng bản ghi âm không hợp lệ.' });
-      if (audio_data.length > 8_000_000)
-        return res.status(400).json({ message: 'Bản ghi âm quá lớn (tối đa khoảng 2 phút).' });
-      audioData = audio_data;
-    }
+    const { audio: audioData, error: audioError } = validateAudio(audio_data);
+    if (audioError) return res.status(400).json({ message: audioError });
 
     let cbtJson = null;
     if (cbt_data && typeof cbt_data === 'object') cbtJson = JSON.stringify(cbt_data);
@@ -434,6 +453,7 @@ router.put('/:id', async (req, res) => {
     const entry = { ...result.recordset[0], event_text: event_text || '', thoughts: thoughts || '', gratitude: gratitude || '', cbt_data: cbtJson };
     await db.request().input('id', sql.Int, entry.id).query('DELETE FROM DiaryMedia WHERE entry_id = @id');
     await saveMedia(db, entry.id, validPhotos, audioData);
+    await logAudit(db, entry.id, req.user.id, 'update', req);
 
     res.json({ message: 'Đã cập nhật nhật ký.', entry: { ...entry, tags: entry.tags ? entry.tags.split('|') : [], photos: validPhotos, audio_data: audioData } });
   } catch (err) {
@@ -538,6 +558,7 @@ router.delete('/:id', async (req, res) => {
     const result = await db.request().input('id', sql.Int, req.params.id).input('user_id', sql.Int, req.user.id)
       .query('DELETE FROM DiaryEntries OUTPUT DELETED.id WHERE id=@id AND user_id=@user_id');
     if (!result.recordset.length) return res.status(404).json({ message: 'Không tìm thấy nhật ký.' });
+    await logAudit(db, req.params.id, req.user.id, 'delete', req);
     res.json({ message: 'Đã xóa nhật ký.' });
   } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
 });

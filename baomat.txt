@@ -1,0 +1,77 @@
+1. Quản lý khóa mã hóa (Critical)
+Vấn đề: ENCRYPTION_KEY đang lưu trong .env trên server. Nếu hacker xâm nhập server, họ có thể lấy được key và giải mã toàn bộ dữ liệu.
+Khuyến nghị:
+Sử dụng Key Management Service (KMS) như AWS KMS, Azure Key Vault hoặc HashiCorp Vault.
+Nếu vẫn dùng local file: Đặt key trong biến môi trường hệ thống (không commit vào git), restrict permissions của file .env xuống chmod 600.
+Implement Key Rotation định kỳ (ví dụ: 6 tháng/lần) với cơ chế chuyển đổi mượt mà.
+2. Cơ sở dữ liệu SQL Server
+Vấn đề: Đang dùng account sa (admin mặc định) – đây là rủi ro rất lớn.
+Khuyến nghị:
+Tạo SQL login riêng với quyền tối thiểu (chỉ SELECT, INSERT, UPDATE, DELETE trên schema của app).
+Vô hiệu hóa authentication bằng SQL nếu có thể, ưu tiên Windows Authentication.
+Bật Transparent Data Encryption (TDE) cho toàn bộ database layer.
+Audit logging: Enable audit trail cho tất cả thao tác CRUD trên bảng diaries.
+3. Xử lý file upload (Ảnh/Ghi âm)
+Vấn đề: Chưa thấy cơ chế kiểm soát file upload chặt chẽ. Hacker có thể upload shell, malware.
+Khuyến nghị:
+Kiểm tra MIME type thực tế (không chỉ trust extension).
+Rename file ngẫu nhiên, không giữ tên gốc.
+Lưu trữ file ngoài thư mục web root, truy cập qua API có xác thực.
+Scan virus trước khi lưu (có thể dùng ClamAV).
+Giới hạn kích thước file (đã có nhưng cần enforce strict).
+4. CORS và CSRF
+Vấn đề: Chưa rõ cấu hình CORS đã chặt chưa. Frontend Vanilla JS dễ bị CSRF nếu không có token.
+Khuyến nghị:
+Restrict CORS origin chỉ cho domain chính thức (không dùng *).
+Implement CSRF Token cho mọi form POST/PUT/DELETE.
+Sử dụng SameSite=Lax hoặc Strict cho cookies.
+5. Rate Limiting chưa đủ sâu
+Vấn đề: Rate limit hiện tại có thể chưa ngăn chặn được brute force login hoặc spam API.
+Khuyến nghị:
+Tăng cường rate limit cho endpoint /auth/login (vd: 5 attempts/15 phút).
+Implement Account Lockout sau 5 lần thất bại.
+Thêm CAPTCHA (reCAPTCHA v3) cho các hành vi nghi ngờ.
+6. Logging và Monitoring
+Vấn đề: Chưa thấy hệ thống monitoring tập trung. Khó phát hiện attack khi xảy ra.
+Khuyến nghị:
+Centralized logging (ELK Stack, Splunk, hoặc CloudWatch Logs).
+Alert khi có dấu hiệu bất thường: nhiều failed login, truy cập từ IP lạ, dump dữ liệu lớn.
+Regular security scan (SAST/DAST) tự động trong CI/CD.
+🚀 Nâng cấp kiến trúc dài hạn
+Lĩnh vực
+Đề xuất
+Mức độ ưu tiên
+Authentication
+Chuyển sang OAuth2/OIDC (Google, Facebook) + MFA
+Cao
+Encryption
+Sử dụng HSM/KMS cho quản lý key
+Cao
+Network
+HTTPS bắt buộc, HTTP Strict Transport Security (HSTS)
+Cao
+API Security
+GraphQL introspection disabled, API Gateway
+Trung bình
+Compliance
+Tuân thủ GDPR/PDPDL (luật bảo vệ dữ liệu VN)
+Trung bình
+Penetration Testing
+Thuê chuyên gia pentest định kỳ 6 tháng/lần
+Thấp
+
+📋 Checklist hành động ngay lập tức
+Đổi password sa SQL Server, tạo user mới với quyền tối thiểu
+Di chuyển ENCRYPTION_KEY khỏi .env vào biến môi trường hệ thống
+Set permission file .env thành 600 (chỉ owner read/write)
+Kiểm tra CORS configuration, restrict allowed origins
+Thêm CSRF protection cho tất cả endpoints write
+Enable audit logging cho bảng diaries
+Setup alert system cho failed login > 5 lần
+Review và test backup strategy cho encrypted data
+💡 Lưu ý đặc biệt cho dự án sức khỏe tâm thần
+Vì đây là ứng dụng chứa dữ liệu nhạy cảm về sức khỏe tâm thần: 
+Data Minimization: Chỉ thu thập thông tin cần thiết, xóa dữ liệu cũ định kỳ.
+Right to Erasure: Implement tính năng "xóa hoàn toàn tài khoản" (bao gồm cả dữ liệu đã mã hóa).
+Consent Management: Có cơ chế xin consent rõ ràng khi thu thập dữ liệu.
+Emergency Protocol: Tích hợp hotline/hỗ trợ khẩn cấp khi phát hiện user có nguy cơ tự harming (dựa trên AI analysis).
