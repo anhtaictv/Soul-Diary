@@ -4,9 +4,9 @@ File này là bảng đối chiếu nhanh, dùng **trước khi viết bài mớ
 
 > ⚠️ **Sự cố 2026-07-06:** database bị xóa sạch (TRUNCATE ngoài ý muốn trong lúc deploy), mất toàn bộ 56 bài viết cũ (id 2–57). Không có bản backup nội dung đầy đủ nào được tìm thấy. Toàn bộ 56 bài dưới đây đã được **viết lại từ đầu** qua 9 đợt dùng skill `/dang-bai` trong ngày 2026-07-06 — **id bài viết đã đổi khác hoàn toàn** so với trước (DB reset về 1, không liên quan gì đến id cũ).
 
-Cập nhật lần cuối: 2026-07-06 (hoàn tất phục hồi — 56 bài, id 1–56, tất cả đang **nháp** chờ admin duyệt)
+Cập nhật lần cuối: 2026-07-30 (thêm 11 bài mới id 57–67, tất cả đang **nháp** chờ admin duyệt)
 
-## stress (11 bài)
+## stress (14 bài)
 
 | id | type | Tiêu đề | Ngày đăng |
 |---|---|---|---|
@@ -21,8 +21,11 @@ Cập nhật lần cuối: 2026-07-06 (hoàn tất phục hồi — 56 bài, id 
 | 43 | library | Dán nhãn tiêu cực: khi suy nghĩ tự động không phải sự thật | 2026-07-06 |
 | 44 | exercise | Kỹ thuật "Tôi đang có suy nghĩ rằng..." | 2026-07-06 |
 | 49 | library | Viết nhật ký cảm xúc — công cụ giảm stress được khoa học chứng minh | 2026-07-06 |
+| 61 | library | Vận động thể chất — liều thuốc giảm stress khoa học chứng minh | 2026-07-30 |
+| 66 | library | Giờ Lo Lắng (Worry Time) — kỹ thuật CBT kiểm soát lo âu lan man | 2026-07-30 |
+| 67 | exercise | Thực hành Giờ Lo Lắng — 10 phút mỗi ngày | 2026-07-30 |
 
-## sleep (9 bài)
+## sleep (11 bài)
 
 | id | type | Tiêu đề | Ngày đăng |
 |---|---|---|---|
@@ -35,6 +38,8 @@ Cập nhật lần cuối: 2026-07-06 (hoàn tất phục hồi — 56 bài, id 
 | 45 | exercise | Tư thế Em Bé (Child's Pose) — giãn cơ nhẹ trước khi ngủ | 2026-07-06 |
 | 46 | exercise | Power Nap 20 phút kiểu NASA | 2026-07-06 |
 | 50 | library | Caffeine và giấc ngủ — uống lúc nào là an toàn | 2026-07-06 |
+| 62 | library | Ngủ để nhớ — giấc ngủ củng cố trí nhớ như thế nào | 2026-07-30 |
+| 63 | exercise | Kiểm soát kích thích — ra khỏi giường khi chưa buồn ngủ | 2026-07-30 |
 
 ## depression (15 bài)
 
@@ -56,7 +61,7 @@ Cập nhật lần cuối: 2026-07-06 (hoàn tất phục hồi — 56 bài, id 
 | 47 | library | Rumination — khi suy nghĩ lặp đi lặp lại không giúp ích gì | 2026-07-06 |
 | 51 | library | Trầm cảm và mạng xã hội — mối liên hệ đáng chú ý | 2026-07-06 |
 
-## relationship (12 bài)
+## relationship (15 bài)
 
 | id | type | Tiêu đề | Ngày đăng |
 |---|---|---|---|
@@ -72,8 +77,11 @@ Cập nhật lần cuối: 2026-07-06 (hoàn tất phục hồi — 56 bài, id 
 | 48 | library | Bạn bè độc hại hay chỉ đang khó khăn? Cách phân biệt | 2026-07-06 |
 | 52 | library | Cách xin lỗi và làm hòa sau xung đột | 2026-07-06 |
 | 53 | library | Tình bạn qua mạng xã hội — kết nối thật hay ảo? | 2026-07-06 |
+| 57 | exercise | Turning Toward — đáp lại lời mời kết nối trong 5 phút | 2026-07-30 |
+| 58 | exercise | Công thức 'Tôi cảm thấy...' khi giận mà không gây phòng thủ | 2026-07-30 |
+| 60 | library | Tỷ lệ 5:1 của Gottman — điều giữ mối quan hệ bền lâu | 2026-07-30 |
 
-## study (9 bài)
+## study (12 bài)
 
 | id | type | Tiêu đề | Ngày đăng |
 |---|---|---|---|
@@ -86,6 +94,9 @@ Cập nhật lần cuối: 2026-07-06 (hoàn tất phục hồi — 56 bài, id 
 | 54 | library | Hiệu ứng Zeigarnik và nghệ thuật 'đóng gói' công việc | 2026-07-06 |
 | 55 | library | Growth Mindset — tư duy phát triển | 2026-07-06 |
 | 56 | exercise | Quản lý thời gian ôn thi — lập kế hoạch ngược từ ngày thi | 2026-07-06 |
+| 59 | exercise | Tự kiểm tra thay vì đọc lại — bài tập Retrieval Practice | 2026-07-30 |
+| 64 | library | Học xen kẽ (Interleaving) — trộn dạng bài thay vì học theo khối | 2026-07-30 |
+| 65 | exercise | Bài tập Dual Coding — vẽ sơ đồ để nhớ lâu hơn | 2026-07-30 |
 
 ---
 
@@ -93,6 +104,15 @@ Cập nhật lần cuối: 2026-07-06 (hoàn tất phục hồi — 56 bài, id 
 
 Đã khôi phục đủ số lượng và tỉ lệ category tương đương trước sự cố (stress 11, sleep 9, depression 15, relationship 12, study 9 = 56 bài). **Đã publish toàn bộ 56 bài (2026-07-07)** — hiện hiển thị công khai trong Thư viện kiến thức.
 
+**2026-07-30 (đợt 1, id 57–61):** Đăng 5 bài qua `/dang-bai` — ưu tiên bù khoảng trống `exercise` cho relationship (1→3 bài) và study (3→4 bài), thêm 2 bài `library` (relationship, stress).
+
+**2026-07-30 (đợt 2, id 62–67):** Theo yêu cầu bổ sung bài cho sleep/study/stress (đang ít nhất) — thêm 1 library + 1 exercise cho mỗi category: sleep (Stickgold sleep-memory + Stimulus Control insomnia), study (Interleaving + Dual Coding), stress (Worry Time library + exercise).
+
+Tổng hiện tại: stress 14, sleep 11, depression 15, relationship 15, study 12 = **67 bài**. 11 bài mới nhất (id 57–67) đang **nháp** chờ admin duyệt trên `souldiary.work.gd`.
+
+Đi kèm: đã thêm bộ đếm giờ thực hành (timer) chung cho mọi bài `exercise` trong modal đọc bài (`frontend/js/app.js`, hàm `renderExerciseTimer`/`toggleExerciseTimer`) — đếm ngược theo `read_time`, không cần code riêng cho từng bài. Cần deploy code frontend (bump SW `v25`) để hiển thị.
+
 ### Việc cần làm tiếp theo
-- [ ] Cân nhắc viết thêm bài `exercise` cho relationship (hiện 12 bài nhưng chỉ 1 bài exercise) và depression/stress để cân bằng tỉ lệ library/exercise tốt hơn.
+- [ ] Deploy code frontend mới (timer thực hành) lên `souldiary.work.gd`.
+- [ ] Admin duyệt (publish) 11 bài nháp id 57–67 trên trang admin.
 - [ ] Thiết lập backup định kỳ cho database để tránh lặp lại sự cố mất dữ liệu tương tự.

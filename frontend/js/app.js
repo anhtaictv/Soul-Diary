@@ -1865,16 +1865,65 @@ const App = (() => {
     try {
       const data = await API.getArticle(id);
       const a = data.article;
+      stopExerciseTimer();
       document.getElementById('article-modal-title').textContent = a.title;
       document.getElementById('article-modal-meta').textContent  = `${a.category} · ${a.read_time} · ${a.author_name||'Soul Diary'} · ${a.view_count} lượt xem`;
-      document.getElementById('article-modal-body').innerHTML    = `<p style="margin-bottom:12px">${renderMarkdown(a.content)}</p>`;
+      const timerHtml = a.type === 'exercise' ? renderExerciseTimer(a) : '';
+      document.getElementById('article-modal-body').innerHTML    = timerHtml + `<p style="margin-bottom:12px">${renderMarkdown(a.content)}</p>`;
       document.getElementById('article-modal').classList.add('open');
     } catch(err) { showToast('❌ Không thể tải bài viết.'); }
   }
 
   function closeArticleModal(e) {
-    if (!e || e.target===document.getElementById('article-modal'))
+    if (!e || e.target===document.getElementById('article-modal')) {
       document.getElementById('article-modal').classList.remove('open');
+      stopExerciseTimer();
+    }
+  }
+
+  // ── Bộ đếm giờ thực hành cho bài viết loại "exercise" ────────────────
+  // Giao diện chung cho mọi bài tập trong thư viện (không cần code riêng
+  // từng bài): đếm ngược theo read_time, có thể tạm dừng/tiếp tục.
+  let exTimerInterval = null, exTimerRemaining = 0, exTimerTotal = 0;
+
+  function renderExerciseTimer(a) {
+    const mins = parseInt((a.read_time||'').match(/\d+/)?.[0], 10) || 5;
+    exTimerTotal = exTimerRemaining = mins * 60;
+    return `
+      <div style="background:var(--surface);border-radius:14px;padding:18px;margin-bottom:16px;text-align:center">
+        <div style="font-size:12px;color:var(--text-hint);margin-bottom:6px">⏱ Hẹn giờ thực hành</div>
+        <div style="font-size:34px;font-weight:900;font-family:'Nunito',sans-serif;color:var(--primary)" id="ex-timer-display">${fmtDuration(exTimerTotal)}</div>
+        <div class="course-progress-bar" style="margin:12px 0">
+          <div class="course-progress-fill" id="ex-timer-fill" style="width:100%"></div>
+        </div>
+        <button class="btn-primary" style="padding:8px 22px;font-size:13px" id="ex-timer-btn" onclick="App.toggleExerciseTimer()">▶ Bắt đầu</button>
+      </div>`;
+  }
+
+  function toggleExerciseTimer() {
+    const btn = document.getElementById('ex-timer-btn');
+    if (!btn) return;
+    if (exTimerInterval) { stopExerciseTimer(); btn.textContent = '▶ Tiếp tục'; return; }
+    if (exTimerRemaining <= 0) exTimerRemaining = exTimerTotal;
+    btn.textContent = '⏸ Tạm dừng';
+    exTimerInterval = setInterval(() => {
+      exTimerRemaining--;
+      const display = document.getElementById('ex-timer-display');
+      const fill    = document.getElementById('ex-timer-fill');
+      if (!display) { stopExerciseTimer(); return; }
+      display.textContent = fmtDuration(exTimerRemaining);
+      fill.style.width = Math.max(0, exTimerRemaining / exTimerTotal * 100) + '%';
+      if (exTimerRemaining <= 0) {
+        stopExerciseTimer();
+        display.textContent = '✅ Xong!';
+        btn.textContent = '↻ Làm lại';
+        showToast('🎉 Hoàn thành bài tập, tuyệt vời!');
+      }
+    }, 1000);
+  }
+
+  function stopExerciseTimer() {
+    if (exTimerInterval) { clearInterval(exTimerInterval); exTimerInterval = null; }
   }
 
   // ── Exercises ────────────────────────────────────────────────────────
@@ -6428,7 +6477,7 @@ const App = (() => {
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   }
 
-  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,toggleAdvancedSearch,applyTheme,toggleThemePicker,loadMoreDiary,
+  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,toggleExerciseTimer,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,toggleAdvancedSearch,applyTheme,toggleThemePicker,loadMoreDiary,
     pinInput,pinDelete,setPinLock,managePinLock,installPWA,showMemoryCard,showYearInReviewCard,setA11yFontSize,toggleHighContrast,createFutureLetter,deleteFutureLetter,exportUserData,
     openPMRModal,openBodyScanModal,openGroundingModal,startGrounding,toggleGroundingItem,nextGroundingStep,openGratitudeModal,gratitudeNext,gratitudeBack,
     handleAvatarUpload,removeAvatar,_applyWritingHour,renderEmotionRadar,
