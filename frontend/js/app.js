@@ -31,7 +31,6 @@ const App = (() => {
   const musicCache    = {};     // { mood: tracks[] } — tránh gọi lại API Jamendo khi đổi mood qua lại
   let diaryMode = 'free';   // 'free' hoặc 'cbt' — chỉ hiệu lực khi cbt_guided_writing được bật
   let checkinAnswers = [];  // mảng 31 phần tử của bài Check-in Sức khỏe Tinh thần đang làm dở
-  let psychTestCatalog = null;  // cache danh mục 11 bài Test tâm lý chuyên sâu
   let currentPsychTest  = null; // { key, name, icon, instrument, preface, disclaimer, items } của bài đang làm
   let psychTestAnswers  = [];   // mảng câu trả lời đang làm dở của bài Test tâm lý chuyên sâu
   let calendarMonth   = new Date(); // tháng đang xem ở Bản đồ thời tiết tâm hồn (mood_calendar)
@@ -61,6 +60,7 @@ const App = (() => {
     document.querySelector('.nav-item.active')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     document.querySelector('.main')?.scrollTo({ top: 0, behavior: 'instant' });
     doneProgress();
+    if (page.startsWith('psych-test-')) { openPsychTest(page.slice('psych-test-'.length)); return; }
     switch (page) {
       case 'dashboard': initDashboard();              break;
       case 'diary':     initDiaryPage();              break;
@@ -87,7 +87,6 @@ const App = (() => {
       case 'exercises': renderExercises();            break;
       case 'music':     initMusicPage();              break;
       case 'checkin':    initCheckinPage();        break;
-      case 'psych-tests': initPsychTestsPage();    break;
       case 'inbox':      initInboxPage();          break;
       case 'challenges': initChallengePage();      break;
       case 'community':  initCommunityPage();      break;
@@ -2265,34 +2264,7 @@ const App = (() => {
     } catch (e) {}
   }
 
-  // ── Test tâm lý chuyên sâu (11 bài, on-demand) ────────────────────────
-  async function initPsychTestsPage() {
-    const el = document.getElementById('psych-tests-content');
-    el.innerHTML = `<div style="text-align:center;color:var(--text-hint);padding:40px 20px">⏳ Đang tải…</div>`;
-    try {
-      if (!psychTestCatalog) {
-        const { tests } = await API.getPsychTests();
-        psychTestCatalog = tests;
-      }
-      renderPsychTestsCatalog();
-    } catch (e) {
-      el.innerHTML = `<div class="empty-state">Không tải được danh sách bài test lúc này. Vui lòng thử lại sau.</div>`;
-    }
-  }
-
-  function renderPsychTestsCatalog() {
-    document.getElementById('psych-tests-content').innerHTML = `
-      <div class="grid-2">
-        ${psychTestCatalog.map(t => `
-          <div class="exercise-card" style="cursor:pointer" onclick="App.openPsychTest('${t.key}')">
-            <div class="ex-icon" style="background:var(--primary-light)">${t.icon}</div>
-            <div class="ex-title">${t.name}</div>
-            <div class="ex-desc">${t.shortDesc}</div>
-            <div style="font-size:11px;color:var(--text-hint)">${t.instrument} · ${t.questionCount} câu</div>
-          </div>`).join('')}
-      </div>`;
-  }
-
+  // ── Test tâm lý chuyên sâu (11 bài, mỗi bài 1 mục riêng trong sidebar) ──
   async function openPsychTest(key) {
     const el = document.getElementById('psych-tests-content');
     el.innerHTML = `<div style="text-align:center;color:var(--text-hint);padding:40px 20px">⏳ Đang tải…</div>`;
@@ -2307,16 +2279,10 @@ const App = (() => {
             Một bài sàng lọc ngắn gồm <b>${currentPsychTest.items.length} câu hỏi</b> (~${Math.max(2, Math.round(currentPsychTest.items.length * 0.3))} phút).
           </div>
           <button class="btn-primary" style="width:auto;padding:12px 28px" onclick="App.startPsychTest()">Bắt đầu</button>
-          <div style="margin-top:14px"><a href="#" onclick="App.backToPsychTestsCatalog();return false" style="font-size:12px;color:var(--text-hint)">← Quay lại danh sách</a></div>
         </div>`;
     } catch (e) {
       el.innerHTML = `<div class="empty-state">Không tải được bài test lúc này. Vui lòng thử lại sau.</div>`;
     }
-  }
-
-  function backToPsychTestsCatalog() {
-    currentPsychTest = null;
-    renderPsychTestsCatalog();
   }
 
   function startPsychTest() {
@@ -2377,7 +2343,7 @@ const App = (() => {
       ${crisisBanner}
       ${renderCheckinResultHTML(result, null)}
       <div style="text-align:center;margin-top:16px">
-        <a href="#" onclick="App.backToPsychTestsCatalog();return false" style="font-size:13px;color:var(--primary);font-weight:700">← Làm bài test khác</a>
+        <a href="#" onclick="App.openPsychTest('${result.items[0].key}');return false" style="font-size:13px;color:var(--primary);font-weight:700">↻ Làm lại bài test này</a>
       </div>`;
   }
 
@@ -4927,9 +4893,8 @@ const App = (() => {
       navCheckin.style.display = '';
       refreshCheckinBadge();
     }
-    const navPsychTests = document.getElementById('nav-psych-tests');
-    if (navPsychTests && window.FEATURES && window.FEATURES.psych_tests) {
-      navPsychTests.style.display = '';
+    if (window.FEATURES && window.FEATURES.psych_tests) {
+      document.querySelectorAll('.psych-test-nav').forEach(el => { el.style.display = ''; });
     }
     if (window.FEATURES && window.FEATURES.challenge_system) {
       const el = document.getElementById('nav-challenges');
@@ -6642,7 +6607,7 @@ const App = (() => {
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   }
 
-  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,toggleExerciseTimer,toggleNavGroup,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openPsychTest,backToPsychTestsCatalog,startPsychTest,selectPsychTestAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,toggleAdvancedSearch,applyTheme,toggleThemePicker,loadMoreDiary,
+  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,toggleExerciseTimer,toggleNavGroup,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openPsychTest,startPsychTest,selectPsychTestAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,toggleAdvancedSearch,applyTheme,toggleThemePicker,loadMoreDiary,
     pinInput,pinDelete,setPinLock,managePinLock,installPWA,showMemoryCard,showYearInReviewCard,setA11yFontSize,toggleHighContrast,createFutureLetter,deleteFutureLetter,exportUserData,
     openPMRModal,openBodyScanModal,openGroundingModal,startGrounding,toggleGroundingItem,nextGroundingStep,openGratitudeModal,gratitudeNext,gratitudeBack,
     handleAvatarUpload,removeAvatar,_applyWritingHour,renderEmotionRadar,
