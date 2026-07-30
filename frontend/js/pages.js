@@ -1059,6 +1059,33 @@ const PAGES = {
     </div>
   `,
 
+  // ── v3.6/v3.7: Mini game giải trí — 5 game + bảng xếp hạng riêng từng game ──
+  game: () => `
+    <div class="page active" id="page-game">
+      <div class="page-header">
+        <div class="page-title">🎮 Giải trí</div>
+        <div class="page-sub">Chọn 1 game bên dưới để chơi</div>
+      </div>
+
+      <div class="game-tabs" style="display:flex;gap:8px;overflow-x:auto;margin-bottom:16px;padding-bottom:4px">
+        <button class="game-tab active" data-game="catmouse" style="flex-shrink:0;padding:8px 14px;border-radius:8px;border:2px solid var(--primary);background:var(--primary);color:#fff;font-weight:600;cursor:pointer;white-space:nowrap">🐱 Mèo đuổi chuột</button>
+        <button class="game-tab" data-game="snake" style="flex-shrink:0;padding:8px 14px;border-radius:8px;border:2px solid var(--border);background:var(--surface);cursor:pointer;white-space:nowrap">🐍 Rắn săn mồi</button>
+        <button class="game-tab" data-game="2048" style="flex-shrink:0;padding:8px 14px;border-radius:8px;border:2px solid var(--border);background:var(--surface);cursor:pointer;white-space:nowrap">🔢 2048</button>
+        <button class="game-tab" data-game="caro" style="flex-shrink:0;padding:8px 14px;border-radius:8px;border:2px solid var(--border);background:var(--surface);cursor:pointer;white-space:nowrap">⭕ Caro</button>
+        <button class="game-tab" data-game="flappy" style="flex-shrink:0;padding:8px 14px;border-radius:8px;border:2px solid var(--border);background:var(--surface);cursor:pointer;white-space:nowrap">🐦 Flappy Mèo</button>
+      </div>
+
+      <div class="card" style="margin-bottom:20px;text-align:center" id="game-stage">
+        <canvas id="game-canvas" width="600" height="200" style="background:#f7f4ee;border-radius:8px;max-width:100%;cursor:pointer"></canvas>
+      </div>
+
+      <div class="section-label">🏆 Bảng xếp hạng</div>
+      <div id="game-leaderboard">
+        <div class="loading-text">Đang tải...</div>
+      </div>
+    </div>
+  `,
+
   // ── v2.7: Gallery ảnh nhật ký ────────────────────────────────────────────
   gallery: () => `
     <div class="page active" id="page-gallery">

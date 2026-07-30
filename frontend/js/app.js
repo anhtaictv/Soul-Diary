@@ -44,6 +44,7 @@ const App = (() => {
     // Lưu ý: KHÔNG dừng nhạc ở đây — thẻ <audio id="music-audio"> nằm ngoài #main-content
     // (xem index.html) nên nó không bị huỷ khi đổi trang, nhạc tiếp tục phát xuyên suốt SPA.
     if (!PAGES[page]) { console.error('Trang không tồn tại:', page); return; }
+    if (document.getElementById('page-game')) _getEngine(currentGameKey)?.stop();
     startProgress();
     try {
       document.getElementById('main-content').innerHTML = PAGES[page]();
@@ -100,6 +101,7 @@ const App = (() => {
       case 'report':        initReportPage();          break;
       case 'reflection':    initReflectionPage();      break;
       case 'habits':        initHabitsPage();          break;
+      case 'game':           initGamePage();            break;
       case 'pomodoro':      initPomodoroPage();        break;
       case 'year-stats':    initYearStatsPage();       break;
       case 'gallery':       initGalleryPage();         break;
@@ -6091,6 +6093,98 @@ const App = (() => {
 
   function discardDraft() { _clearDraft(); }
 
+  // ── v3.6/v3.7: Mini game giải trí — 5 game, mỗi game điểm/xếp hạng riêng ──
+  // game.js/games-extra.js không nạp sẵn trong index.html (đỡ nặng trang chính) —
+  // chỉ tải khi người dùng thật sự mở trang Game, nạp 1 lần rồi dùng lại.
+  const CANVAS_GAMES  = new Set(['catmouse', 'snake', 'flappy']); // dùng <canvas>, còn lại dùng DOM grid
+  let currentGameKey  = 'catmouse';
+  let _gameScriptsLoaded = false;
+  let _gameScriptsLoading = null; // Promise đang tải — tránh nạp trùng nếu bấm ra/vào trang Game liên tục
+
+  function _loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('load fail: ' + src));
+      document.body.appendChild(s);
+    });
+  }
+  function _getEngine(key) {
+    if (!_gameScriptsLoaded) return null;
+    return { catmouse: Game, snake: SnakeGame, '2048': Game2048, caro: CaroGame, flappy: FlappyGame }[key];
+  }
+
+  async function initGamePage() {
+    document.querySelectorAll('.game-tab').forEach(b => b.addEventListener('click', () => switchGame(b.dataset.game)));
+    const stage = document.getElementById('game-stage');
+    if (!_gameScriptsLoaded) {
+      if (stage) stage.innerHTML = '<div class="loading-text">Đang tải game...</div>';
+      if (!_gameScriptsLoading) {
+        _gameScriptsLoading = Promise.all([_loadScript('js/game.js'), _loadScript('js/games-extra.js')]);
+      }
+      try {
+        await _gameScriptsLoading;
+        _gameScriptsLoaded = true;
+      } catch (err) {
+        console.error(err);
+        _gameScriptsLoading = null;
+        if (stage) stage.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted)">Không tải được game, thử lại sau.</div>';
+        return;
+      }
+    }
+    switchGame('catmouse');
+  }
+
+  function switchGame(key) {
+    _getEngine(currentGameKey)?.stop();
+    currentGameKey = key;
+    document.querySelectorAll('.game-tab').forEach(b => {
+      const active = b.dataset.game === key;
+      b.classList.toggle('active', active);
+      b.style.background = active ? 'var(--primary)' : 'var(--surface)';
+      b.style.color       = active ? '#fff' : '';
+      b.style.borderColor = active ? 'var(--primary)' : 'var(--border)';
+    });
+    const stage = document.getElementById('game-stage');
+    if (!stage) return;
+    const onOver = (finalScore) => _submitGameScore(key, finalScore);
+    if (CANVAS_GAMES.has(key)) {
+      stage.innerHTML = `<canvas id="game-canvas" width="600" height="200" style="background:#f7f4ee;border-radius:8px;width:100%;max-width:900px;cursor:pointer"></canvas>`;
+      _getEngine(key).start(document.getElementById('game-canvas'), onOver);
+    } else {
+      stage.innerHTML = `<div id="game-dom-stage" style="max-width:480px;margin:0 auto"></div>`;
+      _getEngine(key).start(document.getElementById('game-dom-stage'), onOver);
+    }
+    _loadGameLeaderboard(key);
+  }
+
+  async function _submitGameScore(key, finalScore) {
+    try {
+      await API.submitGameScore(finalScore, key);
+      if (key === currentGameKey) _loadGameLeaderboard(key);
+    } catch (err) { console.error(err); }
+  }
+
+  async function _loadGameLeaderboard(gameKey = currentGameKey) {
+    const el = document.getElementById('game-leaderboard');
+    if (!el) return;
+    try {
+      const d = await API.getGameLeaderboard(gameKey);
+      if (!d.leaderboard.length) {
+        el.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-muted)">Chưa có ai ghi điểm. Hãy là người đầu tiên!</div>`;
+        return;
+      }
+      const medals = ['🥇','🥈','🥉'];
+      el.innerHTML = `<div class="card" style="padding:8px 0">` + d.leaderboard.map((r, i) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;${i < d.leaderboard.length - 1 ? 'border-bottom:1px solid var(--border)' : ''}">
+          <div style="width:28px;text-align:center;font-weight:700;flex-shrink:0">${medals[i] || (i + 1)}</div>
+          <div style="flex:1;font-weight:600;font-size:14px">${escapeHtml(r.display_name)}</div>
+          <div style="font-family:monospace;font-weight:700;color:var(--primary)">${r.best_score}</div>
+        </div>`).join('') + `</div>`;
+    } catch (err) {
+      el.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-muted)">Không tải được bảng xếp hạng.</div>`;
+    }
+  }
+
   // ── v2.5: Habit Tracker ───────────────────────────────────────────────────
   let _habitsCache = null;
 
@@ -6343,6 +6437,7 @@ const App = (() => {
     createTemplate,deleteTemplate,editTemplate,saveEditTemplate,openTemplatePicker,closeTemplatePicker,applyTemplate,
     loadMonthlyReport,submitReflection,quickLogMood,
     initHabitsPage,createHabit,deleteHabit,toggleHabit,togglePinEntry,
+    initGamePage,
     initPomodoroPage,setPomodoroMode,togglePomodoro,resetPomodoro,updatePomodoroTimes,
     loadYearStats,restoreDraft,discardDraft,
     initGalleryPage,initNotesPage,selectNoteColor,createNote,deleteNote,

@@ -24,7 +24,13 @@ const API = (() => {
 
       const data = await res.json().catch(() => ({}));
 
-      if (res.status === 401) {
+      // Chỉ coi là "phiên hết hạn" với các endpoint CẦN đăng nhập sẵn — không phải
+      // dựa vào việc localStorage có token cũ hay không (token cũ/hỏng vẫn có thể
+      // còn sót lại dù đang gọi chính /auth/login). 401 từ login/register/quên mật khẩu
+      // luôn là "sai thông tin", phải rơi xuống throw bên dưới để hiện đúng thông báo.
+      const isPublicAuthCall = path.startsWith('/auth/login') || path.startsWith('/auth/register')
+        || path.startsWith('/auth/forgot-password') || path.startsWith('/auth/reset-password');
+      if (res.status === 401 && !isPublicAuthCall) {
         localStorage.removeItem('nhk_token');
         localStorage.removeItem('nhk_user');
         window.location.reload();
@@ -292,6 +298,10 @@ const API = (() => {
     createHabit:      (body)      => request('/habits',             { method: 'POST',   body }),
     deleteHabit:      (id)        => request(`/habits/${id}`,       { method: 'DELETE' }),
     toggleHabitLog:   (id)        => request(`/habits/${id}/log`,   { method: 'POST' }),
+
+    // v3.6 — Mèo đuổi chuột: bảng xếp hạng
+    getGameLeaderboard: (gameKey = 'catmouse') => request(`/game/${gameKey}/leaderboard`),
+    submitGameScore:    (score, gameKey = 'catmouse') => request(`/game/${gameKey}/score`, { method: 'POST', body: { score } }),
 
     // v2.4 — Báo cáo tháng
     getMonthlyReport: (month) => request(`/diary/monthly-report${month ? '?month='+month : ''}`),

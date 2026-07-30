@@ -95,6 +95,7 @@ app.use('/api/quotes',      apiLimiter, require('./routes/quotes'));
 app.use('/api/notes',          apiLimiter, require('./routes/notes'));
 app.use('/api/notifications',  apiLimiter, require('./routes/notifications'));
 app.use('/api/announcements',  apiLimiter, require('./routes/announcements'));
+app.use('/api/game',           apiLimiter, require('./routes/game'));
 
 // Health check
 app.get('/api/health', (req, res) => {
