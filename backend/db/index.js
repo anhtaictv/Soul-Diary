@@ -1474,6 +1474,32 @@ async function initSchema() {
     END
   `);
 
+  // ── v3.7: Test tâm lý chuyên sâu — 11 bài sàng lọc on-demand (PHQ-9, GAD-7, MDQ,
+  // OCI-R, PQ-16, EAT-26, EPDS, SDQ x2, PCL-5, DAST-10) — xem routes/psych-tests.js ──
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='PsychTestResults' AND xtype='U')
+    CREATE TABLE PsychTestResults (
+      id          INT           IDENTITY(1,1) PRIMARY KEY,
+      user_id     INT           NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      test_key    NVARCHAR(30)  NOT NULL,
+      raw_answers NVARCHAR(MAX) NOT NULL,
+      total_score INT           NOT NULL,
+      level       NVARCHAR(20)  NOT NULL,
+      created_at  DATETIME2     DEFAULT GETDATE()
+    )
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_PsychTestResults_user_test')
+    CREATE INDEX IX_PsychTestResults_user_test ON PsychTestResults(user_id, test_key, created_at DESC)
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='psych_tests')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order)
+    VALUES ('psych_tests',N'Test tâm lý chuyên sâu',
+            N'11 bài sàng lọc: trầm cảm, lo âu, lưỡng cực, OCD, rối loạn tâm thần, rối loạn ăn uống, trầm cảm sau sinh, sức khỏe tinh thần cho con/thanh thiếu niên, PTSD, độ nghiện',
+            'v3.7',N'Test tâm lý chuyên sâu',0,1)
+  `);
+
   console.log('✅ Schema đã sẵn sàng');
 }
 

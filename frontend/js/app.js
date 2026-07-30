@@ -31,6 +31,9 @@ const App = (() => {
   const musicCache    = {};     // { mood: tracks[] } — tránh gọi lại API Jamendo khi đổi mood qua lại
   let diaryMode = 'free';   // 'free' hoặc 'cbt' — chỉ hiệu lực khi cbt_guided_writing được bật
   let checkinAnswers = [];  // mảng 31 phần tử của bài Check-in Sức khỏe Tinh thần đang làm dở
+  let psychTestCatalog = null;  // cache danh mục 11 bài Test tâm lý chuyên sâu
+  let currentPsychTest  = null; // { key, name, icon, instrument, preface, disclaimer, items } của bài đang làm
+  let psychTestAnswers  = [];   // mảng câu trả lời đang làm dở của bài Test tâm lý chuyên sâu
   let calendarMonth   = new Date(); // tháng đang xem ở Bản đồ thời tiết tâm hồn (mood_calendar)
   let heatmapYear      = new Date().getFullYear(); // năm đang xem ở Heatmap cảm xúc
   let pendingMusicMood = null;      // mood chờ tự phát khi chuyển sang trang Nhạc (mood_ambience)
@@ -84,6 +87,7 @@ const App = (() => {
       case 'exercises': renderExercises();            break;
       case 'music':     initMusicPage();              break;
       case 'checkin':    initCheckinPage();        break;
+      case 'psych-tests': initPsychTestsPage();    break;
       case 'inbox':      initInboxPage();          break;
       case 'challenges': initChallengePage();      break;
       case 'community':  initCommunityPage();      break;
@@ -2259,6 +2263,122 @@ const App = (() => {
       const badge = document.getElementById('checkin-badge');
       if (badge) badge.style.display = status.needsCheckin ? '' : 'none';
     } catch (e) {}
+  }
+
+  // ── Test tâm lý chuyên sâu (11 bài, on-demand) ────────────────────────
+  async function initPsychTestsPage() {
+    const el = document.getElementById('psych-tests-content');
+    el.innerHTML = `<div style="text-align:center;color:var(--text-hint);padding:40px 20px">⏳ Đang tải…</div>`;
+    try {
+      if (!psychTestCatalog) {
+        const { tests } = await API.getPsychTests();
+        psychTestCatalog = tests;
+      }
+      renderPsychTestsCatalog();
+    } catch (e) {
+      el.innerHTML = `<div class="empty-state">Không tải được danh sách bài test lúc này. Vui lòng thử lại sau.</div>`;
+    }
+  }
+
+  function renderPsychTestsCatalog() {
+    document.getElementById('psych-tests-content').innerHTML = `
+      <div class="grid-2">
+        ${psychTestCatalog.map(t => `
+          <div class="exercise-card" style="cursor:pointer" onclick="App.openPsychTest('${t.key}')">
+            <div class="ex-icon" style="background:var(--primary-light)">${t.icon}</div>
+            <div class="ex-title">${t.name}</div>
+            <div class="ex-desc">${t.shortDesc}</div>
+            <div style="font-size:11px;color:var(--text-hint)">${t.instrument} · ${t.questionCount} câu</div>
+          </div>`).join('')}
+      </div>`;
+  }
+
+  async function openPsychTest(key) {
+    const el = document.getElementById('psych-tests-content');
+    el.innerHTML = `<div style="text-align:center;color:var(--text-hint);padding:40px 20px">⏳ Đang tải…</div>`;
+    try {
+      currentPsychTest = await API.getPsychTestDetail(key);
+      el.innerHTML = `
+        <div class="card" style="text-align:center">
+          <div style="font-size:32px;margin-bottom:8px">${currentPsychTest.icon}</div>
+          <div style="font-weight:800;font-size:16px;font-family:'Nunito',sans-serif;margin-bottom:6px">${currentPsychTest.name}</div>
+          <div style="font-size:12px;color:var(--text-hint);margin-bottom:4px">${currentPsychTest.instrument}</div>
+          <div style="font-size:13px;color:var(--text-muted);margin:10px 0 18px">
+            Một bài sàng lọc ngắn gồm <b>${currentPsychTest.items.length} câu hỏi</b> (~${Math.max(2, Math.round(currentPsychTest.items.length * 0.3))} phút).
+          </div>
+          <button class="btn-primary" style="width:auto;padding:12px 28px" onclick="App.startPsychTest()">Bắt đầu</button>
+          <div style="margin-top:14px"><a href="#" onclick="App.backToPsychTestsCatalog();return false" style="font-size:12px;color:var(--text-hint)">← Quay lại danh sách</a></div>
+        </div>`;
+    } catch (e) {
+      el.innerHTML = `<div class="empty-state">Không tải được bài test lúc này. Vui lòng thử lại sau.</div>`;
+    }
+  }
+
+  function backToPsychTestsCatalog() {
+    currentPsychTest = null;
+    renderPsychTestsCatalog();
+  }
+
+  function startPsychTest() {
+    psychTestAnswers = new Array(currentPsychTest.items.length).fill(null);
+    renderPsychTestQuiz();
+  }
+
+  function renderPsychTestQuiz() {
+    let html = `<div class="checkin-progress-bar"><div class="checkin-progress-fill" id="psych-test-progress-fill" style="width:0%"></div></div>
+      <div class="checkin-section-prompt" style="margin-bottom:16px">${currentPsychTest.preface}</div>`;
+    currentPsychTest.items.forEach((q, i) => {
+      html += `<div class="checkin-question" data-q="${i}">
+        <div class="checkin-question-text">${i + 1}. ${q.text}</div>
+        <div class="checkin-options">
+          ${q.options.map(o => `<button type="button" class="checkin-option" onclick="App.selectPsychTestAnswer(${i},${o.value},this)">${o.label}</button>`).join('')}
+        </div>
+      </div>`;
+    });
+    html += `<button class="btn-primary" id="psych-test-submit-btn" disabled>Gửi (0/${currentPsychTest.items.length})</button>`;
+    document.getElementById('psych-tests-content').innerHTML = html;
+    document.getElementById('psych-test-submit-btn').addEventListener('click', submitPsychTestQuiz);
+  }
+
+  function selectPsychTestAnswer(i, value, btn) {
+    psychTestAnswers[i] = value;
+    btn.parentElement.querySelectorAll('.checkin-option').forEach(b => b.classList.remove('sel'));
+    btn.classList.add('sel');
+
+    const total    = currentPsychTest.items.length;
+    const answered = psychTestAnswers.filter(a => a !== null).length;
+    document.getElementById('psych-test-progress-fill').style.width = `${Math.round(answered / total * 100)}%`;
+
+    const submitBtn = document.getElementById('psych-test-submit-btn');
+    submitBtn.disabled = answered < total;
+    submitBtn.textContent = `Gửi (${answered}/${total})`;
+  }
+
+  async function submitPsychTestQuiz() {
+    const submitBtn = document.getElementById('psych-test-submit-btn');
+    const total = currentPsychTest.items.length;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Đang gửi...';
+    try {
+      const { result } = await API.submitPsychTest(currentPsychTest.key, psychTestAnswers);
+      document.getElementById('psych-tests-content').innerHTML = renderPsychTestResultHTML(result);
+    } catch (e) {
+      showToast('❌ ' + (e.message || 'Không gửi được kết quả. Vui lòng thử lại.'));
+      submitBtn.disabled = false;
+      submitBtn.textContent = `Gửi (${psychTestAnswers.filter(a => a !== null).length}/${total})`;
+    }
+  }
+
+  function renderPsychTestResultHTML(result) {
+    const crisisBanner = result.selfHarmAlert
+      ? `<div class="chat-crisis-banner">🆘 Nếu bạn đang có ý nghĩ tự làm hại bản thân, hãy gọi ngay <strong>1800 599 920</strong> hoặc đến <a href="#" onclick="App.nav('sos');return false">trang SOS</a> để được hỗ trợ ngay.</div>`
+      : '';
+    return `
+      ${crisisBanner}
+      ${renderCheckinResultHTML(result, null)}
+      <div style="text-align:center;margin-top:16px">
+        <a href="#" onclick="App.backToPsychTestsCatalog();return false" style="font-size:13px;color:var(--primary);font-weight:700">← Làm bài test khác</a>
+      </div>`;
   }
 
   // ── SOS ──────────────────────────────────────────────────────────────
@@ -4807,6 +4927,10 @@ const App = (() => {
       navCheckin.style.display = '';
       refreshCheckinBadge();
     }
+    const navPsychTests = document.getElementById('nav-psych-tests');
+    if (navPsychTests && window.FEATURES && window.FEATURES.psych_tests) {
+      navPsychTests.style.display = '';
+    }
     if (window.FEATURES && window.FEATURES.challenge_system) {
       const el = document.getElementById('nav-challenges');
       if (el) el.style.display = '';
@@ -6518,7 +6642,7 @@ const App = (() => {
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   }
 
-  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,toggleExerciseTimer,toggleNavGroup,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,toggleAdvancedSearch,applyTheme,toggleThemePicker,loadMoreDiary,
+  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,toggleExerciseTimer,toggleNavGroup,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openPsychTest,backToPsychTestsCatalog,startPsychTest,selectPsychTestAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,toggleAdvancedSearch,applyTheme,toggleThemePicker,loadMoreDiary,
     pinInput,pinDelete,setPinLock,managePinLock,installPWA,showMemoryCard,showYearInReviewCard,setA11yFontSize,toggleHighContrast,createFutureLetter,deleteFutureLetter,exportUserData,
     openPMRModal,openBodyScanModal,openGroundingModal,startGrounding,toggleGroundingItem,nextGroundingStep,openGratitudeModal,gratitudeNext,gratitudeBack,
     handleAvatarUpload,removeAvatar,_applyWritingHour,renderEmotionRadar,

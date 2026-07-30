@@ -437,6 +437,15 @@ const PAGES = {
       <div id="checkin-content"></div>
     </div>`,
 
+  'psych-tests': () => `
+    <div class="page active" id="page-psych-tests">
+      <div class="page-header">
+        <div class="page-title">Test tâm lý chuyên sâu 📋</div>
+        <div class="page-sub">11 bài sàng lọc dựa trên thang đo lâm sàng chuẩn quốc tế — làm bất cứ lúc nào bạn cần</div>
+      </div>
+      <div id="psych-tests-content"></div>
+    </div>`,
+
   inbox: () => `
     <div class="page active" id="page-inbox">
       <div class="page-header">
