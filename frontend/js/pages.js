@@ -437,11 +437,13 @@ const PAGES = {
       <div id="checkin-content"></div>
     </div>`,
 
-  'psych-tests': () => `
+  // Mỗi bài Test tâm lý chuyên sâu là 1 mục riêng trong sidebar (không gộp chung 1 danh mục) —
+  // dùng chung 1 template, PSYCH_TEST_PAGE_KEYS ở cuối file gắn template này vào 11 key psych-test-<key>.
+  psychTestPageTemplate: () => `
     <div class="page active" id="page-psych-tests">
       <div class="page-header">
         <div class="page-title">Test tâm lý chuyên sâu 📋</div>
-        <div class="page-sub">11 bài sàng lọc dựa trên thang đo lâm sàng chuẩn quốc tế — làm bất cứ lúc nào bạn cần</div>
+        <div class="page-sub">Thang đo lâm sàng chuẩn quốc tế — kết quả chỉ mang tính sàng lọc, không thay thế chẩn đoán y khoa</div>
       </div>
       <div id="psych-tests-content"></div>
     </div>`,
@@ -1275,3 +1277,9 @@ const PAGES = {
     </div>
   `,
 };
+
+// 11 mục riêng của Test tâm lý chuyên sâu (psych-test-depression, psych-test-anxiety, ...) —
+// tất cả dùng chung PAGES.psychTestPageTemplate, khác nhau ở nội dung JS render bên trong
+// (xem PSYCH_TEST_NAV_KEYS trong app.js).
+['depression','anxiety','bipolar','ocd','psychosis','eating','postpartum','child','teen','ptsd','addiction']
+  .forEach(key => { PAGES[`psych-test-${key}`] = PAGES.psychTestPageTemplate; });
