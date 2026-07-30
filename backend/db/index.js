@@ -1418,6 +1418,31 @@ async function initSchema() {
       `);
   }
 
+  // ── v3.6: Mèo đuổi chuột — bảng xếp hạng điểm cao ────────────────────────
+  // v3.7: tổng quát hoá cho nhiều mini game — thêm cột game_key, đổi PK thành
+  // (user_id, game_key). Migration idempotent, giữ nguyên dữ liệu cũ (gán 'catmouse').
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='UserGameScores' AND xtype='U')
+    CREATE TABLE UserGameScores (
+      user_id    INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      game_key   NVARCHAR(30) NOT NULL DEFAULT 'catmouse',
+      best_score INT NOT NULL DEFAULT 0,
+      updated_at DATETIME2 DEFAULT GETDATE(),
+      CONSTRAINT PK_UserGameScores PRIMARY KEY (user_id, game_key)
+    )
+  `);
+  await db.request().query(`
+    IF EXISTS (SELECT * FROM sysobjects WHERE name='UserGameScores' AND xtype='U')
+       AND NOT EXISTS (SELECT * FROM syscolumns WHERE id=OBJECT_ID('UserGameScores') AND name='game_key')
+    BEGIN
+      ALTER TABLE UserGameScores ADD game_key NVARCHAR(30) NOT NULL DEFAULT 'catmouse';
+      DECLARE @pk NVARCHAR(200);
+      SELECT @pk = name FROM sys.key_constraints WHERE parent_object_id = OBJECT_ID('UserGameScores') AND type='PK';
+      IF @pk IS NOT NULL EXEC('ALTER TABLE UserGameScores DROP CONSTRAINT ' + @pk);
+      ALTER TABLE UserGameScores ADD CONSTRAINT PK_UserGameScores PRIMARY KEY (user_id, game_key);
+    END
+  `);
+
   console.log('✅ Schema đã sẵn sàng');
 }
 
