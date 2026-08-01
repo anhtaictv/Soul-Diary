@@ -567,3 +567,9 @@ router.get('/:key/history', async (req, res) => {
 });
 
 module.exports = router;
+
+// Định nghĩa test + engine chấm điểm dùng lại được ngoài HTTP (scripts/seed-test-users.js),
+// để dữ liệu seed đi qua đúng thang điểm lâm sàng thay vì chép lại cutoffs.
+module.exports.TESTS = TESTS;
+module.exports.scoreTest = scoreTest;
+module.exports.validateAnswers = validateAnswers;
