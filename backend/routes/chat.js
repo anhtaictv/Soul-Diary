@@ -3,6 +3,7 @@ const express = require('express');
 const { getPool, sql } = require('../db');
 const authMiddleware  = require('../middleware/auth');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const gateway = require('../utils/ai-client');
 
 const router = express.Router();
 const genai  = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
@@ -95,9 +96,27 @@ router.post('/message', authMiddleware, async (req, res) => {
 
     let replyText;
 
-    if (!genai) {
-      replyText = 'Mình hiểu bạn đang chia sẻ điều này. Hãy nói thêm để mình có thể lắng nghe tốt hơn nhé.';
-    } else {
+    // 1. Gateway — history đã gồm cả tin nhắn vừa lưu của user ở cuối.
+    // Chat là màn hình người dùng ngồi chờ nên timeout ngắn hơn mặc định: thà rơi
+    // xuống Gemini sớm còn hơn để họ nhìn dấu "..." tới 90s.
+    replyText = await gateway.chat({
+      system:      SYSTEM_PROMPT,
+      messages:    history.map(m => ({ role: m.role, content: m.content })),
+      maxTokens:   600,
+      timeoutMs:   45000,
+      label:       'soul-chat',
+    });
+
+    if (replyText && crisis) {
+      replyText += '\n\nMình lo cho bạn. Nếu bạn đang trải qua giai đoạn rất khó khăn, hãy gọi **1800 599 920** (miễn phí, 24/7) hoặc mở trang **Đường dây hỗ trợ** trong ứng dụng — bạn không phải một mình.';
+    }
+
+    // 2. Gemini — chỉ chạy khi gateway không trả được
+    if (!replyText && !genai) {
+      replyText = crisis
+        ? 'Mình nghe bạn và mình lo cho bạn. Điều bạn đang cảm thấy rất nặng nề. Hãy gọi ngay **1800 599 920** (miễn phí, 24/7) — có người sẵn sàng lắng nghe bạn ngay lúc này. Bạn không phải một mình.'
+        : 'Mình hiểu bạn đang chia sẻ điều này. Hãy nói thêm để mình có thể lắng nghe tốt hơn nhé.';
+    } else if (!replyText) {
       try {
         const model = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
         const chat  = model.startChat({
