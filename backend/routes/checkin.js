@@ -5,6 +5,7 @@ const authMiddleware    = require('../middleware/auth');
 const { getCheckinWeek } = require('../utils/checkinWeek');
 const { GoogleGenerativeAI, SchemaType } = require('@google/generative-ai');
 const { decryptRows } = require('../utils/diary-crypto');
+const gateway = require('../utils/ai-client');
 
 const genai = process.env.GEMINI_API_KEY
   ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
@@ -196,14 +197,12 @@ function ruleBasedWeeklyAnalysis(currentScores, previousScores, diaryEntries) {
 }
 
 async function generateWeeklyAnalysis(currentScores, previousScores, diaryEntries) {
-  if (genai) {
-    try {
-      const prevText = previousScores ? scoresToText(previousScores) : 'Chưa có dữ liệu tuần trước.';
-      const diaryText = diaryEntries.length
-        ? diaryEntries.map(e => `- [${e.date}] ${e.content}`).join('\n')
-        : 'Không có nhật ký nào trong tuần qua.';
+  const prevText = previousScores ? scoresToText(previousScores) : 'Chưa có dữ liệu tuần trước.';
+  const diaryText = diaryEntries.length
+    ? diaryEntries.map(e => `- [${e.date}] ${e.content}`).join('\n')
+    : 'Không có nhật ký nào trong tuần qua.';
 
-      const prompt = `${ANALYSIS_SYSTEM_PROMPT}
+  const prompt = `${ANALYSIS_SYSTEM_PROMPT}
 
 DỮ LIỆU TUẦN NÀY:
 ${scoresToText(currentScores)}
@@ -214,6 +213,24 @@ ${prevText}
 NHẬT KÝ TRONG TUẦN QUA:
 ${diaryText}`;
 
+  // 1. Gateway — không có responseSchema như Gemini nên phải mô tả schema bằng lời,
+  // rồi vẫn validate lại bằng validateAnalysis() y như nhánh Gemini.
+  const gwParsed = gateway.parseJson(await gateway.chat({
+    prompt: `${prompt}
+
+CHỈ trả về đúng JSON theo mẫu sau, không thêm markdown hay lời dẫn:
+{"weekly_overview":"2-3 câu","emotional_trend":"Tăng|Giảm|Ổn định","key_triggers":["..."],"bright_spots":["..."],"ai_recommendations":["..."]}`,
+    json:        true,
+    maxTokens:   1200,
+    temperature: 0.8,
+    label:       'weekly-analysis',
+  }));
+  if (validateAnalysis(gwParsed)) return gwParsed;
+  if (gwParsed) console.error('Gateway weekly analysis: JSON không hợp lệ schema, thử Gemini.');
+
+  // 2. Gemini
+  if (genai) {
+    try {
       const model = genai.getGenerativeModel({
         model: 'gemini-2.0-flash',
         generationConfig: {

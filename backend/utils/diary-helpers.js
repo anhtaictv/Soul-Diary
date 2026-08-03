@@ -1,5 +1,6 @@
 // utils/diary-helpers.js — Shared AI helpers cho diary routes
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const gateway = require('./ai-client');
 
 const genai = process.env.GEMINI_API_KEY
   ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
@@ -55,13 +56,22 @@ function ruleBasedAnalysis(text, moodScore) {
 }
 
 async function analyzeEntry(text, moodScore) {
-  if (genai && (text || '').trim().length > 20) {
+  const enoughText = (text || '').trim().length > 20;
+
+  if (enoughText) {
     const prompt = `Phân tích cảm xúc đoạn nhật ký tiếng Việt này. Trả về JSON thuần (không markdown, không giải thích):
 {"emotions":[{"name":"Tên cảm xúc","percent":50}],"themes":["Chủ đề"],"intensity":"cao|trung bình|thấp","suggestions":["Gợi ý 1","Gợi ý 2"]}
 Quy tắc: tối đa 3 emotions (tổng percent=100), tối đa 3 themes (1-2 từ tiếng Việt), 2 suggestions ngắn gọn thực tế.
 Nhật ký: "${text.slice(0,800)}"
 Điểm tâm trạng: ${moodScore}/10`;
-    try {
+
+    // 1. Gateway
+    const gwText   = await gateway.chat({ prompt, json: true, maxTokens: 700, label: 'analyze-entry' });
+    const gwParsed = gateway.parseJson(gwText);
+    if (gwParsed?.emotions && Array.isArray(gwParsed.emotions)) return gwParsed;
+
+    // 2. Gemini
+    if (genai) try {
       const model  = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
       const result = await model.generateContent(prompt);
       const raw    = result.response.text().trim().replace(/^```json\n?|\n?```$/g, '');
@@ -100,12 +110,18 @@ function ruleBasedCompanion(moodScore) {
 }
 
 async function companionMessage(text, moodScore) {
-  if (genai && (text || '').trim().length > 20) {
+  if ((text || '').trim().length > 20) {
     const prompt = `Bạn là người đồng hành ấm áp, không phán xét, trong ứng dụng nhật ký "Soul Diary" dành cho học sinh/sinh viên Việt Nam. Họ vừa viết:
 "${text.slice(0,800)}"
 Điểm tâm trạng: ${moodScore}/10
 Hãy viết đúng 2-3 câu tiếng Việt thuần văn xuôi (không markdown, không gạch đầu dòng, không JSON): một lời phản hồi ấm áp, đồng cảm, KHÔNG lặp lại nguyên văn nhật ký, và kết thúc bằng một câu hỏi gợi mở nhẹ nhàng để họ suy ngẫm thêm. Giọng văn tự nhiên, gần gũi, không giáo điều, không dùng emoji.`;
-    try {
+
+    // 1. Gateway
+    const gwText = await gateway.chat({ prompt, maxTokens: 400, label: 'companion' });
+    if (gwText) return gwText;
+
+    // 2. Gemini
+    if (genai) try {
       const model  = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
       const result = await model.generateContent(prompt);
       const text2  = result.response.text().trim();

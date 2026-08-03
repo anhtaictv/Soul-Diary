@@ -4,6 +4,7 @@ const express = require('express');
 const { getPool, sql } = require('../db');
 const { genai, DAILY_PROMPTS, dayOfYear } = require('../utils/diary-helpers');
 const { decryptRows } = require('../utils/diary-crypto');
+const gateway = require('../utils/ai-client');
 
 const router = express.Router();
 
@@ -58,7 +59,7 @@ router.get('/smart-recap', async (req, res) => {
     const lowMoodDays = thisWeek.filter(r => r && r.avg_mood <= 4).length;
 
     let insight;
-    if (genai && thisDays > 0) {
+    if (thisDays > 0) {
       const trend = thisAvg === null || lastAvg === null ? 'chưa đủ dữ liệu so sánh'
         : thisAvg - lastAvg > 0.5 ? `tăng ${(thisAvg-lastAvg).toFixed(1)} điểm so tuần trước`
         : thisAvg - lastAvg < -0.5 ? `giảm ${(thisAvg-lastAvg).toFixed(1)} điểm so tuần trước`
@@ -73,13 +74,20 @@ Dữ liệu tuần này:
 - Ngày tâm trạng thấp (≤4): ${lowMoodDays}
 
 Viết đúng 2-3 câu tiếng Việt: nhận xét ngắn về tuần cảm xúc và một gợi ý nhỏ phù hợp. Giọng ấm áp, khích lệ, tự nhiên. Không dùng tiêu đề, bullet, ký hiệu lạ.`;
-      try {
-        const model  = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
-        const result = await model.generateContent(prompt);
-        insight = result.response.text().trim();
-      } catch (aiErr) {
-        console.error('Gemini smart-recap error:', aiErr.message);
-        insight = null;
+
+      // 1. Gateway
+      insight = await gateway.chat({ prompt, maxTokens: 400, label: 'smart-recap' });
+
+      // 2. Gemini
+      if (!insight && genai) {
+        try {
+          const model  = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+          const result = await model.generateContent(prompt);
+          insight = result.response.text().trim();
+        } catch (aiErr) {
+          console.error('Gemini smart-recap error:', aiErr.message);
+          insight = null;
+        }
       }
     }
 
@@ -129,21 +137,32 @@ router.get('/ai-coach', async (req, res) => {
     let advice = null;
     const avgMood = entries.reduce((s, e) => s + e.mood_score, 0) / entries.length;
 
-    if (genai) {
+    {
       const summary = entries.slice(0, 10).map((e, i) =>
         `#${i+1}: Mood ${e.mood_score}/10. "${(e.event_text || '').slice(0, 100)}"`
       ).join('\n');
       const prompt = `Bạn là coach tâm lý ấm áp cho học sinh/sinh viên Việt Nam. Phân tích nhật ký cảm xúc (mood TB: ${avgMood.toFixed(1)}/10) và đưa ra đúng 3 lời khuyên thực tế, cụ thể, ấm áp.
 Trả về JSON thuần (không markdown): {"advice":[{"emoji":"🌱","title":"Tiêu đề ngắn","body":"2-3 câu cụ thể"}]}
 Nhật ký gần nhất:\n${summary}`;
-      try {
-        const model  = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
-        const result = await model.generateContent(prompt);
-        const raw    = result.response.text().trim().replace(/^```json\n?|\n?```$/g, '');
-        const parsed = JSON.parse(raw);
-        if (parsed.advice && Array.isArray(parsed.advice) && parsed.advice.length > 0)
-          advice = parsed.advice.slice(0, 3);
-      } catch (e) { console.error('Gemini coach error:', e.message); }
+
+      // 1. Gateway
+      const gwParsed = gateway.parseJson(
+        await gateway.chat({ prompt, json: true, maxTokens: 900, label: 'ai-coach' })
+      );
+      if (Array.isArray(gwParsed?.advice) && gwParsed.advice.length > 0)
+        advice = gwParsed.advice.slice(0, 3);
+
+      // 2. Gemini
+      if (!advice && genai) {
+        try {
+          const model  = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+          const result = await model.generateContent(prompt);
+          const raw    = result.response.text().trim().replace(/^```json\n?|\n?```$/g, '');
+          const parsed = JSON.parse(raw);
+          if (parsed.advice && Array.isArray(parsed.advice) && parsed.advice.length > 0)
+            advice = parsed.advice.slice(0, 3);
+        } catch (e) { console.error('Gemini coach error:', e.message); }
+      }
     }
 
     if (!advice) {
