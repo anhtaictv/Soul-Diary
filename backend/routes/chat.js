@@ -15,9 +15,27 @@ const CRISIS_KEYWORDS = [
   'không muốn tồn tại','muốn biến mất','không còn muốn sống','sẽ tự làm hại',
 ];
 
+// Bỏ dấu tiếng Việt (NFD tách dấu, riêng đ/Đ phải thay tay vì không tách được).
+function boDau(text) {
+  return (text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/\s+/g, ' ');
+}
+
+// "tự tử" bỏ dấu thành "tu tu", trùng với "từ từ" (rất hay gặp: "làm từ từ thôi") nên từ
+// khoá này chỉ so khớp bản có dấu. 9 từ khoá còn lại không nhập nhằng khi bỏ dấu.
+const CRISIS_KEYWORDS_KHONG_DAU = CRISIS_KEYWORDS.filter(k => k !== 'tự tử').map(boDau);
+
+// Học sinh gõ điện thoại rất hay bỏ dấu ("nhieu luc khong muon song nua"). Trước đây chỉ so
+// khớp bản có dấu nên những tin nhắn đó lọt lưới và người dùng không nhận được số hỗ trợ.
 function hasCrisis(text) {
-  const lower = text.toLowerCase();
-  return CRISIS_KEYWORDS.some(k => lower.includes(k));
+  const lower = (text || '').toLowerCase();
+  if (CRISIS_KEYWORDS.some(k => lower.includes(k))) return true;
+  const khongDau = boDau(text);
+  return CRISIS_KEYWORDS_KHONG_DAU.some(k => khongDau.includes(k));
 }
 
 const SYSTEM_PROMPT = `Bạn là Soul — người bạn đồng hành tâm lý ấm áp trong ứng dụng Soul Diary, một ứng dụng nhật ký cảm xúc dành cho học sinh sinh viên Việt Nam.
