@@ -2,6 +2,9 @@ node_modules/
 .env
 .env.*
 
+# Nhat ky phien lam viec — ghi chi tiet ha tang VPS, khong day len GitHub
+SESSION_LOG.md
+
 # Local tooling / editor / backup artifacts — not part of project source
 .claude/
 .vscode/
