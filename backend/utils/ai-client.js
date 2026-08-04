@@ -134,6 +134,12 @@ async function chat({
     return null;
   }
 
+  // Model local đôi khi lẫn tiếng Trung dù prompt luôn yêu cầu tiếng Việt (hay gặp khi
+  // hỏi về bài hát/nội dung Trung Quốc). Đây là lỗi nội dung một lần, không phải gateway
+  // hỏng, nên trả null cho rơi xuống Gemini nhưng KHÔNG markDown/cooldown — request kế
+  // tiếp vẫn thử gateway bình thường.
+  if (/[一-鿿]/.test(text)) return null;
+
   markUp();
   return text.trim();
 }
