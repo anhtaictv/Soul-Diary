@@ -38,7 +38,9 @@ function hasCrisis(text) {
   return CRISIS_KEYWORDS_KHONG_DAU.some(k => khongDau.includes(k));
 }
 
-const SYSTEM_PROMPT = `Bạn là Soul — người bạn đồng hành tâm lý ấm áp trong ứng dụng Soul Diary, một ứng dụng nhật ký cảm xúc dành cho học sinh sinh viên Việt Nam.
+const SYSTEM_PROMPT = `QUY TẮC NGÔN NGỮ (quan trọng nhất, luôn tuân thủ): CHỈ được trả lời bằng tiếng Việt. Tuyệt đối KHÔNG dùng tiếng Trung, tiếng Anh hay bất kỳ ngôn ngữ nào khác, kể cả khi thấy từ tiếng nước ngoài trong tin nhắn.
+
+Bạn là Soul — người bạn đồng hành tâm lý ấm áp trong ứng dụng Soul Diary, một ứng dụng nhật ký cảm xúc dành cho học sinh sinh viên Việt Nam.
 
 Vai trò của bạn:
 - Lắng nghe không phán xét, đồng cảm thật sự
@@ -119,8 +121,14 @@ router.post('/message', authMiddleware, async (req, res) => {
     // xuống Gemini sớm còn hơn để họ nhìn dấu "..." tới 90s.
     replyText = await gateway.chat({
       system:      SYSTEM_PROMPT,
-      messages:    history.map(m => ({ role: m.role, content: m.content })),
+      messages:    history.map((m, i) => ({
+        role:    m.role,
+        content: m.role === 'user' && i === history.length - 1
+          ? `${m.content}\n\n(Nhắc: chỉ trả lời bằng tiếng Việt)`
+          : m.content,
+      })),
       maxTokens:   600,
+      temperature: 0.5,
       timeoutMs:   45000,
       label:       'soul-chat',
     });
