@@ -5,14 +5,20 @@
 // Nhật ký được rải ngẫu nhiên trong 15 ngày gần nhất, mỗi lần chạy ra dữ liệu khác nhau.
 //
 // Cách dùng:
-//   node scripts/seed-test-users.js           — tạo (bỏ qua tài khoản đã tồn tại)
-//   node scripts/seed-test-users.js --clean   — xoá sạch toàn bộ tài khoản test_*
-//   node scripts/seed-test-users.js --seed=N  — dựng lại đúng dữ liệu của lần chạy có seed N
+//   node scripts/seed-test-users.js            — tạo (bỏ qua tài khoản đã tồn tại)
+//   node scripts/seed-test-users.js --clean    — xoá sạch toàn bộ tài khoản test_*
+//   node scripts/seed-test-users.js --seed=N   — dựng lại đúng dữ liệu của lần chạy có seed N
+//   node scripts/seed-test-users.js --fill     — viết tiếp nhật ký từ bài cuối cùng đến HÔM NAY
+//                                                (chạy lại định kỳ để dữ liệu demo không bị cũ)
+//     · --fill --days=N   ép lấp từ N ngày gần nhất thay vì chỉ từ bài cuối
+//     · --fill --no-tests chỉ thêm nhật ký, không thêm kết quả test tâm lý mới
 //
 // Mọi tài khoản đều có username tiền tố `test_` và email `@test.local` để lọc/xoá
 // gọn về sau — KHÔNG trộn lẫn với dữ liệu người dùng thật.
 
 require('dotenv').config();
+// Máy chủ dùng chung nên truy vấn đôi khi chậm; nới timeout mặc định 15s của pool.
+process.env.DB_REQUEST_TIMEOUT = process.env.DB_REQUEST_TIMEOUT || '120000';
 const bcrypt = require('bcryptjs');
 const { getPool, sql } = require('../db');
 const { encryptField } = require('../utils/diary-crypto');
@@ -24,6 +30,11 @@ const PASSWORD     = 'Test@2026';
 const DAYS_BACK    = 14;   // nhật ký chỉ nằm trong 15 ngày gần nhất (hôm nay = 0)
 const ENTRIES_MIN  = 10;
 const ENTRIES_MAX  = 18;   // > 15 nên sẽ có vài ngày viết 2 lần, giống người thật
+
+// Chế độ --fill: tỉ lệ ngày bỏ trống / ngày viết 2 bài, để chuỗi ngày trông tự nhiên
+const FILL_SKIP_DAY   = 0.18;
+const FILL_DOUBLE_DAY = 0.15;
+const FILL_TEST_FRESH = 3;  // đã có kết quả test trong N ngày gần đây thì không thêm nữa
 
 // ── RNG có seed — seed lấy ngẫu nhiên mỗi lần chạy để dữ liệu luôn khác nhau.
 // Seed được in ra cuối; truyền --seed=<số> nếu cần dựng lại y hệt một lần chạy cũ.
@@ -37,6 +48,28 @@ function mulberry32(seed) {
 }
 const pick = (rnd, arr) => arr[Math.floor(rnd() * arr.length)];
 const int  = (rnd, lo, hi) => lo + Math.floor(rnd() * (hi - lo + 1));
+
+// Bốc ngẫu nhiên nhưng tránh trùng ngay bài liền trước — kho nội dung mỗi cảm xúc chỉ
+// có 5 câu, nếu không tránh thì hai ngày liên tiếp dễ ra y hệt nhau.
+function pickAvoiding(rnd, arr, avoid) {
+  if (arr.length < 2) return arr[0];
+  const pool = arr.filter(x => x !== avoid);
+  return pick(rnd, pool.length ? pool : arr);
+}
+
+// ── Tiện ích ngày ───────────────────────────────────────────────────────
+// Ngày được biểu diễn bằng chuỗi 'YYYY-MM-DD' cho đỡ nhầm múi giờ — khớp luôn với
+// CONVERT(varchar(10), created_at, 120) khi đọc ngược từ DB.
+//
+// Kết nối đặt useUTC:false (xem db/index.js) nên mọi Date truyền xuống DB đều dùng
+// giờ địa phương — cả DATETIME2 (created_at) lẫn DATE (last_entry). Tuyệt đối không
+// dùng toISOString() để lấy ngày ở đây: nó trả về ngày theo UTC nên lệch từ 0h đến 7h.
+const MS_PER_DAY = 86400000;
+const pad2       = n => String(n).padStart(2, '0');
+const parseDay   = key => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d); };
+const dayKey     = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const addDayKey  = (key, n) => dayKey(new Date(parseDay(key).getTime() + n * MS_PER_DAY));
+const todayKey   = () => dayKey(new Date());
 
 // ── 15 kiểu cảm xúc ─────────────────────────────────────────────────────
 // mood: khoảng điểm tâm trạng (1–10) đặc trưng cho cảm xúc đó
@@ -401,6 +434,43 @@ function answersForLevel(def, targetLevel, rnd) {
   return matches[Math.floor(rnd() * matches.length)];
 }
 
+// ── Sinh nội dung MỘT bài nhật ký đúng chất cảm xúc của profile ─────────
+// `day` là chuỗi 'YYYY-MM-DD'; `avoid` là sự kiện của bài liền trước, để không lặp y nguyên.
+function makeEntry(profile, rnd, day, avoid) {
+  const at = randomTimeOn(day, rnd);
+  // Tâm trạng dao động quanh khoảng đặc trưng, thỉnh thoảng lệch ±1 cho tự nhiên
+  let mood = int(rnd, profile.mood[0], profile.mood[1]);
+  if (rnd() < 0.18) mood += rnd() < 0.5 ? -1 : 1;
+  mood = Math.min(10, Math.max(1, mood));
+
+  const tags = profile.tags.filter(() => rnd() < 0.6);
+  return {
+    mood,
+    event_text: pickAvoiding(rnd, profile.events, avoid),
+    thoughts:   rnd() < 0.75 ? pick(rnd, profile.thoughts)  : '',
+    gratitude:  rnd() < 0.65 ? pick(rnd, profile.gratitude) : '',
+    tags: (tags.length ? tags : [profile.tags[0]]).join('|'),
+    day,
+    created_at: at,
+  };
+}
+
+// Giờ viết ngẫu nhiên (giờ địa phương) trong ngày `day`; nếu rơi vào tương lai —
+// chỉ xảy ra với ngày hôm nay — thì kéo về sát thời điểm hiện tại, không lùi quá 7h sáng.
+const WRITE_HOUR_MIN = 7;
+const WRITE_HOUR_MAX = 23;
+
+function randomTimeOn(day, rnd) {
+  const [y, m, d] = day.split('-').map(Number);
+  const at  = new Date(y, m - 1, d, int(rnd, WRITE_HOUR_MIN, WRITE_HOUR_MAX), int(rnd, 0, 59), int(rnd, 0, 59), 0);
+  const now = new Date();
+  if (at > now) {
+    const floor = new Date(y, m - 1, d, WRITE_HOUR_MIN, 0, 0, 0);
+    at.setTime(Math.max(floor.getTime(), now.getTime() - int(rnd, 1, 90) * 60000));
+  }
+  return at;
+}
+
 // ── Sinh nhật ký cho một profile ────────────────────────────────────────
 function buildEntries(profile, rnd) {
   const total   = int(rnd, ENTRIES_MIN, ENTRIES_MAX);
@@ -415,27 +485,106 @@ function buildEntries(profile, rnd) {
     if ((perDay.get(dayAgo) || 0) >= 2) continue;  // 15 ngày đã kín, dừng thêm bài
     perDay.set(dayAgo, (perDay.get(dayAgo) || 0) + 1);
 
-    const at = new Date();
-    at.setDate(at.getDate() - dayAgo);
-    at.setHours(int(rnd, 7, 23), int(rnd, 0, 59), int(rnd, 0, 59), 0);
-
-    // Tâm trạng dao động quanh khoảng đặc trưng, thỉnh thoảng lệch ±1 cho tự nhiên
-    let mood = int(rnd, profile.mood[0], profile.mood[1]);
-    if (rnd() < 0.18) mood += rnd() < 0.5 ? -1 : 1;
-    mood = Math.min(10, Math.max(1, mood));
-
-    const tags = profile.tags.filter(() => rnd() < 0.6);
-    entries.push({
-      mood,
-      event_text: pick(rnd, profile.events),
-      thoughts:   rnd() < 0.75 ? pick(rnd, profile.thoughts)  : '',
-      gratitude:  rnd() < 0.65 ? pick(rnd, profile.gratitude) : '',
-      tags: (tags.length ? tags : [profile.tags[0]]).join('|'),
-      created_at: at,
-    });
+    entries.push(makeEntry(profile, rnd, addDayKey(todayKey(), -dayAgo), null));
   }
   entries.sort((a, b) => a.created_at - b.created_at);
   return entries;
+}
+
+// ── Sinh nhật ký lấp khoảng trống từ ngày `fromDay` đến hôm nay ─────────
+// `busyDays` = Set các ngày (YYYY-MM-DD) đã có bài, để không viết đè lên.
+// Hôm nay luôn có ít nhất 1 bài — mục đích của --fill là dữ liệu demo chạm tới hiện tại.
+function buildFillEntries(profile, rnd, fromDay, busyDays) {
+  const entries = [];
+  const endDay  = todayKey();
+  let   avoid   = null;
+
+  for (let day = fromDay; day <= endDay; day = addDayKey(day, 1)) {
+    if (busyDays.has(day)) continue;
+    if (day !== endDay && rnd() < FILL_SKIP_DAY) continue;
+
+    const count = rnd() < FILL_DOUBLE_DAY ? 2 : 1;
+    for (let i = 0; i < count; i++) {
+      const entry = makeEntry(profile, rnd, day, avoid);
+      avoid = entry.event_text;
+      entries.push(entry);
+    }
+  }
+  entries.sort((a, b) => a.created_at - b.created_at);
+  return entries;
+}
+
+// Chuỗi ngày hiện tại (tính đến hôm nay) và chuỗi dài nhất từ trước đến nay.
+// Cùng ngữ nghĩa với cách routes/diary.js cộng streak khi người dùng lưu bài thật.
+function computeStreaks(dayKeys) {
+  const days = [...new Set(dayKeys)].sort();
+  let best = 0, run = 0, prev = null;
+  for (const key of days) {
+    const d = parseDay(key);
+    run  = (prev && (d - prev) === MS_PER_DAY) ? run + 1 : 1;
+    best = Math.max(best, run);
+    prev = d;
+  }
+  const current = days.length && days[days.length - 1] === todayKey() ? run : 0;
+  return { current, max: best };
+}
+
+// ── Ghi DB ──────────────────────────────────────────────────────────────
+async function insertEntry(db, userId, e) {
+  await db.request()
+    .input('user_id',    sql.Int,       userId)
+    .input('mood_score', sql.TinyInt,   e.mood)
+    .input('event_text', sql.NVarChar,  encryptField(e.event_text))
+    .input('thoughts',   sql.NVarChar,  encryptField(e.thoughts))
+    .input('gratitude',  sql.NVarChar,  encryptField(e.gratitude))
+    .input('tags',       sql.NVarChar,  e.tags)
+    .input('created_at', sql.DateTime2, e.created_at)
+    .query(`
+      INSERT INTO DiaryEntries (user_id, mood_score, event_text, thoughts, gratitude, tags, created_at, updated_at)
+      VALUES (@user_id, @mood_score, @event_text, @thoughts, @gratitude, @tags, @created_at, @created_at)
+    `);
+}
+
+// Chấm bằng scoreTest() thật của app rồi lưu, nên dữ liệu seed luôn khớp thang điểm hiện hành.
+async function insertTestResult(db, userId, def, level, at, rnd) {
+  const answers = answersForLevel(def, level, rnd);
+  if (!answers) { console.warn(`  ! Không dựng được đáp án mức '${level}' cho '${def.key}'.`); return false; }
+
+  const scored = scoreTest(def, answers);
+  await db.request()
+    .input('user_id',     sql.Int,       userId)
+    .input('test_key',    sql.NVarChar,  def.key)
+    .input('raw_answers', sql.NVarChar,  JSON.stringify(answers))
+    .input('total_score', sql.Int,       scored.total)
+    .input('level',       sql.NVarChar,  scored.items[0].level)
+    .input('created_at',  sql.DateTime2, at)
+    .query(`
+      INSERT INTO PsychTestResults (user_id, test_key, raw_answers, total_score, level, created_at)
+      VALUES (@user_id, @test_key, @raw_answers, @total_score, @level, @created_at)
+    `);
+  return true;
+}
+
+// Đồng bộ last_entry/streak/max_streak theo toàn bộ nhật ký hiện có của user
+async function syncStreak(db, userId) {
+  const rows = await db.request().input('uid', sql.Int, userId).query(`
+    SELECT DISTINCT CONVERT(varchar(10), created_at, 120) AS d
+    FROM DiaryEntries WHERE user_id=@uid
+  `);
+  const days = rows.recordset.map(r => r.d);
+  if (!days.length) return null;
+
+  const { current, max } = computeStreaks(days);
+  const lastDay = days.slice().sort().pop();
+  await db.request()
+    .input('uid',        sql.Int,      userId)
+    .input('last_entry', sql.Date,     parseDay(lastDay))
+    .input('streak',     sql.Int,      current)
+    .input('max_streak', sql.Int,      max)
+    .query(`UPDATE Users SET last_entry=@last_entry, streak=@streak,
+            max_streak=CASE WHEN max_streak > @max_streak THEN max_streak ELSE @max_streak END,
+            updated_at=GETDATE() WHERE id=@uid`);
+  return { current, max, lastDay };
 }
 
 // ── Xoá sạch tài khoản test ─────────────────────────────────────────────
@@ -461,6 +610,80 @@ async function clean(db) {
   console.log(`Đã xoá ${users.recordset.length} tài khoản test: ${users.recordset.map(u => u.username).join(', ')}`);
 }
 
+// ── Viết tiếp nhật ký cho các tài khoản test đã có, đến hết hôm nay ─────
+// Chỉ thêm vào những ngày còn trống nên chạy lại nhiều lần không sinh trùng.
+async function fill(db, baseSeed) {
+  const daysArg   = process.argv.find(a => a.startsWith('--days='));
+  const forceFrom = daysArg ? addDayKey(todayKey(), -(Number(daysArg.split('=')[1]) - 1)) : null;
+  const withTests = !process.argv.includes('--no-tests');
+  const report    = [];
+
+  for (let idx = 0; idx < PROFILES.length; idx++) {
+    const profile  = PROFILES[idx];
+    // Seed lệch theo ngày để mỗi lần chạy --fill ra nội dung khác lần trước
+    const rnd      = mulberry32((baseSeed + idx * 7919) >>> 0);
+    const username = USER_PREFIX + profile.key;
+
+    const found = await db.request()
+      .input('u', sql.NVarChar, username)
+      .query('SELECT id FROM Users WHERE username=@u');
+
+    if (!found.recordset.length) {
+      console.log(`- Bỏ qua ${username} (chưa có tài khoản — chạy script không kèm --fill để tạo)`);
+      report.push({ username, emotion: profile.name, added: '-', tests: '-', note: 'chưa có tài khoản' });
+      continue;
+    }
+    const userId = found.recordset[0].id;
+
+    const existing = await db.request().input('uid', sql.Int, userId).query(`
+      SELECT DISTINCT CONVERT(varchar(10), created_at, 120) AS d
+      FROM DiaryEntries WHERE user_id=@uid
+    `);
+    const busyDays = new Set(existing.recordset.map(r => r.d));
+    const lastDay  = [...busyDays].sort().pop();
+    const fromDay  = forceFrom
+      || (lastDay ? addDayKey(lastDay, 1) : addDayKey(todayKey(), -DAYS_BACK));
+
+    const entries = buildFillEntries(profile, rnd, fromDay, busyDays);
+    for (const e of entries) await insertEntry(db, userId, e);
+
+    // Thêm 1 lần đo mới trong 2 ngày gần đây để lịch sử test cũng chạm tới hiện tại,
+    // trừ khi user đã đo gần đây rồi (tránh làm nhiễu biểu đồ tiến triển).
+    let testCount = 0;
+    if (withTests) {
+      for (const t of profile.tests) {
+        const def = TESTS[t.key];
+        if (!def) continue;
+
+        const recent = await db.request()
+          .input('uid', sql.Int, userId)
+          .input('key', sql.NVarChar, def.key)
+          .input('days', sql.Int, FILL_TEST_FRESH)
+          .query(`SELECT TOP 1 id FROM PsychTestResults
+                  WHERE user_id=@uid AND test_key=@key AND created_at >= DATEADD(day, -@days, GETDATE())`);
+        if (recent.recordset.length) continue;
+
+        const at = randomTimeOn(addDayKey(todayKey(), -int(rnd, 0, 2)), rnd);
+        if (await insertTestResult(db, userId, def, t.level, at, rnd)) testCount++;
+      }
+    }
+
+    const streaks = await syncStreak(db, userId);
+    console.log(`✓ ${username.padEnd(18)} ${profile.name.padEnd(12)} +${String(entries.length).padStart(2)} nhật ký`
+      + `, +${testCount} test, streak ${streaks?.current ?? 0}`);
+    report.push({
+      username, emotion: profile.name,
+      added: entries.length, tests: testCount,
+      note: `${lastDay || 'trống'} → ${todayKey()}`,
+    });
+  }
+
+  console.log('\n── Tổng kết (--fill) ────────────────────────');
+  console.table(report);
+  console.log(`Tổng số nhật ký thêm mới: ${report.reduce((s, r) => s + (Number(r.added) || 0), 0)}`);
+  console.log(`Seed lần này: ${baseSeed}`);
+}
+
 // ── Main ────────────────────────────────────────────────────────────────
 async function main() {
   const db = await getPool();
@@ -472,6 +695,11 @@ async function main() {
 
   const seedArg  = process.argv.find(a => a.startsWith('--seed='));
   const baseSeed = seedArg ? Number(seedArg.split('=')[1]) : (Math.random() * 0xFFFFFFFF) >>> 0;
+
+  if (process.argv.includes('--fill')) {
+    await fill(db, baseSeed);
+    return;
+  }
 
   const hashed = await bcrypt.hash(PASSWORD, 12);
   const report = [];
@@ -492,8 +720,8 @@ async function main() {
       continue;
     }
 
-    const entries  = buildEntries(profile, rnd);
-    const lastDate = entries[entries.length - 1].created_at;
+    const entries = buildEntries(profile, rnd);
+    const lastDay = entries[entries.length - 1].day;
 
     const inserted = await db.request()
       .input('username',    sql.NVarChar, username)
@@ -501,7 +729,7 @@ async function main() {
       .input('password',    sql.NVarChar, hashed)
       .input('full_name',   sql.NVarChar, `[TEST] ${profile.name}`)
       .input('avatar_text', sql.NVarChar, profile.avatar)
-      .input('last_entry',  sql.Date,     lastDate)
+      .input('last_entry',  sql.Date,     parseDay(lastDay))
       .query(`
         INSERT INTO Users (username, email, password, full_name, avatar_text, role, last_entry)
         OUTPUT INSERTED.id
@@ -509,20 +737,7 @@ async function main() {
       `);
     const userId = inserted.recordset[0].id;
 
-    for (const e of entries) {
-      await db.request()
-        .input('user_id',    sql.Int,       userId)
-        .input('mood_score', sql.TinyInt,   e.mood)
-        .input('event_text', sql.NVarChar,  encryptField(e.event_text))
-        .input('thoughts',   sql.NVarChar,  encryptField(e.thoughts))
-        .input('gratitude',  sql.NVarChar,  encryptField(e.gratitude))
-        .input('tags',       sql.NVarChar,  e.tags)
-        .input('created_at', sql.DateTime2, e.created_at)
-        .query(`
-          INSERT INTO DiaryEntries (user_id, mood_score, event_text, thoughts, gratitude, tags, created_at, updated_at)
-          VALUES (@user_id, @mood_score, @event_text, @thoughts, @gratitude, @tags, @created_at, @created_at)
-        `);
-    }
+    for (const e of entries) await insertEntry(db, userId, e);
 
     // Kết quả test tâm lý — 2 lần đo cách nhau vài tuần để history có đường tiến triển
     let testCount = 0;
@@ -532,28 +747,12 @@ async function main() {
 
       // Hai lần đo trong 15 ngày để màn hình lịch sử có đường tiến triển
       for (const dayAgo of [int(rnd, 11, 14), int(rnd, 0, 3)]) {
-        const answers = answersForLevel(def, t.level, rnd);
-        if (!answers) { console.warn(`  ! Không dựng được đáp án mức '${t.level}' cho '${t.key}'.`); break; }
-
-        const scored = scoreTest(def, answers);
-        const at = new Date();
-        at.setDate(at.getDate() - dayAgo);
-        at.setHours(int(rnd, 9, 21), int(rnd, 0, 59), 0, 0);
-
-        await db.request()
-          .input('user_id',     sql.Int,       userId)
-          .input('test_key',    sql.NVarChar,  def.key)
-          .input('raw_answers', sql.NVarChar,  JSON.stringify(answers))
-          .input('total_score', sql.Int,       scored.total)
-          .input('level',       sql.NVarChar,  scored.items[0].level)
-          .input('created_at',  sql.DateTime2, at)
-          .query(`
-            INSERT INTO PsychTestResults (user_id, test_key, raw_answers, total_score, level, created_at)
-            VALUES (@user_id, @test_key, @raw_answers, @total_score, @level, @created_at)
-          `);
+        const at = randomTimeOn(addDayKey(todayKey(), -dayAgo), rnd);
+        if (!await insertTestResult(db, userId, def, t.level, at, rnd)) break;
         testCount++;
       }
     }
+    await syncStreak(db, userId);
 
     console.log(`✓ ${username.padEnd(18)} ${profile.name.padEnd(12)} ${entries.length} nhật ký, ${testCount} kết quả test`);
     report.push({ username, emotion: profile.name, status: 'đã tạo', entries: entries.length, tests: testCount });
@@ -564,6 +763,7 @@ async function main() {
   console.log(`Mật khẩu chung cho tất cả tài khoản test: ${PASSWORD}`);
   console.log(`Nhật ký nằm trong ${DAYS_BACK + 1} ngày gần nhất. Seed lần này: ${baseSeed}`);
   console.log(`  · Dựng lại y hệt: node scripts/seed-test-users.js --seed=${baseSeed}`);
+  console.log(`  · Viết tiếp:      node scripts/seed-test-users.js --fill`);
   console.log(`  · Xoá sạch:       node scripts/seed-test-users.js --clean`);
 }
 
