@@ -8,10 +8,19 @@ const config = {
   user:     process.env.DB_USER || 'sa',
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME || 'NhatKyCamXuc',
+  // Mặc định 15s như trước; script chạy hàng loạt (seed/backfill) có thể nới qua env
+  // vì máy chủ dùng chung nên truy vấn đôi khi chậm bất thường.
+  requestTimeout: Number(process.env.DB_REQUEST_TIMEOUT) || 15000,
   options: {
     encrypt: process.env.DB_ENCRYPT === 'true',
     trustServerCertificate: process.env.DB_TRUST_SERVER_CERT !== 'false',
     enableArithAbort: true,
+    // Toàn bộ DB nói giờ địa phương: các cột đều mặc định GETDATE() và mọi so sánh
+    // trong SQL đều dùng GETDATE()/CAST(GETDATE() AS DATE). Mặc định useUTC:true của
+    // tedious lại coi giá trị đọc lên là UTC và ghi xuống bằng phần UTC của Date, làm
+    // lệch đúng 7 tiếng: giờ nhật ký hiển thị muộn 7h, cột DATE lùi 1 ngày, token đặt
+    // lại mật khẩu hết hạn ngay khi tạo. Đặt false để driver dùng cùng múi giờ với DB.
+    useUTC: false,
   },
   pool: {
     max: 15, min: 2, idleTimeoutMillis: 30000,

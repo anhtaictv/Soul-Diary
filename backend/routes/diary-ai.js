@@ -4,6 +4,7 @@ const express = require('express');
 const { getPool, sql } = require('../db');
 const { genai, DAILY_PROMPTS, dayOfYear } = require('../utils/diary-helpers');
 const { decryptRows } = require('../utils/diary-crypto');
+const { toDateOnly, fromDateOnly, localDayKey } = require('../utils/date-only');
 const gateway = require('../utils/ai-client');
 
 const router = express.Router();
@@ -23,8 +24,8 @@ router.get('/smart-recap', async (req, res) => {
     const cacheRes = await db.request().input('id', sql.Int, req.user.id)
       .query(`SELECT ai_recap_text, ai_recap_date FROM Users WHERE id = @id`);
     const { ai_recap_text, ai_recap_date } = cacheRes.recordset[0];
-    const today = new Date().toISOString().split('T')[0];
-    if (ai_recap_text && ai_recap_date && ai_recap_date.toISOString().startsWith(today))
+    const today = localDayKey();
+    if (ai_recap_text && ai_recap_date && localDayKey(fromDateOnly(ai_recap_date)) === today)
       return res.json({ insight: ai_recap_text, cached: true });
 
     const statsRes = await db.request().input('user_id', sql.Int, req.user.id).query(`
@@ -105,7 +106,7 @@ Viết đúng 2-3 câu tiếng Việt: nhận xét ngắn về tuần cảm xúc
     await db.request()
       .input('id',   sql.Int,      req.user.id)
       .input('text', sql.NVarChar, insight)
-      .input('date', sql.Date,     new Date())
+      .input('date', sql.Date,     toDateOnly())
       .query(`UPDATE Users SET ai_recap_text = @text, ai_recap_date = @date WHERE id = @id`);
 
     res.json({ insight, cached: false });
@@ -185,7 +186,7 @@ Nhật ký gần nhất:\n${summary}`;
     await db.request()
       .input('id',   sql.Int,      uid)
       .input('text', sql.NVarChar, JSON.stringify(advice))
-      .input('date', sql.Date,     new Date())
+      .input('date', sql.Date,     toDateOnly())
       .query(`UPDATE Users SET ai_coach_text = @text, ai_coach_date = @date WHERE id = @id`);
 
     res.json({ advice, cached: false });

@@ -7,6 +7,7 @@ const authMiddleware    = require('../middleware/auth');
 const { analyzeEntry, companionMessage } = require('../utils/diary-helpers');
 const { dataUriToBuffer, bufferToDataUri, SAFE_MIME_RE } = require('../utils/media');
 const { encryptField, decryptRow, decryptRows } = require('../utils/diary-crypto');
+const { toDateOnly, fromDateOnly } = require('../utils/date-only');
 
 const router = express.Router();
 
@@ -318,8 +319,7 @@ router.post('/', async (req, res) => {
     const today      = new Date(); today.setHours(0,0,0,0);
     const yesterday  = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
     const twoDaysAgo = new Date(today); twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-    const lastDate   = last_entry ? new Date(last_entry) : null;
-    if (lastDate) lastDate.setHours(0,0,0,0);
+    const lastDate   = fromDateOnly(last_entry);
 
     let newStreak = streak, freezeUsed = false, freezeGrant = 0, newFreezeCount = streak_freeze;
     const isSameDay    = lastDate && lastDate.getTime() === today.getTime();
@@ -349,7 +349,7 @@ router.post('/', async (req, res) => {
       await db.request()
         .input('user_id',    sql.Int,  req.user.id)
         .input('streak',     sql.Int,  newStreak)
-        .input('last_entry', sql.Date, today)
+        .input('last_entry', sql.Date, toDateOnly(today))
         .input('max_streak', sql.Int,  newMaxStreak)
         .input('new_freeze', sql.Int,  newFreezeCount)
         .query(`UPDATE Users SET streak=@streak, last_entry=@last_entry, max_streak=@max_streak, streak_freeze=@new_freeze, updated_at=GETDATE() WHERE id=@user_id`);
