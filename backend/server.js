@@ -10,6 +10,7 @@ const cron       = require('node-cron');
 const { initSchema, seedAdmin, getPool, sql } = require('./db');
 const { webpush } = require('./routes/push');
 const { getCheckinWeek } = require('./utils/checkinWeek');
+const { safeKeyGenerator } = require('./utils/rateLimitKey');
 
 const compression = require('compression');
 
@@ -18,17 +19,6 @@ const PORT = process.env.PORT || 3001;
 
 // IIS đứng trước proxy /api/* → tin tưởng header X-Forwarded-For từ localhost
 app.set('trust proxy', 'loopback');
-
-// Một số request đến với X-Forwarded-For dạng "IP:PORT" (proxy/bot gửi sai định dạng)
-// → req.ip trả về chuỗi không phải IP hợp lệ, khiến express-rate-limit ném ValidationError
-// (ERR_ERL_INVALID_IP_ADDRESS) chưa được bắt → unhandled rejection → crash toàn bộ tiến trình
-// (đây là nguyên nhân của loạt restart liên tục khiến site thỉnh thoảng "không vào được").
-// Cắt bỏ phần ":port" thừa trước khi đưa cho rate limiter để tránh ném lỗi.
-function safeKeyGenerator(req) {
-  const ip = req.ip || '';
-  const m  = ip.match(/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):\d+$/);
-  return m ? m[1] : ip;
-}
 
 // Chốt chặn cuối — không để một promise bị từ chối mà không ai bắt làm sập cả server
 process.on('unhandledRejection', (err) => {
