@@ -7,6 +7,7 @@ const nodemailer   = require('nodemailer');
 const rateLimit    = require('express-rate-limit');
 const { getPool, sql } = require('../db');
 const authMiddleware   = require('../middleware/auth');
+const { safeKeyGenerator } = require('../utils/rateLimitKey');
 
 // baomat.txt #5: rate limit riêng cho /login (chặt hơn authLimiter chung 20/15p ở server.js)
 // + account lockout theo user sau nhiều lần sai — IP limiter dễ bị né qua nhiều IP,
@@ -19,6 +20,7 @@ const loginLimiter = rateLimit({
   message: { message: 'Quá nhiều lần đăng nhập. Vui lòng thử lại sau 15 phút.' },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: safeKeyGenerator,
 });
 
 function createMailTransporter() {
