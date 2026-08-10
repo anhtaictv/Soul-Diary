@@ -449,9 +449,27 @@ cron.schedule('5 17 * * *', async () => {
 });
 
 // ── Start ─────────────────────────────────────────────────────────────────
+// SQL Server chạy cùng máy (localhost) — sau khi VPS reboot, PM2 tự khởi động app
+// trước khi service SQL Server kịp sẵn sàng (thường mất 30s-2 phút), khiến initSchema()
+// fail ngay lần đầu. Retry với backoff thay vì exit ngay để chịu được khoảng chờ đó
+// mà không cần PM2 restart-loop dồn dập.
+async function connectWithRetry(maxAttempts = 5, baseDelayMs = 5000) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await initSchema();
+      return;
+    } catch (err) {
+      if (attempt === maxAttempts) throw err;
+      const delay = baseDelayMs * attempt;
+      console.error(`⚠️  Kết nối DB thất bại (lần ${attempt}/${maxAttempts}): ${err.message} — thử lại sau ${delay / 1000}s`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+}
+
 async function start() {
   try {
-    await initSchema();
+    await connectWithRetry();
 
     // Tạo tài khoản admin lần đầu từ .env
     const adminEmail = process.env.ADMIN_EMAIL;
