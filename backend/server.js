@@ -148,7 +148,9 @@ cron.schedule('0 * * * *', async () => {
 
     const sentIds      = [];
     const expiredEps   = [];
-    for (const u of toNotify) {
+    // Gửi song song thay vì tuần tự — chờ từng push một (network round-trip từng cái)
+    // có thể chặn event loop đủ lâu khiến node-cron báo "missed execution" ở tick kế tiếp.
+    await Promise.allSettled(toNotify.map(async (u) => {
       let body;
       const m = u.last_mood;
       if      (m !== null && m <= 4)  body = `Hôm qua bạn cảm thấy không tốt lắm. Hôm nay thế nào rồi? 💙`;
@@ -164,7 +166,7 @@ cron.schedule('0 * * * *', async () => {
       } catch (pushErr) {
         if (pushErr.statusCode === 410 || pushErr.statusCode === 404) expiredEps.push(u.endpoint);
       }
-    }
+    }));
     // Batch UPDATE/DELETE thay vì N round trips
     if (sentIds.length) {
       await db.request().query(
@@ -214,7 +216,7 @@ cron.schedule('0 * * * *', async () => {
 
     const sentIds2    = [];
     const expiredEps2 = [];
-    for (const u of result.recordset) {
+    await Promise.allSettled(result.recordset.map(async (u) => {
       try {
         await webpush.sendNotification(
           { endpoint: u.endpoint, keys: { p256dh: u.p256dh, auth: u.auth } },
@@ -224,7 +226,7 @@ cron.schedule('0 * * * *', async () => {
       } catch (pushErr) {
         if (pushErr.statusCode === 410 || pushErr.statusCode === 404) expiredEps2.push(u.endpoint);
       }
-    }
+    }));
     if (sentIds2.length) {
       await db.request().query(
         `UPDATE Users SET last_checkin_notif_at = GETDATE() WHERE id IN (${sentIds2.join(',')})`
