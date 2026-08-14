@@ -279,7 +279,7 @@ cron.schedule('0 1 * * *', async () => {
     `);
     const sentIds3    = [];
     const expiredEps3 = [];
-    for (const u of result.recordset) {
+    await Promise.allSettled(result.recordset.map(async (u) => {
       try {
         await webpush.sendNotification(
           { endpoint: u.endpoint, keys: { p256dh: u.p256dh, auth: u.auth } },
@@ -293,7 +293,7 @@ cron.schedule('0 1 * * *', async () => {
       } catch (pushErr) {
         if (pushErr.statusCode === 410 || pushErr.statusCode === 404) expiredEps3.push(u.endpoint);
       }
-    }
+    }));
     if (sentIds3.length) {
       await db.request().query(
         `UPDATE Users SET last_lowmood_notif_at = GETDATE() WHERE id IN (${sentIds3.join(',')})`
@@ -385,7 +385,7 @@ cron.schedule('0 3 * * *', async () => {
 
     const notifiedIds = [];
     const expiredEps  = [];
-    for (const u of result.recordset) {
+    await Promise.allSettled(result.recordset.map(async (u) => {
       const body = u.max_streak > 0
         ? `Bạn từng đạt streak ${u.max_streak} ngày! Đã ${u.inactive_days} ngày rồi, quay lại viết một dòng thôi 💙`
         : `Đã ${u.inactive_days} ngày bạn chưa ghé Soul Diary. Một dòng nhật ký ngắn cũng đủ để bắt đầu lại 🌱`;
@@ -424,7 +424,7 @@ cron.schedule('0 3 * * *', async () => {
         }
       }
       if (delivered) notifiedIds.push(u.id);
-    }
+    }));
     if (notifiedIds.length) {
       await db.request().query(
         `UPDATE Users SET last_winback_notif_at = GETDATE() WHERE id IN (${notifiedIds.join(',')})`
