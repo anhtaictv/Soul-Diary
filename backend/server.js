@@ -111,6 +111,11 @@ cron.schedule('0 * * * *', async () => {
   if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) return;
   try {
     const db = await getPool();
+    const flagRes = await db.request().query(
+      `SELECT enabled FROM FeatureFlags WHERE flag_key='smart_push_reminder'`
+    );
+    if (!flagRes.recordset.length || !flagRes.recordset[0].enabled) return;
+
     // Giờ hiện tại theo múi giờ Việt Nam (UTC+7)
     const vnHour = (new Date().getUTCHours() + 7) % 24;
 
@@ -248,6 +253,11 @@ cron.schedule('0 1 * * *', async () => {
   if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) return;
   try {
     const db = await getPool();
+    const flagRes = await db.request().query(
+      `SELECT enabled FROM FeatureFlags WHERE flag_key='lowmood_alert'`
+    );
+    if (!flagRes.recordset.length || !flagRes.recordset[0].enabled) return;
+
     // Lấy user có 7 ngày nhật ký gần nhất đều avg_mood ≤ 4 + có push subscription + chưa nhận cảnh báo hôm nay
     const result = await db.request().query(`
       SELECT u.id, ps.endpoint, ps.p256dh, ps.auth

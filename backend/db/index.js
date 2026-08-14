@@ -1509,6 +1509,23 @@ async function initSchema() {
             'v3.7',N'Test tâm lý chuyên sâu',0,1)
   `);
 
+  // ── v3.7.2: Feature flags cho 2 cron nhắc nhở đang chạy sẵn (đã triển khai, enabled=1) ──
+  const v372flags = [
+    { key: 'smart_push_reminder', label: 'Push nhắc nhở thông minh', desc: 'Nhắc viết nhật ký mỗi giờ theo giờ ưa thích của từng user, dựa trên mood hôm trước và streak', ver: 'v3.7.2', title: 'Vận hành & Nhắc nhở', sort: 372 },
+    { key: 'lowmood_alert',       label: 'Cảnh báo tâm trạng tiêu cực', desc: 'Push cảnh báo + link SOS khi user có 7 ngày liên tiếp mood trung bình ≤ 4', ver: 'v3.7.2', title: 'Vận hành & Nhắc nhở', sort: 373 },
+  ];
+  for (const f of v372flags) {
+    await db.request()
+      .input('k', sql.NVarChar, f.key).input('l', sql.NVarChar, f.label)
+      .input('d', sql.NVarChar, f.desc).input('v', sql.NVarChar, f.ver)
+      .input('vt', sql.NVarChar, f.title).input('s', sql.Int, f.sort)
+      .query(`
+        IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key = @k)
+        INSERT INTO FeatureFlags (flag_key, label, description, version, version_title, enabled, sort_order, released_at)
+        VALUES (@k, @l, @d, @v, @vt, 1, @s, GETDATE())
+      `);
+  }
+
   console.log('✅ Schema đã sẵn sàng');
 }
 
