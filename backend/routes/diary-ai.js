@@ -122,10 +122,8 @@ router.get('/ai-coach', async (req, res) => {
     const cacheR = await db.request().input('id', sql.Int, uid)
       .query(`SELECT ai_coach_text, ai_coach_date FROM Users WHERE id = @id`);
     const row = cacheR.recordset[0];
-    if (row && row.ai_coach_text && row.ai_coach_date) {
-      const ageDays = Math.floor((Date.now() - new Date(row.ai_coach_date).getTime()) / 86400000);
-      if (ageDays < 7) return res.json({ advice: JSON.parse(row.ai_coach_text), cached: true });
-    }
+    if (row && row.ai_coach_text && row.ai_coach_date && localDayKey(fromDateOnly(row.ai_coach_date)) === localDayKey())
+      return res.json({ advice: JSON.parse(row.ai_coach_text), cached: true });
 
     const entriesR = await db.request().input('uid', sql.Int, uid).query(`
       SELECT TOP 30 mood_score, event_text, tags, created_at
