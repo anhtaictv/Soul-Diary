@@ -117,6 +117,8 @@ const API = (() => {
     updateProfile:      (body) => request('/auth/profile',        { method: 'PUT', body }),
     getWritingPattern:  ()     => request('/auth/writing-pattern'),
     getReferral:        ()     => request('/user/referral'),
+    getEmergencyContact:  ()     => request('/user/emergency-contact'),
+    saveEmergencyContact: (body) => request('/user/emergency-contact', { method: 'PUT', body }),
 
     // Articles
     getArticles:    (cat='', search='', type='') => request(`/articles?category=${cat}&search=${encodeURIComponent(search)}&type=${type}`),

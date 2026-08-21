@@ -8,9 +8,16 @@ const router = express.Router();
 
 const SEVERITIES = ['info', 'warning', 'critical'];
 
+// Cache 30s — bảng ít đổi nhưng được gọi ở mọi lần tải trang của mọi user
+let _activeCache = null; // { data, time }
+const ACTIVE_CACHE_TTL = 30000;
+
 // ── GET /api/announcements/active — public, chỉ các thông báo đang bật ──
 router.get('/active', async (req, res) => {
   try {
+    if (_activeCache && Date.now() - _activeCache.time < ACTIVE_CACHE_TTL) {
+      return res.json({ announcements: _activeCache.data });
+    }
     const db = await getPool();
     const result = await db.request().query(`
       SELECT id, message, severity, created_at
@@ -18,10 +25,11 @@ router.get('/active', async (req, res) => {
       WHERE is_active = 1
       ORDER BY created_at DESC
     `);
+    _activeCache = { data: result.recordset, time: Date.now() };
     res.json({ announcements: result.recordset });
   } catch (err) {
     console.error('Get active announcements error:', err);
-    res.json({ announcements: [] });
+    res.json({ announcements: _activeCache?.data || [] });
   }
 });
 

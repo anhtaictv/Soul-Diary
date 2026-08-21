@@ -294,6 +294,80 @@ cron.schedule('0 1 * * *', async () => {
         if (pushErr.statusCode === 410 || pushErr.statusCode === 404) expiredEps3.push(u.endpoint);
       }
     }));
+
+    // ── Email báo người thân (chỉ user đã tự bật đồng ý emergency_contact_consent) ──
+    // Lưu ý riêng tư: KHÔNG gửi kèm nội dung/điểm mood nhật ký, chỉ báo chung chung.
+    const ecFlagRes = await db.request().query(
+      `SELECT enabled FROM FeatureFlags WHERE flag_key='emergency_contact'`
+    );
+    if (ecFlagRes.recordset.length && ecFlagRes.recordset[0].enabled) {
+      const ecResult = await db.request().query(`
+        SELECT u.id, u.username, u.full_name,
+               u.emergency_contact_name, u.emergency_contact_email
+        FROM Users u
+        WHERE u.emergency_contact_consent = 1
+          AND u.emergency_contact_email IS NOT NULL AND u.emergency_contact_email <> ''
+          AND (u.last_lowmood_notif_at IS NULL OR CAST(u.last_lowmood_notif_at AS DATE) < CAST(GETDATE() AS DATE))
+          AND u.id IN (
+            SELECT user_id FROM (
+              SELECT user_id, CAST(created_at AS DATE) AS d,
+                     AVG(CAST(mood_score AS FLOAT)) AS avg_m,
+                     ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY CAST(created_at AS DATE) DESC) AS rn
+              FROM DiaryEntries
+              GROUP BY user_id, CAST(created_at AS DATE)
+            ) daily
+            WHERE rn <= 7
+            GROUP BY user_id
+            HAVING COUNT(*) = 7 AND SUM(CASE WHEN avg_m <= 4 THEN 1 ELSE 0 END) = 7
+          )
+      `);
+      if (ecResult.recordset.length) {
+        const { createTransporter } = require('./utils/mailer');
+        const { decryptRow } = require('./utils/diary-crypto');
+        const transporter = createTransporter();
+        if (transporter) {
+          const from = process.env.SMTP_FROM || `Soul Diary <${process.env.SMTP_USER}>`;
+          const notifiedIds = [];
+          for (const row of ecResult.recordset) {
+            const ec = decryptRow(row, ['emergency_contact_name', 'emergency_contact_email']);
+            const displayName = row.full_name || row.username;
+            try {
+              await transporter.sendMail({
+                from, to: ec.emergency_contact_email,
+                subject: `💙 Soul Diary — hãy dành chút thời gian hỏi thăm ${displayName}`,
+                html: `
+                  <div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:32px;background:#f0f9ff;border-radius:16px">
+                    <h2 style="color:#0369a1;margin-bottom:8px">💙 Xin chào ${ec.emergency_contact_name || ''}</h2>
+                    <p style="color:#1e293b;line-height:1.8">
+                      Bạn được <strong>${displayName}</strong> lưu làm người liên hệ khi cần trên ứng dụng Soul Diary — nhật ký cảm xúc.
+                      Hệ thống nhận thấy gần đây bạn ấy có thể đang trải qua giai đoạn khó khăn. Đây chỉ là gợi ý tự động dựa trên xu hướng ghi chép,
+                      <strong>không phải đánh giá y khoa</strong>, và Soul Diary không chia sẻ nội dung nhật ký của bạn ấy.
+                    </p>
+                    <p style="color:#1e293b;line-height:1.8">
+                      Hãy dành chút thời gian hỏi thăm, trò chuyện cùng bạn ấy nhé. Nếu là tình huống khẩn cấp, gọi ngay
+                      <strong>1800 599 920</strong> (đường dây hỗ trợ tâm lý 24/7, miễn phí).
+                    </p>
+                    <p style="color:#94a3b8;font-size:12px;margin-top:24px;text-align:center">
+                      Bạn nhận được email này vì được chính ${displayName} chỉ định làm người liên hệ khẩn cấp và đồng ý gửi thông báo này.
+                    </p>
+                  </div>
+                `,
+              });
+              notifiedIds.push(row.id);
+            } catch (mailErr) {
+              console.error('[lowmood-cron] Lỗi gửi email người thân:', mailErr.message);
+            }
+          }
+          if (notifiedIds.length) {
+            await db.request().query(
+              `UPDATE Users SET last_lowmood_notif_at = GETDATE() WHERE id IN (${notifiedIds.join(',')})`
+            );
+            console.log(`💙 Đã báo người thân cho ${notifiedIds.length} người dùng`);
+          }
+        }
+      }
+    }
+
     if (sentIds3.length) {
       await db.request().query(
         `UPDATE Users SET last_lowmood_notif_at = GETDATE() WHERE id IN (${sentIds3.join(',')})`
