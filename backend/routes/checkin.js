@@ -232,7 +232,7 @@ CHỈ trả về đúng JSON theo mẫu sau, không thêm markdown hay lời d�
   if (genai) {
     try {
       const model = genai.getGenerativeModel({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-3.6-flash',
         generationConfig: {
           responseMimeType: 'application/json',
           responseSchema: ANALYSIS_SCHEMA,
