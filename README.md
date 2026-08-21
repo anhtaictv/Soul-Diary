@@ -4,7 +4,7 @@
 
 **Không gian riêng tư để lắng nghe tâm hồn mình**
 
-[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v3.10-6366f1?style=flat-square&logo=github&logoColor=white)](https://github.com/anhtaictv/Soul-Diary)
+[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v3.10.1-6366f1?style=flat-square&logo=github&logoColor=white)](https://github.com/anhtaictv/Soul-Diary)
 [![Deploy](https://img.shields.io/github/actions/workflow/status/anhtaictv/Soul-Diary/soul-diary-deploy-windows.yml?style=flat-square&label=Deploy&logo=githubactions&logoColor=white)](https://github.com/anhtaictv/Soul-Diary/actions/workflows/soul-diary-deploy-windows.yml)
 [![Stack](https://img.shields.io/badge/Node.js_+_MSSQL-339933?style=flat-square&logo=nodedotjs&logoColor=white)]()
 [![Vanilla JS](https://img.shields.io/badge/Vanilla_JS-F7DF1E?style=flat-square&logo=javascript&logoColor=black)]()
@@ -300,7 +300,8 @@ pm2 restart souldiary-api
 | v3.7.2 | Bản vá độ ổn định | Fix `NODE-CRON missed execution`: gửi push nhắc nhở song song thay vì tuần tự, tránh chặn event loop · Retry kết nối SQL Server lúc khởi động (5 lần, backoff tăng dần) thay vì exit ngay — chịu được VPS reboot mà không cần PM2 restart-loop |
 | v3.8 | Liên hệ khẩn cấp & Trợ năng | User tự lưu người thân + đồng ý → email báo tự động khi 7 ngày mood thấp liên tiếp (không kèm nội dung nhật ký) · Cỡ chữ trợ năng phóng to rõ rệt hơn (zoom 1.3x/1.6x), thêm Giảm chuyển động + Giãn cách chữ · Lazy-load `admin.js`, cache 30s cho API feature flags/thông báo |
 | v3.9 | Dự báo chủ động | Đối chiếu Lịch học tập (StudyEvents) với pattern mood lịch sử của chính user quanh các kỳ thi/deadline tương tự trước đây — cảnh báo trước thay vì chỉ báo sau khi mood đã xuống, kèm gợi ý bài tập phù hợp từ thư viện |
-| **v3.10** | **Kết nối ẩn danh** | **Bản đồ cảm xúc trường học: mood trung bình ẩn danh của các bạn cùng trường (chỉ hiện khi ≥5 người, bảo vệ danh tính) · Luyện phản ứng tình huống: AI dựng tình huống từ nhật ký gần nhất để luyện phản ứng, góp ý theo hướng CBT** |
+| v3.10 | Kết nối ẩn danh | Bản đồ cảm xúc trường học: mood trung bình ẩn danh của các bạn cùng trường (chỉ hiện khi ≥5 người, bảo vệ danh tính) · Luyện phản ứng tình huống: AI dựng tình huống từ nhật ký gần nhất để luyện phản ứng, góp ý theo hướng CBT |
+| **v3.10.1** | **Bản vá AI** | **Fix Gemini fallback: model `gemini-2.0-flash` đã bị Google gỡ bỏ (404), đổi sang `gemini-3.6-flash` — ảnh hưởng toàn bộ 8 điểm gọi Gemini fallback trong app · AI Coach: cache theo ngày thay vì 7 ngày, khớp với Smart Recap** |
 
 <details>
 <summary><b>Xem đầy đủ lịch sử từ v1.0</b> (bấm để xem)</summary>
@@ -343,6 +344,7 @@ pm2 restart souldiary-api
 | v3.8 | Liên hệ khẩn cấp & Trợ năng | Thêm Liên hệ khẩn cấp: user tự lưu tên/SĐT/email người thân (mã hoá AES-256-GCM như nhật ký) + tự bật đồng ý; cron `lowmood_alert` gửi thêm email báo người thân khi phát hiện 7 ngày mood thấp liên tiếp — không kèm nội dung/điểm mood nhật ký, gate sau feature flag `emergency_contact`. Fix cỡ chữ trợ năng: `zoom` 1.15x/1.3x quá nhẹ trên nền chữ 11-13px nên chỉ thấy khoảng cách giãn chứ chữ không rõ lớn hơn — tăng lên 1.3x/1.6x; thêm 2 toggle mới **Giảm chuyển động** (tắt animation/transition, WCAG 2.3.3) và **Giãn cách chữ** (letter/word-spacing, WCAG 1.4.12). Hiệu năng: `admin.js` (48KB) không còn nạp eager cho mọi user — chỉ tải khi vào trang Quản trị, giống pattern `game.js`; cache 30s cho `GET /api/features` và `GET /api/announcements/active` (gọi lại mỗi lần tải trang, dữ liệu ít đổi) |
 | v3.9 | Dự báo chủ động | Tận dụng `StudyEvents` (Lịch học tập) đã có sẵn: đối chiếu kỳ thi/deadline sắp tới (≤21 ngày) với mood trung bình 5 ngày trước các mốc tương tự đã qua của chính user, so với mood trung bình chung — nếu lệch ≥0.5 điểm thì cảnh báo trước kèm gợi ý 1 bài tập phù hợp từ thư viện, thay vì chỉ phát hiện *sau* khi mood đã xuống như cơ chế `lowmood_alert` 7 ngày liên tiếp hiện có. Endpoint `GET /api/diary/mood-forecast`, gate sau feature flag `mood_forecast` |
 | v3.10 | Kết nối ẩn danh | **Bản đồ cảm xúc trường học**: thêm field `school_name` optional trong hồ sơ; khi có ≥5 người cùng trường (bảo vệ ẩn danh), hiện mood trung bình + % lượt ghi mood thấp 7 ngày qua của cả trường (`GET /api/user/school-mood-map`, flag `school_mood_map`). **Luyện phản ứng tình huống**: AI đọc nhật ký gần nhất, dựng tình huống "nếu gặp lại thì sao" để luyện phản ứng rồi góp ý theo hướng CBT — cá nhân hoá theo đúng chuyện user vừa kể thay vì bài tập tĩnh trong thư viện (`GET/POST /api/diary/roleplay*`, flag `roleplay_cbt`) |
+| v3.10.1 | Bản vá AI | Google đã gỡ model `gemini-2.0-flash` (API trả 404 "no longer available") — mọi nhánh fallback Gemini trong app (smart-recap, ai-coach, roleplay, chat, checkin, daily-prompt...) đều fail và rơi về nội dung mặc định dù đã cấu hình `GEMINI_API_KEY` đúng. Đổi toàn bộ 8 điểm gọi sang `gemini-3.6-flash`. Cũng đổi cache `ai-coach` từ 7 ngày rolling sang theo ngày lịch (giống `smart-recap`) để nội dung mới xuất hiện sớm hơn |
 
 </details>
 
