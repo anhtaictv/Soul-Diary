@@ -4,7 +4,7 @@
 
 **Không gian riêng tư để lắng nghe tâm hồn mình**
 
-[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v3.8-6366f1?style=flat-square&logo=github&logoColor=white)](https://github.com/anhtaictv/Soul-Diary)
+[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v3.10-6366f1?style=flat-square&logo=github&logoColor=white)](https://github.com/anhtaictv/Soul-Diary)
 [![Deploy](https://img.shields.io/github/actions/workflow/status/anhtaictv/Soul-Diary/soul-diary-deploy-windows.yml?style=flat-square&label=Deploy&logo=githubactions&logoColor=white)](https://github.com/anhtaictv/Soul-Diary/actions/workflows/soul-diary-deploy-windows.yml)
 [![Stack](https://img.shields.io/badge/Node.js_+_MSSQL-339933?style=flat-square&logo=nodedotjs&logoColor=white)]()
 [![Vanilla JS](https://img.shields.io/badge/Vanilla_JS-F7DF1E?style=flat-square&logo=javascript&logoColor=black)]()
@@ -45,6 +45,9 @@
 - Bài tập thở 4-7-8, PMR, Body Scan, 5-4-3-2-1
 - **Thư viện kiến thức** — bài viết + bài tập có trích dẫn nghiên cứu khoa học
 - **Liên hệ khẩn cấp** — tự lưu người thân tin tưởng; khi phát hiện 7 ngày mood thấp liên tiếp, hệ thống báo họ qua email (không kèm nội dung nhật ký), chỉ kích hoạt khi user tự đồng ý
+- **Dự báo tâm trạng chủ động** — đối chiếu Lịch học tập (kỳ thi/deadline sắp tới) với pattern mood lịch sử của chính bạn, cảnh báo *trước* giai đoạn dễ tuột mood thay vì chỉ báo sau khi đã xuống
+- **Bản đồ cảm xúc trường học** — mood trung bình ẩn danh của các bạn cùng trường tuần này, giảm cảm giác cô đơn (chỉ hiện khi đủ 5 người trở lên)
+- **Luyện phản ứng tình huống** — AI dựng tình huống "nếu gặp lại thì sao" từ chính nhật ký gần nhất, luyện cách phản ứng và nhận góp ý theo hướng CBT
 
 </td>
 </tr>
@@ -295,7 +298,9 @@ pm2 restart souldiary-api
 | v3.7 | Test tâm lý chuyên sâu | Tách 11 bài sàng lọc tâm lý (PHQ-9, GAD-7, MDQ, OCI-R, PQ-16, EAT-26, EPDS, SDQ x2, PCL-5, DAST-10) thành mục riêng, bỏ trang danh mục gộp chung |
 | v3.7.1 | Bản vá bảo mật | Fix crash `ERR_ERL_INVALID_IP_ADDRESS`: rate limiter đăng nhập (`/api/auth/login`) crash lặp lại khi nhận IP dạng "IP:PORT" từ proxy/bot gửi sai định dạng, khiến site thỉnh thoảng không vào được — áp dụng `keyGenerator` an toàn dùng chung cho mọi rate limiter |
 | v3.7.2 | Bản vá độ ổn định | Fix `NODE-CRON missed execution`: gửi push nhắc nhở song song thay vì tuần tự, tránh chặn event loop · Retry kết nối SQL Server lúc khởi động (5 lần, backoff tăng dần) thay vì exit ngay — chịu được VPS reboot mà không cần PM2 restart-loop |
-| **v3.8** | **Liên hệ khẩn cấp & Trợ năng** | **User tự lưu người thân + đồng ý → email báo tự động khi 7 ngày mood thấp liên tiếp (không kèm nội dung nhật ký) · Cỡ chữ trợ năng phóng to rõ rệt hơn (zoom 1.3x/1.6x), thêm Giảm chuyển động + Giãn cách chữ · Lazy-load `admin.js`, cache 30s cho API feature flags/thông báo** |
+| v3.8 | Liên hệ khẩn cấp & Trợ năng | User tự lưu người thân + đồng ý → email báo tự động khi 7 ngày mood thấp liên tiếp (không kèm nội dung nhật ký) · Cỡ chữ trợ năng phóng to rõ rệt hơn (zoom 1.3x/1.6x), thêm Giảm chuyển động + Giãn cách chữ · Lazy-load `admin.js`, cache 30s cho API feature flags/thông báo |
+| v3.9 | Dự báo chủ động | Đối chiếu Lịch học tập (StudyEvents) với pattern mood lịch sử của chính user quanh các kỳ thi/deadline tương tự trước đây — cảnh báo trước thay vì chỉ báo sau khi mood đã xuống, kèm gợi ý bài tập phù hợp từ thư viện |
+| **v3.10** | **Kết nối ẩn danh** | **Bản đồ cảm xúc trường học: mood trung bình ẩn danh của các bạn cùng trường (chỉ hiện khi ≥5 người, bảo vệ danh tính) · Luyện phản ứng tình huống: AI dựng tình huống từ nhật ký gần nhất để luyện phản ứng, góp ý theo hướng CBT** |
 
 <details>
 <summary><b>Xem đầy đủ lịch sử từ v1.0</b> (bấm để xem)</summary>
@@ -336,6 +341,8 @@ pm2 restart souldiary-api
 | v3.7.1 | Bản vá bảo mật | Fix crash `ERR_ERL_INVALID_IP_ADDRESS`: rate limiter đăng nhập (`/api/auth/login`) dùng `keyGenerator` mặc định của `express-rate-limit`, ném lỗi validate chưa được bắt khi `req.ip` có dạng "IP:PORT" (proxy/bot gửi sai định dạng) → unhandled rejection → crash tiến trình lặp lại. Chuyển `safeKeyGenerator` (đã có ở `server.js`) ra `utils/rateLimitKey.js` dùng chung, áp dụng cho cả `loginLimiter` |
 | v3.7.2 | Bản vá độ ổn định | Fix `NODE-CRON missed execution`: 2 cron job chạy mỗi giờ gửi `webpush.sendNotification` tuần tự từng user, chuỗi round-trip mạng nối tiếp chặn event loop đủ lâu khiến node-cron báo lỡ tick kế tiếp — chuyển sang `Promise.allSettled` gửi song song. Thêm retry-with-backoff (5 lần, 5s/10s/15s/20s) khi kết nối SQL Server thất bại lúc khởi động, thay vì `process.exit(1)` ngay gây PM2 restart-loop khi VPS reboot (SQL Server cùng máy khởi động chậm hơn PM2) |
 | v3.8 | Liên hệ khẩn cấp & Trợ năng | Thêm Liên hệ khẩn cấp: user tự lưu tên/SĐT/email người thân (mã hoá AES-256-GCM như nhật ký) + tự bật đồng ý; cron `lowmood_alert` gửi thêm email báo người thân khi phát hiện 7 ngày mood thấp liên tiếp — không kèm nội dung/điểm mood nhật ký, gate sau feature flag `emergency_contact`. Fix cỡ chữ trợ năng: `zoom` 1.15x/1.3x quá nhẹ trên nền chữ 11-13px nên chỉ thấy khoảng cách giãn chứ chữ không rõ lớn hơn — tăng lên 1.3x/1.6x; thêm 2 toggle mới **Giảm chuyển động** (tắt animation/transition, WCAG 2.3.3) và **Giãn cách chữ** (letter/word-spacing, WCAG 1.4.12). Hiệu năng: `admin.js` (48KB) không còn nạp eager cho mọi user — chỉ tải khi vào trang Quản trị, giống pattern `game.js`; cache 30s cho `GET /api/features` và `GET /api/announcements/active` (gọi lại mỗi lần tải trang, dữ liệu ít đổi) |
+| v3.9 | Dự báo chủ động | Tận dụng `StudyEvents` (Lịch học tập) đã có sẵn: đối chiếu kỳ thi/deadline sắp tới (≤21 ngày) với mood trung bình 5 ngày trước các mốc tương tự đã qua của chính user, so với mood trung bình chung — nếu lệch ≥0.5 điểm thì cảnh báo trước kèm gợi ý 1 bài tập phù hợp từ thư viện, thay vì chỉ phát hiện *sau* khi mood đã xuống như cơ chế `lowmood_alert` 7 ngày liên tiếp hiện có. Endpoint `GET /api/diary/mood-forecast`, gate sau feature flag `mood_forecast` |
+| v3.10 | Kết nối ẩn danh | **Bản đồ cảm xúc trường học**: thêm field `school_name` optional trong hồ sơ; khi có ≥5 người cùng trường (bảo vệ ẩn danh), hiện mood trung bình + % lượt ghi mood thấp 7 ngày qua của cả trường (`GET /api/user/school-mood-map`, flag `school_mood_map`). **Luyện phản ứng tình huống**: AI đọc nhật ký gần nhất, dựng tình huống "nếu gặp lại thì sao" để luyện phản ứng rồi góp ý theo hướng CBT — cá nhân hoá theo đúng chuyện user vừa kể thay vì bài tập tĩnh trong thư viện (`GET/POST /api/diary/roleplay*`, flag `roleplay_cbt`) |
 
 </details>
 
