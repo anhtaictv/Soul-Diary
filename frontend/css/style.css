@@ -1310,8 +1310,15 @@ body.dark-mode .body-zone.bz-done{fill:#14532d}
    không phải rem, nên chỉ tăng font-size gốc sẽ không ảnh hưởng các phần tử con). Áp lên
    chính body (không chỉ .app/#auth-screen) để phủ luôn các modal, toast, banner thông báo —
    vốn là con trực tiếp của <body>, nằm ngoài .app/#auth-screen. */
-body.a11y-font-large{zoom:1.15}
-body.a11y-font-xlarge{zoom:1.3}
+body.a11y-font-large{zoom:1.3}
+body.a11y-font-xlarge{zoom:1.6}
+
+/* Giảm chuyển động — bản thủ công của rule prefers-reduced-motion ở trên (#10),
+   để user tự bật được thay vì phụ thuộc cài đặt hệ điều hành */
+body.a11y-reduce-motion *{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+
+/* Giãn cách chữ — theo khuyến nghị WCAG 1.4.12 Text Spacing, dễ đọc hơn cho người khó đọc chữ sát nhau */
+body.a11y-loose-text, body.a11y-loose-text *{letter-spacing:.04em!important; word-spacing:.12em!important}
 
 /* Độ tương phản cao — ghi đè biến màu chữ/viền, đặt sau cùng để luôn thắng dark-mode/theme */
 body.a11y-high-contrast{

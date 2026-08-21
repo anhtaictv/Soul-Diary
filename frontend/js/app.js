@@ -3374,6 +3374,8 @@ const App = (() => {
     A11Y_FONT_SIZES.forEach(s => document.body.classList.remove('a11y-font-' + s));
     if (A11Y_FONT_SIZES.includes(size)) document.body.classList.add('a11y-font-' + size);
     document.body.classList.toggle('a11y-high-contrast', localStorage.getItem('nhk_a11y_contrast') === '1');
+    document.body.classList.toggle('a11y-reduce-motion', localStorage.getItem('nhk_a11y_motion') === '1');
+    document.body.classList.toggle('a11y-loose-text',   localStorage.getItem('nhk_a11y_loosetext') === '1');
   }
   function setA11yFontSize(size) {
     localStorage.setItem('nhk_a11y_fontsize', size);
@@ -3383,6 +3385,14 @@ const App = (() => {
   }
   function toggleHighContrast(on) {
     localStorage.setItem('nhk_a11y_contrast', on ? '1' : '0');
+    applyA11ySettings();
+  }
+  function toggleReduceMotion(on) {
+    localStorage.setItem('nhk_a11y_motion', on ? '1' : '0');
+    applyA11ySettings();
+  }
+  function toggleLooseText(on) {
+    localStorage.setItem('nhk_a11y_loosetext', on ? '1' : '0');
     applyA11ySettings();
   }
 
@@ -3468,6 +3478,10 @@ const App = (() => {
     document.querySelectorAll('.a11y-fontsize-btn').forEach(b => b.classList.toggle('active', b.dataset.size === curSize));
     const contrastToggle = document.getElementById('a11y-contrast-toggle');
     if (contrastToggle) contrastToggle.checked = localStorage.getItem('nhk_a11y_contrast') === '1';
+    const motionToggle = document.getElementById('a11y-motion-toggle');
+    if (motionToggle) motionToggle.checked = localStorage.getItem('nhk_a11y_motion') === '1';
+    const looseTextToggle = document.getElementById('a11y-loosetext-toggle');
+    if (looseTextToggle) looseTextToggle.checked = localStorage.getItem('nhk_a11y_loosetext') === '1';
 
     // Bio + avatar (gated)
     const hasAvatarBio = !!(window.FEATURES && window.FEATURES.avatar_bio);
@@ -6689,7 +6703,7 @@ const App = (() => {
   }
 
   return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,toggleExerciseTimer,toggleNavGroup,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openPsychTest,startPsychTest,selectPsychTestAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,toggleAdvancedSearch,applyTheme,toggleThemePicker,loadMoreDiary,
-    pinInput,pinDelete,setPinLock,managePinLock,installPWA,showMemoryCard,showYearInReviewCard,setA11yFontSize,toggleHighContrast,createFutureLetter,deleteFutureLetter,exportUserData,
+    pinInput,pinDelete,setPinLock,managePinLock,installPWA,showMemoryCard,showYearInReviewCard,setA11yFontSize,toggleHighContrast,toggleReduceMotion,toggleLooseText,createFutureLetter,deleteFutureLetter,exportUserData,
     openPMRModal,openBodyScanModal,openGroundingModal,startGrounding,toggleGroundingItem,nextGroundingStep,openGratitudeModal,gratitudeNext,gratitudeBack,
     handleAvatarUpload,removeAvatar,_applyWritingHour,renderEmotionRadar,
     shareCurrentEntry,closeShareModal,copyShareLink,revokeCurrentShare,
