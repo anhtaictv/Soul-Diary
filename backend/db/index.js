@@ -253,6 +253,44 @@ async function initSchema() {
     ALTER TABLE Users ADD last_lowmood_notif_at DATETIME2 NULL
   `);
 
+  // Liên hệ khẩn cấp (người thân) — chỉ dùng khi user tự nhập + tự bật đồng ý (emergency_contact_consent).
+  // name/phone/email mã hoá at-rest như nội dung nhật ký (xem utils/diary-crypto.js).
+  await db.request().query(`
+    IF NOT EXISTS (
+      SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME='Users' AND COLUMN_NAME='emergency_contact_name'
+    )
+    ALTER TABLE Users ADD emergency_contact_name NVARCHAR(MAX) NULL
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (
+      SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME='Users' AND COLUMN_NAME='emergency_contact_phone'
+    )
+    ALTER TABLE Users ADD emergency_contact_phone NVARCHAR(MAX) NULL
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (
+      SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME='Users' AND COLUMN_NAME='emergency_contact_email'
+    )
+    ALTER TABLE Users ADD emergency_contact_email NVARCHAR(MAX) NULL
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (
+      SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME='Users' AND COLUMN_NAME='emergency_contact_relationship'
+    )
+    ALTER TABLE Users ADD emergency_contact_relationship NVARCHAR(100) NULL
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (
+      SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME='Users' AND COLUMN_NAME='emergency_contact_consent'
+    )
+    ALTER TABLE Users ADD emergency_contact_consent BIT NOT NULL DEFAULT 0
+  `);
+
   // Account lockout chống brute-force login (baomat.txt: khuyến nghị #5)
   await db.request().query(`
     IF NOT EXISTS (
@@ -1525,6 +1563,15 @@ async function initSchema() {
         VALUES (@k, @l, @d, @v, @vt, 1, @s, GETDATE())
       `);
   }
+
+  // ── v3.8: Liên hệ khẩn cấp — user tự lưu người thân + đồng ý được tự động báo ──
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='emergency_contact')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order,released_at)
+    VALUES ('emergency_contact',N'Liên hệ khẩn cấp',
+            N'User tự lưu người thân + đồng ý: khi phát hiện 7 ngày mood thấp liên tiếp, hệ thống gửi email báo người thân (không kèm nội dung nhật ký)',
+            'v3.8',N'Vận hành & Nhắc nhở',1,374,GETDATE())
+  `);
 
   console.log('✅ Schema đã sẵn sàng');
 }

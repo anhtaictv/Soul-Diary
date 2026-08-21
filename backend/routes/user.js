@@ -2,9 +2,54 @@ const express        = require('express');
 const router         = express.Router();
 const { getPool, sql } = require('../db');
 const authMiddleware   = require('../middleware/auth');
-const { decryptRows }  = require('../utils/diary-crypto');
+const { decryptRows, decryptRow, encryptField } = require('../utils/diary-crypto');
 
 router.use(authMiddleware);
+
+const EC_FIELDS = ['emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_email'];
+
+// GET /api/user/emergency-contact — người thân được user tự lưu để liên hệ khi cần
+router.get('/emergency-contact', async (req, res) => {
+  try {
+    const db = await getPool();
+    const r = await db.request().input('uid', sql.Int, req.user.id).query(`
+      SELECT emergency_contact_name, emergency_contact_phone, emergency_contact_email,
+             emergency_contact_relationship, emergency_contact_consent
+      FROM Users WHERE id = @uid
+    `);
+    if (!r.recordset.length) return res.status(404).json({ message: 'Không tìm thấy người dùng.' });
+    res.json(decryptRow(r.recordset[0], EC_FIELDS));
+  } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+// PUT /api/user/emergency-contact — lưu người thân + bật/tắt đồng ý tự động báo khi khủng hoảng
+router.put('/emergency-contact', async (req, res) => {
+  const { name, phone, email, relationship, consent } = req.body;
+  const name_ = (name || '').trim(), phone_ = (phone || '').trim(), email_ = (email || '').trim();
+  const consent_ = !!consent;
+  if (consent_ && !name_) return res.status(400).json({ message: 'Cần nhập tên người thân để bật đồng ý.' });
+  if (consent_ && !phone_ && !email_) return res.status(400).json({ message: 'Cần ít nhất số điện thoại hoặc email của người thân để bật đồng ý.' });
+  try {
+    const db = await getPool();
+    await db.request()
+      .input('uid', sql.Int, req.user.id)
+      .input('name', sql.NVarChar, encryptField(name_))
+      .input('phone', sql.NVarChar, encryptField(phone_))
+      .input('email', sql.NVarChar, encryptField(email_))
+      .input('rel', sql.NVarChar, (relationship || '').trim().slice(0, 100))
+      .input('consent', sql.Bit, consent_ ? 1 : 0)
+      .query(`
+        UPDATE Users SET
+          emergency_contact_name = @name,
+          emergency_contact_phone = @phone,
+          emergency_contact_email = @email,
+          emergency_contact_relationship = @rel,
+          emergency_contact_consent = @consent
+        WHERE id = @uid
+      `);
+    res.json({ message: 'Đã lưu thông tin liên hệ khẩn cấp.' });
+  } catch (err) { res.status(500).json({ message: err.message }); }
+});
 
 // GET /api/user/export — xuất toàn bộ dữ liệu người dùng
 router.get('/export', async (req, res) => {

@@ -92,7 +92,7 @@ const App = (() => {
       case 'community':  initCommunityPage();      break;
       case 'settings':    initSettingsPage();       break;
       case 'sos':         renderSOSContacts();      break;
-      case 'admin':       Admin.initPage();         break;
+      case 'admin':       initAdminPage();          break;
       case 'chat':        initChatPage();           break;
       case 'study':       initStudyPage();          break;
       case 'courses':     initCoursesPage();        break;
@@ -1604,6 +1604,58 @@ const App = (() => {
       () => showToast('✅ Đã sao chép link mời!'),
       () => document.execCommand('copy')
     );
+  }
+
+  // ── Liên hệ khẩn cấp — người thân, chỉ dùng khi user tự lưu + tự đồng ý (v3.8) ──
+  async function renderEmergencyContactSection() {
+    const sec = document.getElementById('emergency-contact-section');
+    if (!sec) return;
+    try {
+      const d = await API.getEmergencyContact();
+      sec.innerHTML = `
+        <hr style="border:none;border-top:1px solid var(--border);margin:24px 0"/>
+        <div class="settings-section-title" style="margin-bottom:6px">💙 Liên hệ khẩn cấp</div>
+        <p style="color:var(--text-muted);font-size:13px;margin-bottom:12px">
+          Lưu thông tin một người thân bạn tin tưởng. Nếu bạn bật đồng ý, khi hệ thống phát hiện dấu hiệu tâm trạng
+          tiêu cực kéo dài, một email nhắc người này quan tâm tới bạn sẽ được gửi tự động — <strong>nội dung nhật ký của bạn không bao giờ được chia sẻ.</strong>
+        </p>
+        <div class="form-group"><label class="form-label">Tên người thân</label>
+          <input class="text-input" id="ec-name" value="${(d.emergency_contact_name || '').replace(/"/g, '&quot;')}" placeholder="VD: Mẹ, anh Hai..." maxlength="200" /></div>
+        <div class="form-group"><label class="form-label">Mối quan hệ</label>
+          <input class="text-input" id="ec-relationship" value="${(d.emergency_contact_relationship || '').replace(/"/g, '&quot;')}" placeholder="VD: Mẹ, anh/chị, bạn thân..." maxlength="100" /></div>
+        <div class="form-group"><label class="form-label">Số điện thoại</label>
+          <input class="text-input" id="ec-phone" type="tel" value="${(d.emergency_contact_phone || '').replace(/"/g, '&quot;')}" placeholder="Không bắt buộc nếu có email" /></div>
+        <div class="form-group"><label class="form-label">Email</label>
+          <input class="text-input" id="ec-email" type="email" value="${(d.emergency_contact_email || '').replace(/"/g, '&quot;')}" placeholder="Cần có để gửi báo tự động" /></div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);margin:10px 0 14px;cursor:pointer">
+          <input type="checkbox" id="ec-consent" ${d.emergency_contact_consent ? 'checked' : ''} style="width:16px;height:16px" />
+          Tôi đồng ý gửi email tự động cho người thân này khi hệ thống phát hiện dấu hiệu tiêu cực kéo dài
+        </label>
+        <button class="btn-primary" style="max-width:200px" onclick="App.saveEmergencyContactForm()">&#128190; Lưu liên hệ khẩn cấp</button>
+        <div id="ec-msg" class="settings-msg" style="display:none"></div>
+      `;
+    } catch (e) {
+      sec.innerHTML = `<div style="color:var(--text-muted);font-size:13px">Không tải được thông tin liên hệ khẩn cấp.</div>`;
+    }
+  }
+
+  async function saveEmergencyContactForm() {
+    const msg = document.getElementById('ec-msg');
+    const body = {
+      name: document.getElementById('ec-name')?.value || '',
+      relationship: document.getElementById('ec-relationship')?.value || '',
+      phone: document.getElementById('ec-phone')?.value || '',
+      email: document.getElementById('ec-email')?.value || '',
+      consent: !!document.getElementById('ec-consent')?.checked,
+    };
+    try {
+      await API.saveEmergencyContact(body);
+      showToast('✅ Đã lưu liên hệ khẩn cấp');
+      if (msg) { msg.style.display = 'none'; }
+    } catch (e) {
+      if (msg) { msg.textContent = '❌ ' + e.message; msg.style.display = ''; }
+      else showToast('❌ ' + e.message);
+    }
   }
 
   // ── Thử thách Sức khỏe Tâm thần ─────────────────────────────────────
@@ -3455,6 +3507,14 @@ const App = (() => {
       const hasReferral = !!(window.FEATURES && window.FEATURES.referral_program);
       referralSec.style.display = hasReferral ? '' : 'none';
       if (hasReferral) renderReferralSection();
+    }
+
+    // Liên hệ khẩn cấp (v3.8, gated)
+    const ecSec = document.getElementById('emergency-contact-section');
+    if (ecSec) {
+      const hasEC = !!(window.FEATURES && window.FEATURES.emergency_contact);
+      ecSec.style.display = hasEC ? '' : 'none';
+      if (hasEC) renderEmergencyContactSection();
     }
 
     // Đồng bộ notif prefs từ DB
@@ -6292,6 +6352,27 @@ const App = (() => {
     return { catmouse: Game, snake: SnakeGame, '2048': Game2048, caro: CaroGame, flappy: FlappyGame }[key];
   }
 
+  // ── Admin panel — không nạp sẵn trong index.html (chỉ admin dùng, đỡ nặng trang chính) ──
+  let _adminScriptLoaded  = false;
+  let _adminScriptLoading = null;
+
+  async function initAdminPage() {
+    if (!_adminScriptLoaded) {
+      if (!_adminScriptLoading) _adminScriptLoading = _loadScript('js/admin.js');
+      try {
+        await _adminScriptLoading;
+        _adminScriptLoaded = true;
+      } catch (err) {
+        console.error(err);
+        _adminScriptLoading = null;
+        const mc = document.getElementById('main-content');
+        if (mc) mc.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted)">Không tải được trang quản trị, thử lại sau.</div>';
+        return;
+      }
+    }
+    Admin.initPage();
+  }
+
   async function initGamePage() {
     document.querySelectorAll('.game-tab').forEach(b => b.addEventListener('click', () => switchGame(b.dataset.game)));
     const stage = document.getElementById('game-stage');
@@ -6628,5 +6709,6 @@ const App = (() => {
     _loadReflectionHistory,_loadHabitsList,
     _addRecentTag,_renderRecentTags,
     copyReferralLink,
+    saveEmergencyContactForm,
     _confirmResolve: (val) => _confirmResolve && _confirmResolve(val)};
 })();

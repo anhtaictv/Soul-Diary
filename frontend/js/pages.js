@@ -773,6 +773,7 @@ const PAGES = {
         '<button class="btn-primary" style="max-width:200px" onclick="App.saveProfileSettings()">&#128190; Lưu thay đổi</button>' +
         '<div id="set-profile-msg" class="settings-msg" style="display:none"></div>' +
         '<div id="referral-section" style="display:none"></div>' +
+        '<div id="emergency-contact-section" style="display:none"></div>' +
       '</div>' +
       '<div id="settings-panel-security" class="settings-panel card" style="display:none">' +
         '<div class="settings-section-title">Đổi mật khẩu</div>' +

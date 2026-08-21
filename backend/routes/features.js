@@ -6,17 +6,25 @@ const sql   = require('mssql');
 const auth  = require('../middleware/auth');
 const admin = require('../middleware/admin');
 
+// Cache 30s — bảng ít đổi nhưng được gọi ở mọi lần tải trang của mọi user
+let _featuresCache = null; // { data, time }
+const FEATURES_CACHE_TTL = 30000;
+
 // GET /api/features — public, trả toàn bộ flags (frontend tự đọc enabled)
 router.get('/', async (req, res) => {
   try {
+    if (_featuresCache && Date.now() - _featuresCache.time < FEATURES_CACHE_TTL) {
+      return res.json({ features: _featuresCache.data });
+    }
     const db = await getPool();
     const r  = await db.request().query(`
       SELECT flag_key AS [key], label, description, version, version_title, enabled
       FROM FeatureFlags ORDER BY version DESC, sort_order ASC
     `);
+    _featuresCache = { data: r.recordset, time: Date.now() };
     res.json({ features: r.recordset });
   } catch (e) {
-    res.json({ features: [] });
+    res.json({ features: _featuresCache?.data || [] });
   }
 });
 
