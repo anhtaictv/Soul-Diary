@@ -72,7 +72,7 @@ Nhật ký: "${text.slice(0,800)}"
 
     // 2. Gemini
     if (genai) try {
-      const model  = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      const model  = genai.getGenerativeModel({ model: 'gemini-3.6-flash' });
       const result = await model.generateContent(prompt);
       const raw    = result.response.text().trim().replace(/^```json\n?|\n?```$/g, '');
       const parsed = JSON.parse(raw);
@@ -122,7 +122,7 @@ Hãy viết đúng 2-3 câu tiếng Việt thuần văn xuôi (không markdown, 
 
     // 2. Gemini
     if (genai) try {
-      const model  = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      const model  = genai.getGenerativeModel({ model: 'gemini-3.6-flash' });
       const result = await model.generateContent(prompt);
       const text2  = result.response.text().trim();
       if (text2) return text2;

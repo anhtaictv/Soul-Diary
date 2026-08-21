@@ -82,7 +82,7 @@ Viết đúng 2-3 câu tiếng Việt: nhận xét ngắn về tuần cảm xúc
       // 2. Gemini
       if (!insight && genai) {
         try {
-          const model  = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+          const model  = genai.getGenerativeModel({ model: 'gemini-3.6-flash' });
           const result = await model.generateContent(prompt);
           insight = result.response.text().trim();
         } catch (aiErr) {
@@ -156,7 +156,7 @@ Nhật ký gần nhất:\n${summary}`;
       // 2. Gemini
       if (!advice && genai) {
         try {
-          const model  = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+          const model  = genai.getGenerativeModel({ model: 'gemini-3.6-flash' });
           const result = await model.generateContent(prompt);
           const raw    = result.response.text().trim().replace(/^```json\n?|\n?```$/g, '');
           const parsed = JSON.parse(raw);
@@ -289,7 +289,7 @@ Nhật ký: "${text.slice(0, 500)}"`;
 
     if (!roleplay && genai) {
       try {
-        const model  = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const model  = genai.getGenerativeModel({ model: 'gemini-3.6-flash' });
         const result = await model.generateContent(prompt);
         const raw    = result.response.text().trim().replace(/^```json\n?|\n?```$/g, '');
         const parsed = JSON.parse(raw);
@@ -321,7 +321,7 @@ Viết đúng 2-3 câu tiếng Việt góp ý: khen điểm tốt trong cách ph
 
     if (!feedback && genai) {
       try {
-        const model  = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const model  = genai.getGenerativeModel({ model: 'gemini-3.6-flash' });
         const result = await model.generateContent(prompt);
         feedback = result.response.text().trim();
       } catch (e) { console.error('Gemini roleplay-feedback error:', e.message); }

@@ -144,7 +144,7 @@ router.post('/message', authMiddleware, async (req, res) => {
         : 'Mình hiểu bạn đang chia sẻ điều này. Hãy nói thêm để mình có thể lắng nghe tốt hơn nhé.';
     } else if (!replyText) {
       try {
-        const model = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const model = genai.getGenerativeModel({ model: 'gemini-3.6-flash' });
         const chat  = model.startChat({
           history: [
             { role: 'user',  parts: [{ text: SYSTEM_PROMPT }] },
