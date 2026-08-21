@@ -833,6 +833,18 @@ const PAGES = {
           '<input type="checkbox" id="a11y-contrast-toggle" onchange="App.toggleHighContrast(this.checked)" />' +
           '<span>Bật chế độ tương phản cao (chữ và viền rõ hơn, dễ đọc hơn)</span>' +
         '</label>' +
+        '<hr style="border:none;border-top:1px solid var(--border);margin:20px 0"/>' +
+        '<div class="settings-section-title" style="margin-bottom:8px">Chuyển động</div>' +
+        '<label class="a11y-toggle-row">' +
+          '<input type="checkbox" id="a11y-motion-toggle" onchange="App.toggleReduceMotion(this.checked)" />' +
+          '<span>Giảm hiệu ứng chuyển động (tắt animation/hiệu ứng trượt, phù hợp nếu bạn dễ chóng mặt/mất tập trung khi có chuyển động)</span>' +
+        '</label>' +
+        '<hr style="border:none;border-top:1px solid var(--border);margin:20px 0"/>' +
+        '<div class="settings-section-title" style="margin-bottom:8px">Giãn cách chữ</div>' +
+        '<label class="a11y-toggle-row">' +
+          '<input type="checkbox" id="a11y-loosetext-toggle" onchange="App.toggleLooseText(this.checked)" />' +
+          '<span>Tăng khoảng cách giữa các chữ/từ (dễ đọc hơn nếu chữ sát nhau gây khó đọc)</span>' +
+        '</label>' +
       '</div>' +
     '</div>';
   },
