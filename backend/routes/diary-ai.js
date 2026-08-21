@@ -193,4 +193,147 @@ Nhật ký gần nhất:\n${summary}`;
   } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
 });
 
+// ── GET /api/diary/mood-forecast — Dự báo chủ động: đối chiếu Lịch học tập
+//     sắp tới với pattern mood của chính user quanh các mốc tương tự trước đây ──
+router.get('/mood-forecast', async (req, res) => {
+  try {
+    const db  = await getPool();
+    const uid = req.user.id;
+
+    const upcomingR = await db.request().input('uid', sql.Int, uid).query(`
+      SELECT TOP 1 title, event_type, event_date
+      FROM StudyEvents
+      WHERE user_id=@uid AND is_done=0 AND event_type IN ('exam','deadline')
+        AND event_date >= CAST(GETDATE() AS DATE) AND event_date <= DATEADD(DAY,21,CAST(GETDATE() AS DATE))
+      ORDER BY event_date ASC
+    `);
+    const upcoming = upcomingR.recordset[0];
+    if (!upcoming) return res.json({ forecast: null });
+
+    const daysUntil = Math.round((fromDateOnly(upcoming.event_date) - toDateOnly()) / 86400000);
+    const eventLabel = upcoming.event_type === 'exam' ? 'kỳ thi' : 'deadline';
+
+    const overallR = await db.request().input('uid', sql.Int, uid).query(`
+      SELECT AVG(CAST(mood_score AS FLOAT)) AS avg_mood, COUNT(*) AS cnt FROM DiaryEntries WHERE user_id=@uid
+    `);
+    const { avg_mood: overallAvg, cnt: totalEntries } = overallR.recordset[0];
+
+    const pastR = await db.request().input('uid', sql.Int, uid).query(`
+      SELECT (SELECT AVG(CAST(mood_score AS FLOAT)) FROM DiaryEntries de
+                WHERE de.user_id=se.user_id AND de.created_at >= DATEADD(DAY,-5,se.event_date) AND de.created_at < se.event_date) AS pre_avg
+      FROM StudyEvents se
+      WHERE se.user_id=@uid AND se.event_type IN ('exam','deadline') AND se.event_date < CAST(GETDATE() AS DATE)
+    `);
+    const preAvgs = pastR.recordset.map(r => r.pre_avg).filter(v => v !== null);
+
+    let level = 'unknown'; // 'unknown' | 'dip' | 'stable'
+    let dip = 0;
+    if (totalEntries >= 5 && preAvgs.length >= 2 && overallAvg !== null) {
+      const avgPre = preAvgs.reduce((a, b) => a + b, 0) / preAvgs.length;
+      dip = overallAvg - avgPre;
+      level = dip >= 0.5 ? 'dip' : 'stable';
+    }
+
+    let suggestion = null;
+    if (level === 'dip') {
+      const artR = await db.request().query(`
+        SELECT TOP 1 id, title FROM Articles
+        WHERE is_published=1 AND type='exercise' AND category IN ('stress','study')
+        ORDER BY NEWID()
+      `);
+      suggestion = artR.recordset[0] || null;
+    }
+
+    const message = level === 'dip'
+      ? `Bạn có "${upcoming.title}" (${eventLabel}) trong ${daysUntil} ngày nữa. Nhìn lại lịch sử, tâm trạng của bạn thường giảm nhẹ trong những ngày trước các mốc như thế này (thấp hơn khoảng ${dip.toFixed(1)} điểm so với mức trung bình) — biết trước để chuẩn bị sẽ dễ hơn nhiều.`
+      : level === 'stable'
+      ? `Bạn có "${upcoming.title}" (${eventLabel}) trong ${daysUntil} ngày nữa. Nhìn lại lịch sử, bạn thường giữ tâm trạng khá ổn quanh những mốc như thế này — cứ tự tin chuẩn bị nhé!`
+      : `Bạn có "${upcoming.title}" (${eventLabel}) trong ${daysUntil} ngày nữa. Chưa đủ dữ liệu để dự báo, nhưng đừng quên chăm sóc bản thân trong giai đoạn chuẩn bị.`;
+
+    res.json({
+      forecast: {
+        event: { title: upcoming.title, type: upcoming.event_type, days_until: daysUntil },
+        level, message,
+        suggestion: suggestion ? { id: suggestion.id, title: suggestion.title } : null,
+      },
+    });
+  } catch (err) {
+    console.error('Mood forecast error:', err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+// ── GET /api/diary/roleplay — dựng tình huống "nếu gặp lại thì sao" từ nhật ký gần nhất ──
+router.get('/roleplay', async (req, res) => {
+  try {
+    const db  = await getPool();
+    const uid = req.user.id;
+    const entryR = await db.request().input('uid', sql.Int, uid).query(`
+      SELECT TOP 1 event_text FROM DiaryEntries WHERE user_id=@uid ORDER BY created_at DESC
+    `);
+    if (!entryR.recordset.length)
+      return res.json({ roleplay: null, message: 'Cần ít nhất 1 nhật ký để tạo tình huống.' });
+    const [entry] = decryptRows(entryR.recordset, ['event_text']);
+    const text = (entry.event_text || '').trim();
+    if (!text) return res.json({ roleplay: null, message: 'Nhật ký gần nhất chưa có nội dung để phân tích.' });
+
+    const prompt = `Bạn là coach tâm lý CBT ấm áp cho học sinh/sinh viên Việt Nam. Đọc đoạn nhật ký sau và dựng ra MỘT tình huống ngắn kiểu "nếu chuyện tương tự xảy ra lần nữa" để người viết luyện cách phản ứng. Không lặp lại nguyên văn nhật ký, không phán xét, không giả định chi tiết nhạy cảm không có trong bài viết.
+Trả về JSON thuần (không markdown): {"scenario":"1-2 câu mô tả tình huống giả định","question":"câu hỏi mời người dùng viết cách họ sẽ phản ứng"}
+Nhật ký: "${text.slice(0, 500)}"`;
+
+    let roleplay = null;
+    const gwParsed = gateway.parseJson(
+      await gateway.chat({ prompt, json: true, maxTokens: 400, label: 'roleplay' })
+    );
+    if (gwParsed?.scenario) roleplay = { scenario: gwParsed.scenario, question: gwParsed.question || 'Bạn sẽ phản ứng thế nào?' };
+
+    if (!roleplay && genai) {
+      try {
+        const model  = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const result = await model.generateContent(prompt);
+        const raw    = result.response.text().trim().replace(/^```json\n?|\n?```$/g, '');
+        const parsed = JSON.parse(raw);
+        if (parsed.scenario) roleplay = { scenario: parsed.scenario, question: parsed.question || 'Bạn sẽ phản ứng thế nào?' };
+      } catch (e) { console.error('Gemini roleplay error:', e.message); }
+    }
+
+    if (!roleplay) return res.json({ roleplay: null, message: 'Chưa tạo được tình huống, thử lại sau.' });
+    res.json({ roleplay });
+  } catch (err) {
+    console.error('Roleplay error:', err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
+// ── POST /api/diary/roleplay-feedback — AI góp ý cho cách phản ứng người dùng vừa nhập ──
+router.post('/roleplay-feedback', async (req, res) => {
+  try {
+    const { scenario, response } = req.body;
+    if (!scenario || !response || !response.trim())
+      return res.status(400).json({ message: 'Thiếu tình huống hoặc câu trả lời.' });
+
+    const prompt = `Bạn là coach tâm lý CBT ấm áp cho học sinh/sinh viên Việt Nam.
+Tình huống: "${String(scenario).slice(0, 300)}"
+Cách người dùng dự định phản ứng: "${String(response).slice(0, 500)}"
+Viết đúng 2-3 câu tiếng Việt góp ý: khen điểm tốt trong cách phản ứng (nếu có), gợi ý nhẹ nhàng để cải thiện. Giọng ấm áp, không phán xét, không chẩn đoán. Không dùng tiêu đề, bullet.`;
+
+    let feedback = await gateway.chat({ prompt, maxTokens: 300, label: 'roleplay-feedback' });
+
+    if (!feedback && genai) {
+      try {
+        const model  = genai.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        const result = await model.generateContent(prompt);
+        feedback = result.response.text().trim();
+      } catch (e) { console.error('Gemini roleplay-feedback error:', e.message); }
+    }
+
+    if (!feedback) feedback = 'Cảm ơn bạn đã thử luyện tập! Đây là một bước tốt để chuẩn bị tâm lý cho tình huống thật — cứ tiếp tục suy ngẫm và điều chỉnh dần theo thời gian nhé.';
+
+    res.json({ feedback });
+  } catch (err) {
+    console.error('Roleplay feedback error:', err);
+    res.status(500).json({ message: 'Lỗi server.' });
+  }
+});
+
 module.exports = router;

@@ -52,8 +52,17 @@ const PAGES = {
       <!-- Ghi chú nhanh widget (v2.7) -->
       <div id="notes-dashboard-widget" style="display:none;margin-bottom:16px"></div>
 
+      <!-- Dự báo tâm trạng chủ động (v3.9, ẩn cho đến khi mood_forecast flag bật) -->
+      <div id="mood-forecast-card" style="display:none;margin-bottom:16px"></div>
+
       <!-- AI Coach Tuần (v3.0, ẩn cho đến khi ai_weekly_coach flag bật) -->
       <div id="ai-coach-card" style="display:none;margin-bottom:16px"></div>
+
+      <!-- Bản đồ cảm xúc trường (v3.10, ẩn cho đến khi school_mood_map flag bật) -->
+      <div id="school-mood-card" style="display:none;margin-bottom:16px"></div>
+
+      <!-- Luyện phản ứng tình huống (v3.10, ẩn cho đến khi roleplay_cbt flag bật) -->
+      <div id="roleplay-card" style="display:none;margin-bottom:16px"></div>
 
       <div class="section-label">Gợi ý dành cho bạn</div>
       <div id="recommendations"></div>
@@ -769,6 +778,10 @@ const PAGES = {
           '<label class="form-label">Tiểu sử <span style="color:var(--text-hint);font-size:11px">(tối đa 300 ký tự)</span></label>' +
           '<textarea class="text-input" id="set-bio" rows="3" placeholder="Giới thiệu ngắn về bản thân..." style="resize:vertical" maxlength="300" oninput="document.getElementById(\'set-bio-count\').textContent=this.value.length"></textarea>' +
           '<div style="text-align:right;font-size:11px;color:var(--text-hint);margin-top:3px"><span id="set-bio-count">0</span>/300</div>' +
+        '</div>' +
+        '<div class="form-group" id="settings-school-group" style="display:none">' +
+          '<label class="form-label">Trường <span style="color:var(--text-hint);font-size:11px">(không bắt buộc — để hiện Bản đồ cảm xúc trường)</span></label>' +
+          '<input class="text-input" id="set-school" placeholder="Ví dụ: THPT Nguyễn Du" maxlength="100" />' +
         '</div>' +
         '<button class="btn-primary" style="max-width:200px" onclick="App.saveProfileSettings()">&#128190; Lưu thay đổi</button>' +
         '<div id="set-profile-msg" class="settings-msg" style="display:none"></div>' +

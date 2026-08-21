@@ -284,6 +284,12 @@ const App = (() => {
     _checkWellnessAlert();
     // AI Coach Tuần (v3.0)
     if (window.FEATURES && window.FEATURES.ai_weekly_coach) loadAICoach();
+    // Dự báo tâm trạng chủ động (v3.9)
+    if (window.FEATURES && window.FEATURES.mood_forecast) loadMoodForecast();
+    // Bản đồ cảm xúc trường (v3.10)
+    if (window.FEATURES && window.FEATURES.school_mood_map) loadSchoolMoodMap();
+    // Luyện phản ứng tình huống (v3.10)
+    if (window.FEATURES && window.FEATURES.roleplay_cbt) renderRoleplayCard();
   }
 
   function renderRecommendations(mood) {
@@ -3499,6 +3505,15 @@ const App = (() => {
       _renderAvatarPreview(user.avatar_url, user.avatar_text);
     }
 
+    // Trường học (gated, v3.10)
+    const hasSchoolMap = !!(window.FEATURES && window.FEATURES.school_mood_map);
+    const schoolGroup = document.getElementById('settings-school-group');
+    if (schoolGroup) schoolGroup.style.display = hasSchoolMap ? '' : 'none';
+    if (hasSchoolMap) {
+      const schoolEl = document.getElementById('set-school');
+      if (schoolEl) schoolEl.value = user.school_name || '';
+    }
+
     // Tài khoản info
     const ai = document.getElementById('set-account-info');
     if (ai) {
@@ -3655,8 +3670,10 @@ const App = (() => {
     const msgEl    = document.getElementById('set-profile-msg');
     if (!fullName) { showSettingsMsg(msgEl, 'Tên không được để trống.', false); return; }
     try {
-      const hasAvatarBio = !!(window.FEATURES && window.FEATURES.avatar_bio);
-      const payload = { full_name: fullName, bio: hasAvatarBio ? bio : undefined };
+      const hasAvatarBio  = !!(window.FEATURES && window.FEATURES.avatar_bio);
+      const hasSchoolMap  = !!(window.FEATURES && window.FEATURES.school_mood_map);
+      const school        = (document.getElementById('set-school')?.value || '').trim();
+      const payload = { full_name: fullName, bio: hasAvatarBio ? bio : undefined, school_name: hasSchoolMap ? school : undefined };
       if (hasAvatarBio && _pendingAvatarUrl !== null) payload.avatar_url = _pendingAvatarUrl;
       const d    = await API.updateProfile(payload);
       const user = Auth.getUser();
@@ -3664,6 +3681,7 @@ const App = (() => {
         user.full_name  = fullName;
         user.bio        = bio;
         user.avatar_text = d.avatar_text;
+        if (hasSchoolMap) user.school_name = school;
         if (_pendingAvatarUrl !== null) user.avatar_url = _pendingAvatarUrl;
         localStorage.setItem('nhk_user', JSON.stringify(user));
         _pendingAvatarUrl = null;
@@ -5959,6 +5977,91 @@ const App = (() => {
     }
   }
 
+  // ── v3.9: Dự báo tâm trạng chủ động (mood_forecast) ─────────────────────
+  async function loadMoodForecast() {
+    const el = document.getElementById('mood-forecast-card');
+    if (!el) return;
+    try {
+      const d = await API.getMoodForecast();
+      const f = d.forecast;
+      if (!f) return;
+      const levelColor = f.level === 'dip' ? 'var(--primary)' : f.level === 'stable' ? 'var(--teal)' : 'var(--text-muted)';
+      el.innerHTML = `<div class="card" style="padding:16px;border-left:4px solid ${levelColor}">
+        <div style="font-weight:700;font-size:14px;margin-bottom:8px">🔮 Dự báo tâm trạng</div>
+        <div style="font-size:13px;color:var(--text-muted);line-height:1.6">${escapeHtml(f.message)}</div>
+        ${f.suggestion ? `<button class="btn-secondary" style="margin-top:10px" onclick="App.nav('library')">📖 Xem gợi ý: ${escapeHtml(f.suggestion.title)}</button>` : ''}
+      </div>`;
+      el.style.display = '';
+    } catch {}
+  }
+
+  // ── v3.10: Bản đồ cảm xúc trường (school_mood_map) ───────────────────────
+  async function loadSchoolMoodMap() {
+    const el = document.getElementById('school-mood-card');
+    if (!el) return;
+    try {
+      const d = await API.getSchoolMoodMap();
+      if (!d.map) return;
+      const { school, n_users, avg_mood, pct_low } = d.map;
+      el.innerHTML = `<div class="card" style="padding:16px;border-left:4px solid var(--teal)">
+        <div style="font-weight:700;font-size:14px;margin-bottom:8px">🏫 Bản đồ cảm xúc trường</div>
+        <div style="font-size:13px;color:var(--text-muted);line-height:1.6">
+          ${escapeHtml(n_users + '')} bạn ở "${escapeHtml(school)}" cũng đang ghi nhật ký trên Soul Diary tuần này —
+          mood trung bình <strong>${avg_mood}/10</strong>, ${pct_low}% lượt ghi có tâm trạng thấp. Bạn không đơn độc 💙
+        </div>
+      </div>`;
+      el.style.display = '';
+    } catch {}
+  }
+
+  // ── v3.10: Luyện phản ứng tình huống (roleplay_cbt) ──────────────────────
+  function renderRoleplayCard() {
+    const el = document.getElementById('roleplay-card');
+    if (!el) return;
+    el.innerHTML = `<div class="card" style="padding:16px;border-left:4px solid var(--primary)">
+      <div style="font-weight:700;font-size:14px;margin-bottom:8px">🎭 Luyện phản ứng tình huống</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px">AI dựng một tình huống dựa trên nhật ký gần nhất của bạn để luyện cách phản ứng.</div>
+      <button class="btn-outline" style="font-size:13px" onclick="App.startRoleplay()">▶️ Tạo tình huống</button>
+      <div id="roleplay-body" style="margin-top:12px"></div>
+    </div>`;
+    el.style.display = '';
+  }
+
+  let _lastRoleplayScenario = null;
+
+  async function startRoleplay() {
+    const body = document.getElementById('roleplay-body');
+    if (!body) return;
+    body.innerHTML = '<div class="loading-text">Đang tạo tình huống...</div>';
+    try {
+      const d = await API.getRoleplay();
+      if (!d.roleplay) { body.innerHTML = `<div style="font-size:12px;color:var(--text-muted)">${escapeHtml(d.message || 'Chưa tạo được tình huống.')}</div>`; return; }
+      const { scenario, question } = d.roleplay;
+      _lastRoleplayScenario = scenario;
+      body.innerHTML = `
+        <div style="background:var(--bg);border-radius:var(--radius);padding:12px;font-size:13px;margin-bottom:10px">${escapeHtml(scenario)}</div>
+        <div class="form-group" style="margin-bottom:8px">
+          <label class="form-label" style="font-size:12px">${escapeHtml(question)}</label>
+          <textarea class="text-input" id="roleplay-response" rows="3" placeholder="Viết cách bạn sẽ phản ứng..."></textarea>
+        </div>
+        <button class="btn-primary" style="font-size:13px;max-width:180px" onclick="App.submitRoleplayResponse()">Gửi & nhận góp ý</button>
+        <div id="roleplay-feedback" style="margin-top:10px"></div>`;
+    } catch (e) { body.innerHTML = '<div style="font-size:12px;color:var(--text-muted)">Lỗi tải tình huống.</div>'; }
+  }
+
+  async function submitRoleplayResponse() {
+    const responseEl = document.getElementById('roleplay-response');
+    const feedbackEl = document.getElementById('roleplay-feedback');
+    const response = (responseEl?.value || '').trim();
+    if (!response) { showToast('Viết cách bạn sẽ phản ứng trước đã nhé.'); return; }
+    if (!feedbackEl) return;
+    feedbackEl.innerHTML = '<div class="loading-text">Đang phân tích...</div>';
+    try {
+      const d = await API.getRoleplayFeedback(_lastRoleplayScenario, response);
+      feedbackEl.innerHTML = `<div style="background:var(--bg);border-radius:var(--radius);padding:12px;font-size:13px;color:var(--text-muted);border-left:3px solid var(--primary)">💡 ${escapeHtml(d.feedback)}</div>`;
+    } catch (e) { feedbackEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted)">Lỗi tải góp ý.</div>'; }
+  }
+
   // ── v3.0: AI Coach Tuần (ai_weekly_coach) ────────────────────────────────
   async function loadAICoach() {
     const el = document.getElementById('ai-coach-card');
@@ -6724,5 +6827,6 @@ const App = (() => {
     _addRecentTag,_renderRecentTags,
     copyReferralLink,
     saveEmergencyContactForm,
+    startRoleplay,submitRoleplayResponse,
     _confirmResolve: (val) => _confirmResolve && _confirmResolve(val)};
 })();

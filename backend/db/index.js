@@ -1573,6 +1573,38 @@ async function initSchema() {
             'v3.8',N'Vận hành & Nhắc nhở',1,374,GETDATE())
   `);
 
+  // ── v3.9: Dự báo mood chủ động — đối chiếu Lịch học tập với lịch sử mood ──
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='mood_forecast')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order,released_at)
+    VALUES ('mood_forecast',N'Dự báo tâm trạng chủ động',
+            N'Đối chiếu lịch thi/deadline sắp tới (Lịch học tập) với pattern mood của chính user quanh các mốc tương tự trước đây, cảnh báo trước thay vì chỉ báo sau khi mood đã xuống',
+            'v3.9',N'Dự báo chủ động',1,380,GETDATE())
+  `);
+
+  // ── v3.10: Trường/lớp (optional, để tổng hợp Bản đồ cảm xúc trường) ─────
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME='Users' AND COLUMN_NAME='school_name')
+    ALTER TABLE Users ADD school_name NVARCHAR(100) NULL
+  `);
+
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='school_mood_map')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order,released_at)
+    VALUES ('school_mood_map',N'Bản đồ cảm xúc trường học',
+            N'User tự nhập trường (không bắt buộc); khi có từ 5 bạn cùng trường trở lên, hiển thị mood trung bình 7 ngày qua của cả trường (ẩn danh, chỉ số liệu tổng hợp) để giảm cảm giác cô đơn',
+            'v3.10',N'Kết nối ẩn danh',1,390,GETDATE())
+  `);
+
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='roleplay_cbt')
+    INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order,released_at)
+    VALUES ('roleplay_cbt',N'Luyện phản ứng tình huống',
+            N'AI đọc nhật ký gần nhất, dựng lại tình huống "nếu gặp lại thì sao" để user luyện cách phản ứng, rồi AI góp ý — cá nhân hoá theo đúng chuyện user vừa kể thay vì bài tập chung chung',
+            'v3.10',N'Kết nối ẩn danh',1,391,GETDATE())
+  `);
+
   console.log('✅ Schema đã sẵn sàng');
 }
 

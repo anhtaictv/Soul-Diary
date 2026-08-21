@@ -103,4 +103,36 @@ router.get('/referral', async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
+// GET /api/user/school-mood-map — mood TB 7 ngày qua của các bạn cùng trường (ẩn danh, tổng hợp)
+router.get('/school-mood-map', async (req, res) => {
+  try {
+    const db  = await getPool();
+    const uid = req.user.id;
+    const meR = await db.request().input('uid', sql.Int, uid).query('SELECT school_name FROM Users WHERE id=@uid');
+    const school = meR.recordset[0]?.school_name;
+    if (!school) return res.json({ map: null, message: 'Chưa cập nhật trường trong hồ sơ.' });
+
+    const r = await db.request().input('school', sql.NVarChar, school).query(`
+      SELECT COUNT(DISTINCT de.user_id) AS n_users,
+             AVG(CAST(de.mood_score AS FLOAT)) AS avg_mood,
+             SUM(CASE WHEN de.mood_score <= 4 THEN 1 ELSE 0 END) * 100.0 / COUNT(*) AS pct_low
+      FROM DiaryEntries de
+      JOIN Users u ON u.id = de.user_id
+      WHERE u.school_name = @school AND de.created_at >= DATEADD(DAY, -7, GETDATE())
+    `);
+    const { n_users, avg_mood, pct_low } = r.recordset[0];
+    if (!n_users || n_users < 5)
+      return res.json({ map: null, message: `Cần thêm bạn cùng trường tham gia (hiện có ${n_users || 0}) để hiện bản đồ ẩn danh.` });
+
+    res.json({
+      map: {
+        school,
+        n_users,
+        avg_mood: Math.round(avg_mood * 10) / 10,
+        pct_low: Math.round(pct_low),
+      },
+    });
+  } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
 module.exports = router;

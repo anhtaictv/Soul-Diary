@@ -237,7 +237,7 @@ router.get('/me', authMiddleware, async (req, res) => {
       .query(`
         SELECT id, username, email, full_name, avatar_text, role,
                streak, streak_freeze, max_streak, last_entry, created_at,
-               notif_hour, notif_days, bio, avatar_url
+               notif_hour, notif_days, bio, avatar_url, school_name
         FROM Users WHERE id = @id
       `);
 
@@ -255,9 +255,10 @@ router.get('/me', authMiddleware, async (req, res) => {
 // ── PUT /api/auth/profile — cập nhật profile ────────────────────────────
 router.put('/profile', authMiddleware, async (req, res) => {
   try {
-    const { full_name, bio, avatar_url } = req.body;
+    const { full_name, bio, avatar_url, school_name } = req.body;
     if (!full_name) return res.status(400).json({ message: 'Tên không được để trống.' });
     if (bio && bio.length > 300) return res.status(400).json({ message: 'Bio tối đa 300 ký tự.' });
+    if (school_name && school_name.length > 100) return res.status(400).json({ message: 'Tên trường tối đa 100 ký tự.' });
     // Chỉ chấp nhận data URI ảnh do canvas client tạo ra (xem handleAvatarUpload) — chặn XSS
     // qua avatar_url nếu có client khác gọi thẳng API với giá trị tùy ý.
     if (avatar_url && !/^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(avatar_url)) {
@@ -273,14 +274,15 @@ router.put('/profile', authMiddleware, async (req, res) => {
       .input('avatar_text', sql.NVarChar, avatarText)
       .input('bio',         sql.NVarChar, bio || null)
       .input('avatar_url',  sql.NVarChar, avatar_url || null)
+      .input('school_name', sql.NVarChar, (school_name || '').trim() || null)
       .query(`
         UPDATE Users
         SET full_name = @full_name, avatar_text = @avatar_text,
-            bio = @bio, avatar_url = @avatar_url, updated_at = GETDATE()
+            bio = @bio, avatar_url = @avatar_url, school_name = @school_name, updated_at = GETDATE()
         WHERE id = @id
       `);
 
-    res.json({ message: 'Cập nhật thành công.', avatar_text: avatarText, full_name, bio, avatar_url });
+    res.json({ message: 'Cập nhật thành công.', avatar_text: avatarText, full_name, bio, avatar_url, school_name });
   } catch (err) {
     console.error('Update profile error:', err);
     res.status(500).json({ message: 'Lỗi server.' });
