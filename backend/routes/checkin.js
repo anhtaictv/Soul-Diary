@@ -375,4 +375,10 @@ router.get('/history', async (req, res) => {
   }
 });
 
+// Gắn lên router (vẫn là 1 function) để test_checkin_scoring.js gọi trực tiếp
+// mà không đụng cách server.js mount route (app.use('/api/check-in', require(...)))
+router.validateAnswers  = validateAnswers;
+router.computeScores    = computeScores;
+router.TOTAL_QUESTIONS  = TOTAL_QUESTIONS;
+
 module.exports = router;

@@ -25,6 +25,13 @@ process.on('unhandledRejection', (err) => {
   console.error('⚠️  Unhandled rejection (đã chặn để server không crash):', err);
 });
 
+// Chốt chặn cho lỗi đồng bộ lọt khỏi mọi try/catch (vd trong callback cron) — log rõ
+// nguyên nhân trước khi thoát, thay vì để Node crash âm thầm và PM2 restart-loop mù mờ.
+process.on('uncaughtException', (err) => {
+  console.error('🔥 Uncaught exception (server sẽ thoát để PM2 khởi động lại sạch):', err);
+  process.exit(1);
+});
+
 // ── Security + Performance middleware ────────────────────────────────────
 // Nén gzip/brotli — giảm ~70% bandwidth JSON response
 app.use(compression());
