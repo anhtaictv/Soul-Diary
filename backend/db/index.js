@@ -322,6 +322,12 @@ async function initSchema() {
       updated_at  DATETIME2     DEFAULT GETDATE()
     )
   `);
+  // List/search/on-this-day/streak đều lọc theo user_id rồi sort theo created_at —
+  // không có index này thì mỗi query đó là table scan, càng nặng khi nhật ký tăng lên.
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_DiaryEntries_user_created')
+    CREATE INDEX IX_DiaryEntries_user_created ON DiaryEntries(user_id, created_at DESC)
+  `);
 
   // Audit log CRUD nhật ký (baomat.txt: khuyến nghị #6 — audit trail cho bảng diaries).
   // entry_id/user_id KHÔNG đặt FK cascade — log phải sống sót sau khi entry/tài khoản
