@@ -4,7 +4,7 @@
 
 **Không gian riêng tư để lắng nghe tâm hồn mình**
 
-[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v3.10.2-6366f1?style=flat-square&logo=github&logoColor=white)](https://github.com/anhtaictv/Soul-Diary)
+[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v3.10.3-6366f1?style=flat-square&logo=github&logoColor=white)](https://github.com/anhtaictv/Soul-Diary)
 [![Deploy](https://img.shields.io/github/actions/workflow/status/anhtaictv/Soul-Diary/soul-diary-deploy-windows.yml?style=flat-square&label=Deploy&logo=githubactions&logoColor=white)](https://github.com/anhtaictv/Soul-Diary/actions/workflows/soul-diary-deploy-windows.yml)
 [![Stack](https://img.shields.io/badge/Node.js_+_MSSQL-339933?style=flat-square&logo=nodedotjs&logoColor=white)]()
 [![Vanilla JS](https://img.shields.io/badge/Vanilla_JS-F7DF1E?style=flat-square&logo=javascript&logoColor=black)]()
@@ -302,7 +302,8 @@ pm2 restart souldiary-api
 | v3.9 | Dự báo chủ động | Đối chiếu Lịch học tập (StudyEvents) với pattern mood lịch sử của chính user quanh các kỳ thi/deadline tương tự trước đây — cảnh báo trước thay vì chỉ báo sau khi mood đã xuống, kèm gợi ý bài tập phù hợp từ thư viện |
 | v3.10 | Kết nối ẩn danh | Bản đồ cảm xúc trường học: mood trung bình ẩn danh của các bạn cùng trường (chỉ hiện khi ≥5 người, bảo vệ danh tính) · Luyện phản ứng tình huống: AI dựng tình huống từ nhật ký gần nhất để luyện phản ứng, góp ý theo hướng CBT |
 | v3.10.1 | Bản vá AI | Fix Gemini fallback: model `gemini-2.0-flash` đã bị Google gỡ bỏ (404), đổi sang `gemini-3.6-flash` — ảnh hưởng toàn bộ 8 điểm gọi Gemini fallback trong app · AI Coach: cache theo ngày thay vì 7 ngày, khớp với Smart Recap |
-| **v3.10.2** | **Bản vá hiệu năng** | **Thêm index `(user_id, created_at DESC)` cho `DiaryEntries` — list/search/on-this-day/streak đang table scan, càng nặng khi nhật ký tăng · Bật GitHub Dependabot theo dõi cập nhật bảo mật cho `backend/`** |
+| v3.10.2 | Bản vá hiệu năng | Thêm index `(user_id, created_at DESC)` cho `DiaryEntries` — list/search/on-this-day/streak đang table scan, càng nặng khi nhật ký tăng · Bật GitHub Dependabot theo dõi cập nhật bảo mật cho `backend/` |
+| **v3.10.3** | **Bản vá độ ổn định** | **Thêm `uncaughtException` handler, hoàn thiện cặp chốt chặn với `unhandledRejection` đã có — lỗi đồng bộ lọt khỏi try/catch (vd trong cron callback) giờ log rõ nguyên nhân trước khi PM2 restart sạch · Thêm self-check cho logic đảo điểm PSS-10 trong check-in tuần, tránh sai điểm hiển thị mức căng thẳng cho người dùng** |
 
 <details>
 <summary><b>Xem đầy đủ lịch sử từ v1.0</b> (bấm để xem)</summary>
@@ -347,6 +348,7 @@ pm2 restart souldiary-api
 | v3.10 | Kết nối ẩn danh | **Bản đồ cảm xúc trường học**: thêm field `school_name` optional trong hồ sơ; khi có ≥5 người cùng trường (bảo vệ ẩn danh), hiện mood trung bình + % lượt ghi mood thấp 7 ngày qua của cả trường (`GET /api/user/school-mood-map`, flag `school_mood_map`). **Luyện phản ứng tình huống**: AI đọc nhật ký gần nhất, dựng tình huống "nếu gặp lại thì sao" để luyện phản ứng rồi góp ý theo hướng CBT — cá nhân hoá theo đúng chuyện user vừa kể thay vì bài tập tĩnh trong thư viện (`GET/POST /api/diary/roleplay*`, flag `roleplay_cbt`) |
 | v3.10.1 | Bản vá AI | Google đã gỡ model `gemini-2.0-flash` (API trả 404 "no longer available") — mọi nhánh fallback Gemini trong app (smart-recap, ai-coach, roleplay, chat, checkin, daily-prompt...) đều fail và rơi về nội dung mặc định dù đã cấu hình `GEMINI_API_KEY` đúng. Đổi toàn bộ 8 điểm gọi sang `gemini-3.6-flash`. Cũng đổi cache `ai-coach` từ 7 ngày rolling sang theo ngày lịch (giống `smart-recap`) để nội dung mới xuất hiện sớm hơn |
 | v3.10.2 | Bản vá hiệu năng | `DiaryEntries` chưa có index nào ngoài khoá chính — mọi query list/search/on-this-day/tính streak đều lọc `user_id` rồi sắp xếp `created_at`, hiện đang table scan toàn bảng, càng chậm khi số nhật ký tăng lên. Thêm index `IX_DiaryEntries_user_created (user_id, created_at DESC)` vào `initSchema()`, tự tạo ở lần deploy kế tiếp, không cần chạy script tay. Bật GitHub Dependabot cho `backend/` (theo dõi cập nhật bảo mật npm hàng tuần) |
+| v3.10.3 | Bản vá độ ổn định | Server có sẵn `unhandledRejection` nhưng thiếu `uncaughtException` — nếu 1 lỗi đồng bộ lọt khỏi try/catch (vd trong callback cron) thì process crash không log rõ nguyên nhân trước khi PM2 restart-loop. Thêm handler còn thiếu, log lỗi rồi thoát sạch. Thêm `test_checkin_scoring.js` (self-check assert, không cần DB) bảo vệ logic đảo điểm 4 câu reverse-scoring của PSS-10 trong check-in tuần — sai 1 index là sai điểm mức căng thẳng hiển thị cho người dùng, dạng bug im lặng khó phát hiện bằng mắt |
 
 </details>
 
