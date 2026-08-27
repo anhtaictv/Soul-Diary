@@ -512,6 +512,14 @@ async function initSchema() {
     ALTER TABLE CheckIns ADD ai_analysis NVARCHAR(MAX) NULL
   `);
 
+  // Dọn 2 bản ghi CheckIns sinh ra khi kiểm thử checkin flow trên production (2026-08-27)
+  // bằng tài khoản test_vui_ve/test_binh_yen. Tự nhiên idempotent: chỉ khớp đúng tuần/năm
+  // đã submit lúc test, chạy lại vô hại vì lần sau không còn gì khớp WHERE nữa.
+  await db.request().query(`
+    DELETE c FROM CheckIns c JOIN Users u ON u.id = c.user_id
+    WHERE u.username IN ('test_vui_ve', 'test_binh_yen') AND c.year = 2026 AND c.week_number = 34
+  `);
+
   // Seed feature flag v1.4 — Check-in Sức khỏe Tinh thần hàng tuần (disabled by default)
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key='weekly_checkin')
