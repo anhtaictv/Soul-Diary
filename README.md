@@ -4,7 +4,7 @@
 
 **Không gian riêng tư để lắng nghe tâm hồn mình**
 
-[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v3.10.3-6366f1?style=flat-square&logo=github&logoColor=white)](https://github.com/anhtaictv/Soul-Diary)
+[![Phiên bản](https://img.shields.io/badge/Phiên_bản-v3.10.4-6366f1?style=flat-square&logo=github&logoColor=white)](https://github.com/anhtaictv/Soul-Diary)
 [![Deploy](https://img.shields.io/github/actions/workflow/status/anhtaictv/Soul-Diary/soul-diary-deploy-windows.yml?style=flat-square&label=Deploy&logo=githubactions&logoColor=white)](https://github.com/anhtaictv/Soul-Diary/actions/workflows/soul-diary-deploy-windows.yml)
 [![Stack](https://img.shields.io/badge/Node.js_+_MSSQL-339933?style=flat-square&logo=nodedotjs&logoColor=white)]()
 [![Vanilla JS](https://img.shields.io/badge/Vanilla_JS-F7DF1E?style=flat-square&logo=javascript&logoColor=black)]()
@@ -303,7 +303,8 @@ pm2 restart souldiary-api
 | v3.10 | Kết nối ẩn danh | Bản đồ cảm xúc trường học: mood trung bình ẩn danh của các bạn cùng trường (chỉ hiện khi ≥5 người, bảo vệ danh tính) · Luyện phản ứng tình huống: AI dựng tình huống từ nhật ký gần nhất để luyện phản ứng, góp ý theo hướng CBT |
 | v3.10.1 | Bản vá AI | Fix Gemini fallback: model `gemini-2.0-flash` đã bị Google gỡ bỏ (404), đổi sang `gemini-3.6-flash` — ảnh hưởng toàn bộ 8 điểm gọi Gemini fallback trong app · AI Coach: cache theo ngày thay vì 7 ngày, khớp với Smart Recap |
 | v3.10.2 | Bản vá hiệu năng | Thêm index `(user_id, created_at DESC)` cho `DiaryEntries` — list/search/on-this-day/streak đang table scan, càng nặng khi nhật ký tăng · Bật GitHub Dependabot theo dõi cập nhật bảo mật cho `backend/` |
-| **v3.10.3** | **Bản vá độ ổn định** | **Thêm `uncaughtException` handler, hoàn thiện cặp chốt chặn với `unhandledRejection` đã có — lỗi đồng bộ lọt khỏi try/catch (vd trong cron callback) giờ log rõ nguyên nhân trước khi PM2 restart sạch · Thêm self-check cho logic đảo điểm PSS-10 trong check-in tuần, tránh sai điểm hiển thị mức căng thẳng cho người dùng** |
+| v3.10.3 | Bản vá độ ổn định | Thêm `uncaughtException` handler, hoàn thiện cặp chốt chặn với `unhandledRejection` đã có — lỗi đồng bộ lọt khỏi try/catch (vd trong cron callback) giờ log rõ nguyên nhân trước khi PM2 restart sạch · Thêm self-check cho logic đảo điểm PSS-10 trong check-in tuần, tránh sai điểm hiển thị mức căng thẳng cho người dùng |
+| **v3.10.4** | **Dọn dữ liệu test** | **Kiểm thử checkin flow trực tiếp trên production (tài khoản `test_vui_ve`/`test_binh_yen`) xác nhận toàn bộ luồng — tính điểm, phân loại, AI phân tích tuần, chặn submit trùng, validate input — đều đúng. Xoá 2 bản ghi check-in test sinh ra lúc kiểm thử bằng 1 lệnh dọn tự chạy khi server khởi động, không cần vào tay VPS** |
 
 <details>
 <summary><b>Xem đầy đủ lịch sử từ v1.0</b> (bấm để xem)</summary>
@@ -349,6 +350,7 @@ pm2 restart souldiary-api
 | v3.10.1 | Bản vá AI | Google đã gỡ model `gemini-2.0-flash` (API trả 404 "no longer available") — mọi nhánh fallback Gemini trong app (smart-recap, ai-coach, roleplay, chat, checkin, daily-prompt...) đều fail và rơi về nội dung mặc định dù đã cấu hình `GEMINI_API_KEY` đúng. Đổi toàn bộ 8 điểm gọi sang `gemini-3.6-flash`. Cũng đổi cache `ai-coach` từ 7 ngày rolling sang theo ngày lịch (giống `smart-recap`) để nội dung mới xuất hiện sớm hơn |
 | v3.10.2 | Bản vá hiệu năng | `DiaryEntries` chưa có index nào ngoài khoá chính — mọi query list/search/on-this-day/tính streak đều lọc `user_id` rồi sắp xếp `created_at`, hiện đang table scan toàn bảng, càng chậm khi số nhật ký tăng lên. Thêm index `IX_DiaryEntries_user_created (user_id, created_at DESC)` vào `initSchema()`, tự tạo ở lần deploy kế tiếp, không cần chạy script tay. Bật GitHub Dependabot cho `backend/` (theo dõi cập nhật bảo mật npm hàng tuần) |
 | v3.10.3 | Bản vá độ ổn định | Server có sẵn `unhandledRejection` nhưng thiếu `uncaughtException` — nếu 1 lỗi đồng bộ lọt khỏi try/catch (vd trong callback cron) thì process crash không log rõ nguyên nhân trước khi PM2 restart-loop. Thêm handler còn thiếu, log lỗi rồi thoát sạch. Thêm `test_checkin_scoring.js` (self-check assert, không cần DB) bảo vệ logic đảo điểm 4 câu reverse-scoring của PSS-10 trong check-in tuần — sai 1 index là sai điểm mức căng thẳng hiển thị cho người dùng, dạng bug im lặng khó phát hiện bằng mắt |
+| v3.10.4 | Dọn dữ liệu test | Chạy thử toàn bộ checkin flow trên production thật bằng 2 tài khoản test có sẵn (`test_vui_ve`, `test_binh_yen`) — xác nhận tính điểm/phân loại/AI phân tích tuần/chặn trùng/validate input đều khớp logic đã unit-test. Dọn lại 2 bản ghi `CheckIns` test sinh ra lúc kiểm thử bằng 1 câu lệnh `DELETE` tự nhiên idempotent trong `initSchema()`, tự chạy ở lần khởi động kế tiếp — không cần RDP vào VPS chạy tay |
 
 </details>
 
