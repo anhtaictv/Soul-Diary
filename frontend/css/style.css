@@ -64,7 +64,15 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#f1f5f9;color:var(--text
 .eye-btn{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;padding:4px}
 
 /* ══════════════ APP LAYOUT ══════════════ */
-.app{display:flex;min-height:100vh;max-width:1140px;margin:0 auto;background:var(--bg)}
+.app{display:flex;min-height:100vh;max-width:1140px;width:100%;margin:0 auto;background:var(--bg)}
+/* Thanh thông báo hệ thống nằm trên .app — desktop: #app-screen là cột cao đúng màn hình, .app chiếm phần còn lại
+   (trước đây .app/.sidebar/.main cố định 100vh nên có thông báo thì đáy trang + nút Đăng xuất bị đẩy ra ngoài) */
+#app-screen{flex-direction:column}
+@media(min-width:721px){
+  #app-screen{height:100vh;height:100dvh}
+  #app-screen .app{flex:1;min-height:0}
+  #app-screen .sidebar,#app-screen .main{height:auto}
+}
 
 /* Sidebar */
 .sidebar{width:230px;min-width:230px;background:var(--sidebar-bg);display:flex;flex-direction:column;position:sticky;top:0;height:100vh}

@@ -161,7 +161,7 @@ const Auth = (() => {
 
   function showApp(user) {
     document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('app-screen').style.display  = 'block';
+    document.getElementById('app-screen').style.display  = 'flex'; // flex cột: xem #app-screen trong style.css
     updateSidebarUser(user);
     App.init();
   }
