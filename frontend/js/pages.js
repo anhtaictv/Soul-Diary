@@ -15,27 +15,14 @@ const PAGES = {
         <div class="stat-card"><div class="stat-val" id="dash-today">—</div><div class="stat-lbl">Hôm nay</div></div>
       </div>
 
+      <!-- Chấm mood hôm nay — 1 widget duy nhất (v3.11 gộp "Chấm điểm nhanh" + "Quick Mood"), App.renderQuickMoodWidget dựng nội dung -->
+      <div class="quick-mood-section" id="quick-mood-widget"></div>
+
       <!-- Weekly streak calendar -->
       <div class="streak-calendar-card" id="streak-calendar-card"></div>
 
-      <!-- Hôm nay năm ngoái (v3.4, ẩn cho đến khi flag on_this_day được bật) -->
-      <div id="on-this-day-section" style="display:none;margin-bottom:16px"></div>
-
-      <!-- Thanh cấp độ cảm xúc -->
-      <div id="dash-level-bar"></div>
-
-      <!-- Hạt mầm tâm hồn (ẩn cho đến khi feature soul_seed được bật) -->
-      <div id="soul-seed-section" style="display:none"></div>
-
-      <div class="quick-mood-section">
-        <div class="quick-mood-title">Chấm điểm nhanh hôm nay</div>
-        <div class="quick-mood-sub">Mất chưa đến 30 giây</div>
-        <div class="mood-icon-scale" id="quick-mood-scale"></div>
-        <div class="mood-label-row"><span>😔 Rất tệ</span><span>😊 Rất tốt</span></div>
-        <button class="btn-primary" style="margin-top:12px;max-width:200px" onclick="App.nav('diary')">✍️ Viết nhật ký</button>
-      </div>
-      <!-- Quick Mood Log widget (v2.4, ẩn cho đến khi quick_mood_log flag bật) -->
-      <div id="quick-mood-widget" style="display:none;margin-bottom:16px"></div>
+      <!-- Cảnh báo sức khỏe nhẹ nhàng (v2.7, ẩn mặc định) -->
+      <div id="wellness-alert-banner" style="display:none;margin-bottom:16px"></div>
 
       <!-- Habit Tracker widget (v2.5, ẩn cho đến khi habit_tracker flag bật) -->
       <div id="habit-dashboard-widget" style="display:none;margin-bottom:16px"></div>
@@ -43,27 +30,13 @@ const PAGES = {
       <!-- Nhật ký đã ghim (v2.5, ẩn cho đến khi pinned_entries flag bật) -->
       <div id="pinned-entries-section" style="display:none"></div>
 
-      <!-- Câu truyền cảm hứng (v2.6, ẩn cho đến khi daily_quote flag bật) -->
-      <div id="daily-quote-card" style="display:none;margin-bottom:16px"></div>
-
-      <!-- Cảnh báo sức khỏe nhẹ nhàng (v2.7, ẩn mặc định) -->
-      <div id="wellness-alert-banner" style="display:none;margin-bottom:16px"></div>
-
-      <!-- Ghi chú nhanh widget (v2.7) -->
-      <div id="notes-dashboard-widget" style="display:none;margin-bottom:16px"></div>
-
       <!-- Dự báo tâm trạng chủ động (v3.9, ẩn cho đến khi mood_forecast flag bật) -->
       <div id="mood-forecast-card" style="display:none;margin-bottom:16px"></div>
 
       <!-- AI Coach Tuần (v3.0, ẩn cho đến khi ai_weekly_coach flag bật) -->
       <div id="ai-coach-card" style="display:none;margin-bottom:16px"></div>
 
-      <!-- Bản đồ cảm xúc trường (v3.10, ẩn cho đến khi school_mood_map flag bật) -->
-      <div id="school-mood-card" style="display:none;margin-bottom:16px"></div>
       <div id="mood-insights-card" style="display:none;margin-bottom:16px"></div>
-
-      <!-- Luyện phản ứng tình huống (v3.10, ẩn cho đến khi roleplay_cbt flag bật) -->
-      <div id="roleplay-card" style="display:none;margin-bottom:16px"></div>
 
       <div class="section-label">Gợi ý dành cho bạn</div>
       <div id="recommendations"></div>
@@ -71,29 +44,50 @@ const PAGES = {
       <!-- Push notification opt-in -->
       <div id="push-optin-banner"></div>
 
-      <!-- Nhắc nhở tùy chỉnh (ẩn cho đến khi feature custom_reminder được bật) -->
-      <div id="custom-reminder-section" style="display:none"></div>
+      <div class="section-label">Nhật ký gần đây</div>
+      <div id="dash-recent-entries" style="margin-bottom:16px"><div class="loading-text">Đang tải...</div></div>
 
-      <!-- Recap tuần này -->
-      <div id="weekly-recap"></div>
+      <!-- v3.11: khối ít dùng gom vào "Xem thêm" (nhớ trạng thái mở/đóng) — JS vẫn nạp nội dung bình thường -->
+      <details class="dash-more" ${localStorage.getItem('nhk_dash_more') === '1' ? 'open' : ''}
+        ontoggle="localStorage.setItem('nhk_dash_more', this.open ? '1' : '0')">
+        <summary class="dash-more-summary">Xem thêm: tổng kết tuần, cấp độ, huy hiệu, kỷ niệm...</summary>
 
-      <!-- Dashboard sức khỏe tâm thần nâng cao (v1.3, ẩn cho đến khi feature được bật) -->
-      <div id="mental-health-section" style="display:none">
-        <div class="section-label">Sức khỏe tâm thần 30 ngày qua</div>
-        <div class="grid-4" id="mental-health-cards"></div>
-      </div>
+        <!-- Recap tuần này -->
+        <div id="weekly-recap"></div>
 
-      <!-- Huy hiệu & Nhật ký gần đây -->
-      <div class="grid-2">
-        <div>
-          <div class="section-label" id="badges-label" style="display:none">Huy hiệu của bạn</div>
-          <div id="badges-grid"></div>
+        <!-- Dashboard sức khỏe tâm thần nâng cao (v1.3, ẩn cho đến khi feature được bật) -->
+        <div id="mental-health-section" style="display:none">
+          <div class="section-label">Sức khỏe tâm thần 30 ngày qua</div>
+          <div class="grid-4" id="mental-health-cards"></div>
         </div>
-        <div>
-          <div class="section-label">Nhật ký gần đây</div>
-          <div id="dash-recent-entries"><div class="loading-text">Đang tải...</div></div>
-        </div>
-      </div>
+
+        <!-- Hôm nay năm ngoái (v3.4, ẩn cho đến khi flag on_this_day được bật) -->
+        <div id="on-this-day-section" style="display:none;margin-bottom:16px"></div>
+
+        <!-- Thanh cấp độ cảm xúc -->
+        <div id="dash-level-bar"></div>
+
+        <!-- Hạt mầm tâm hồn (ẩn cho đến khi feature soul_seed được bật) -->
+        <div id="soul-seed-section" style="display:none"></div>
+
+        <!-- Câu truyền cảm hứng (v2.6, ẩn cho đến khi daily_quote flag bật) -->
+        <div id="daily-quote-card" style="display:none;margin-bottom:16px"></div>
+
+        <!-- Ghi chú nhanh widget (v2.7) -->
+        <div id="notes-dashboard-widget" style="display:none;margin-bottom:16px"></div>
+
+        <!-- Bản đồ cảm xúc trường (v3.10, ẩn cho đến khi school_mood_map flag bật) -->
+        <div id="school-mood-card" style="display:none;margin-bottom:16px"></div>
+
+        <!-- Luyện phản ứng tình huống (v3.10, ẩn cho đến khi roleplay_cbt flag bật) -->
+        <div id="roleplay-card" style="display:none;margin-bottom:16px"></div>
+
+        <!-- Nhắc nhở tùy chỉnh (ẩn cho đến khi feature custom_reminder được bật) -->
+        <div id="custom-reminder-section" style="display:none"></div>
+
+        <div class="section-label" id="badges-label" style="display:none">Huy hiệu của bạn</div>
+        <div id="badges-grid"></div>
+      </details>
     </div>`,
 
   diary: () => `

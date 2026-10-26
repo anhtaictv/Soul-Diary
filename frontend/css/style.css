@@ -335,6 +335,14 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#f1f5f9;color:var(--text
 /* Misc */
 .disclaimer{background:var(--amber-light);border:1px solid #fcd34d;border-radius:var(--radius-sm);padding:10px 14px;font-size:11px;color:var(--amber);margin-bottom:20px;display:flex;align-items:center;gap:8px;font-weight:500}
 .section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-hint);margin:20px 0 10px}
+/* Tổng quan — mục "Xem thêm" gom các khối ít dùng (v3.11) */
+.dash-more{margin-top:8px}
+.dash-more-summary{cursor:pointer;list-style:none;padding:12px 16px;border:1px dashed var(--border);border-radius:var(--radius-lg);font-size:13px;font-weight:600;color:var(--text-muted);text-align:center;transition:background .15s}
+.dash-more-summary::-webkit-details-marker{display:none}
+.dash-more-summary::before{content:'▸ ';display:inline-block;transition:transform .2s}
+.dash-more[open] .dash-more-summary{margin-bottom:12px}
+.dash-more[open] .dash-more-summary::before{transform:rotate(90deg)}
+.dash-more-summary:hover{background:var(--bg)}
 
 /* Modal */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center}

@@ -218,7 +218,7 @@ const App = (() => {
 
   // ── Dashboard ────────────────────────────────────────────────────────
   async function initDashboard() {
-    buildMoodScale('quick-mood-scale', v => { selectedMood = v; });
+    renderQuickMoodWidget(null); // hiện ngay thang chấm mood, cập nhật lại khi biết hôm nay đã ghi chưa
     // #6 skeleton stat cards while data loads
     ['dash-entries','dash-avg','dash-streak','dash-today'].forEach(id => {
       const el = document.getElementById(id);
@@ -276,7 +276,7 @@ const App = (() => {
       setTimeout(() => showToast('⚠️ Chuỗi ' + user.streak + ' ngày sắp hết! Đừng quên ghi nhật ký hôm nay.'), 1500);
 
     // Quick mood log widget (v2.4)
-    if (window.FEATURES && window.FEATURES.quick_mood_log) renderQuickMoodWidget(todayEntry);
+    if (todayEntry) renderQuickMoodWidget(todayEntry);
     // Habit tracker widget (v2.5)
     if (window.FEATURES && window.FEATURES.habit_tracker) renderHabitDashboardWidget();
     // Pinned entries (v2.5)
@@ -313,7 +313,7 @@ const App = (() => {
 
   function getRecommendations(mood) {
     if (!mood) return [
-      {emoji:'💛',title:'Chấm điểm tâm trạng hôm nay',sub:'Mất chưa đến 30 giây',nav:'diary'},
+      {emoji:'🎧',title:'Nghe nhạc thư giãn',sub:'Playlist theo tâm trạng',nav:'music'},
       {emoji:'📚',title:'Đọc bài về quản lý stress',sub:'Thư viện kiến thức',nav:'library'},
       {emoji:'🌬️',title:'Thử bài tập thở 4-7-8',sub:'Giảm lo âu tức thì',nav:'exercises'},
     ];
@@ -5954,55 +5954,50 @@ const App = (() => {
   }
 
   // ── v2.4: Quick Mood Log widget ────────────────────────────────────────────
-  const QUICK_MOODS = [
-    { score: 2, emoji: '😢', label: 'Tệ' },
-    { score: 4, emoji: '😕', label: 'Buồn' },
-    { score: 6, emoji: '😐', label: 'Bình thường' },
-    { score: 8, emoji: '🙂', label: 'Tốt' },
-    { score: 10, emoji: '😄', label: 'Tuyệt!' },
-  ];
-
+  // Widget chấm mood duy nhất trên Tổng quan (v3.11 gộp "Chấm điểm nhanh" 1-10 + "Quick Mood" 5 emoji).
+  // Có flag quick_mood_log: chạm là lưu luôn; không có: chạm chỉ chọn điểm rồi mang sang trang Nhật ký.
   function renderQuickMoodWidget(todayEntry) {
     const el = document.getElementById('quick-mood-widget');
     if (!el) return;
+    el.style.pointerEvents = '';
     if (todayEntry) {
-      const m = QUICK_MOODS.reduce((best, cur) => Math.abs(cur.score - todayEntry.mood_score) < Math.abs(best.score - todayEntry.mood_score) ? cur : best);
-      el.innerHTML = `<div class="card" style="text-align:center;padding:16px 12px">
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">Mood hôm nay</div>
-        <div style="font-size:32px">${m.emoji}</div>
-        <div style="font-size:13px;font-weight:600;color:var(--primary)">${todayEntry.mood_score}/10 · ${m.label}</div>
-      </div>`;
-    } else {
-      el.innerHTML = `<div class="card" style="padding:16px 12px">
-        <div style="font-size:13px;font-weight:600;margin-bottom:10px">⚡ Mood hôm nay thế nào?</div>
-        <div style="display:flex;justify-content:space-around;gap:4px">
-          ${QUICK_MOODS.map(m => `
-            <button onclick="App.quickLogMood(${m.score})" style="background:none;border:none;cursor:pointer;text-align:center;padding:8px 4px;border-radius:var(--radius);transition:background .15s" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='none'">
-              <div style="font-size:28px">${m.emoji}</div>
-              <div style="font-size:10px;color:var(--text-muted);margin-top:2px">${m.label}</div>
-            </button>`).join('')}
+      const m = MOOD_DATA[todayEntry.mood_score];
+      selectedMood = todayEntry.mood_score; // "Viết thêm" mở trang Nhật ký với đúng điểm này
+      el.innerHTML = `<div class="quick-mood-title">Mood hôm nay</div>
+        <div style="display:flex;align-items:center;gap:12px;margin:10px 0">
+          <span style="font-size:40px">${m.emoji}</span>
+          <div><div style="font-size:20px;font-weight:700;color:${m.color}">${todayEntry.mood_score}/10</div>
+            <div style="font-size:13px;color:var(--text-muted)">${m.label}</div></div>
         </div>
-      </div>`;
+        <button class="btn-primary" style="max-width:220px" onclick="App.nav('diary')">✍️ Viết thêm nhật ký</button>`;
+      return;
     }
-    el.style.display = '';
+    const quick = !!(window.FEATURES && window.FEATURES.quick_mood_log);
+    el.innerHTML = `<div class="quick-mood-title">Hôm nay bạn thấy thế nào?</div>
+      <div class="quick-mood-sub">${quick ? 'Chạm 1 lần là lưu — muốn kể thêm thì bấm Viết nhật ký' : 'Mất chưa đến 30 giây'}</div>
+      <div class="mood-icon-scale" id="quick-mood-scale"></div>
+      <div class="mood-label-row"><span>😔 Rất tệ</span><span>😊 Rất tốt</span></div>
+      <button class="btn-primary" style="margin-top:12px;max-width:200px" onclick="App.nav('diary')">✍️ Viết nhật ký</button>`;
+    buildMoodScale('quick-mood-scale', v => {
+      selectedMood = v;
+      if (!quick) return;
+      el.style.pointerEvents = 'none'; // chặn chạm đúp tạo 2 bản ghi
+      quickLogMood(v).finally(() => { el.style.pointerEvents = ''; });
+    }, quick ? 0 : 5);
   }
 
   async function quickLogMood(score) {
-    const el = document.getElementById('quick-mood-widget');
     try {
       const res = await API.createEntry({ mood_score: score, event_text: '', tags: '', gratitude: '', quick: true });
-      const m = QUICK_MOODS.find(x => x.score === score) || { emoji: '📝', label: '' };
       if (res && res.queued) {
         // v3.3: mất mạng — chưa lưu lên server nên KHÔNG đổi widget thành "đã ghi", tránh log trùng khi mở lại
         showToast('📥 Không có mạng — đã lưu nháp, sẽ tự động đồng bộ khi có mạng trở lại.');
         return;
       }
-      showToast(`${m.emoji} Đã ghi mood ${score}/10!`);
-      if (el) el.innerHTML = `<div class="card" style="text-align:center;padding:16px 12px">
-        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">Mood hôm nay</div>
-        <div style="font-size:32px">${m.emoji}</div>
-        <div style="font-size:13px;font-weight:600;color:var(--primary)">${score}/10 · ${m.label}</div>
-      </div>`;
+      showToast(`${MOOD_DATA[score]?.emoji || '📝'} Đã ghi mood ${score}/10!`);
+      renderQuickMoodWidget({ mood_score: score });
+      const todayEl = document.getElementById('dash-today');
+      if (todayEl) todayEl.textContent = score + '/10';
       if (score <= 6 && window.FEATURES && window.FEATURES.exercise_suggest) {
         setTimeout(() => _showExerciseSuggest(score), 800);
       }
