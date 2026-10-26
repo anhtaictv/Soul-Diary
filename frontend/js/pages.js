@@ -410,7 +410,7 @@ const PAGES = {
     <div class="page active" id="page-library">
       <div class="page-header">
         <div class="page-title">Thư viện kiến thức 📚</div>
-        <div class="page-sub">Tâm lý học ứng dụng cho sinh viên đại học</div>
+        <div class="page-sub">Tâm lý học ứng dụng cho cuộc sống hằng ngày</div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap" id="lib-filters">
         <button class="tag sel" onclick="App.filterArticles('all',this)">Tất cả</button>
@@ -444,7 +444,7 @@ const PAGES = {
       </div>
       <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap" id="music-moods">
         <button class="tag sel" data-mood="chill"  onclick="App.loadMusicMood('chill',this)">🌿 Thư giãn</button>
-        <button class="tag"     data-mood="focus"  onclick="App.loadMusicMood('focus',this)">📖 Tập trung học bài</button>
+        <button class="tag"     data-mood="focus"  onclick="App.loadMusicMood('focus',this)">📖 Tập trung</button>
         <button class="tag"     data-mood="sleep"  onclick="App.loadMusicMood('sleep',this)">🌙 Dễ ngủ</button>
         <button class="tag"     data-mood="nature" onclick="App.loadMusicMood('nature',this)">🍃 Thiên nhiên</button>
       </div>
@@ -681,14 +681,14 @@ const PAGES = {
   study: () => `
     <div class="page active" id="page-study">
       <div class="page-header">
-        <div class="page-title">📅 Lịch Học tập</div>
-        <div class="page-sub">Ghi lịch thi, deadline, bài tập — không bao giờ quên nữa</div>
+        <div class="page-title">📅 Lịch & Deadline</div>
+        <div class="page-sub">Ghi lịch thi, deadline công việc, cuộc hẹn quan trọng — không bao giờ quên nữa</div>
       </div>
       <div class="card" style="margin-bottom:16px">
         <div class="settings-section-title" style="margin-bottom:12px">Thêm sự kiện mới</div>
         <div class="grid-2" style="gap:10px;margin-bottom:10px">
           <div class="form-group" style="margin:0">
-            <input class="text-input" id="study-title" placeholder="Tên sự kiện (VD: Thi Toán giải tích)" maxlength="200" />
+            <input class="text-input" id="study-title" placeholder="Tên sự kiện (VD: Thi cuối kỳ, Nộp báo cáo quý)" maxlength="200" />
           </div>
           <div class="form-group" style="margin:0">
             <input class="text-input" type="date" id="study-date" />
@@ -697,8 +697,8 @@ const PAGES = {
         <div class="grid-2" style="gap:10px;margin-bottom:12px">
           <select class="text-input" id="study-type">
             <option value="exam">🔴 Thi / Kiểm tra</option>
-            <option value="deadline">🔶 Deadline / Nộp bài</option>
-            <option value="assignment">💛 Bài tập / Thực hành</option>
+            <option value="deadline">🔶 Deadline / Nộp việc</option>
+            <option value="assignment">💛 Bài tập / Công việc</option>
             <option value="other">🔵 Khác</option>
           </select>
           <input class="text-input" id="study-notes" placeholder="Ghi chú (không bắt buộc)" maxlength="200" />
@@ -1024,7 +1024,7 @@ const PAGES = {
         <div class="grid-2" style="gap:10px">
           <div class="form-group" style="margin:0">
             <label class="form-label">Tags mẫu</label>
-            <input class="text-input" id="tpl-tags" placeholder="VD: sáng tạo, học tập" />
+            <input class="text-input" id="tpl-tags" placeholder="VD: sáng tạo, công việc" />
           </div>
           <div class="form-group" style="margin:0">
             <label class="form-label">Mood mặc định</label>
@@ -1255,7 +1255,7 @@ const PAGES = {
     <div class="page active" id="page-pomodoro">
       <div class="page-header">
         <div class="page-title">⏱ Pomodoro</div>
-        <div class="page-subtitle">Tập trung học tập · Nghỉ ngơi đúng lúc</div>
+        <div class="page-subtitle">Tập trung làm việc · Nghỉ ngơi đúng lúc</div>
       </div>
 
       <div class="card" style="text-align:center;padding:28px 24px;margin-bottom:16px">

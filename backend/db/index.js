@@ -1664,6 +1664,30 @@ async function initSchema() {
     CREATE INDEX IX_CounselingMessages_thread ON CounselingMessages(org_id, user_id, created_at)
   `);
 
+  // Lịch hẹn tư vấn: thành viên đề xuất giờ → tư vấn viên xác nhận (kèm phòng/link) hoặc từ chối.
+  // note mã hoá at-rest. org_id không cascade (cùng lý do CounselingMessages).
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='CounselingAppointments' AND xtype='U')
+    CREATE TABLE CounselingAppointments (
+      id           INT IDENTITY(1,1) PRIMARY KEY,
+      org_id       INT NOT NULL REFERENCES Organizations(id),
+      user_id      INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      counselor_id INT NULL,
+      start_at     DATETIME2 NOT NULL,
+      mode         NVARCHAR(10)  NOT NULL DEFAULT 'offline',
+      note         NVARCHAR(MAX) NULL,
+      status       NVARCHAR(20)  NOT NULL DEFAULT 'pending',
+      location     NVARCHAR(300) NULL,
+      reply        NVARCHAR(300) NULL,
+      created_at   DATETIME2 DEFAULT GETDATE(),
+      updated_at   DATETIME2 DEFAULT GETDATE()
+    )
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_CounselingAppointments_org_start')
+    CREATE INDEX IX_CounselingAppointments_org_start ON CounselingAppointments(org_id, start_at)
+  `);
+
   // Tổ chức tự đăng ký → admin duyệt. Người đăng ký thành tư vấn viên đầu tiên khi được duyệt;
   // mật khẩu băm ngay lúc gửi. Organizations chỉ chứa tổ chức đã duyệt.
   await db.request().query(`

@@ -65,7 +65,7 @@ router.get('/smart-recap', async (req, res) => {
         : thisAvg - lastAvg > 0.5 ? `tăng ${(thisAvg-lastAvg).toFixed(1)} điểm so tuần trước`
         : thisAvg - lastAvg < -0.5 ? `giảm ${(thisAvg-lastAvg).toFixed(1)} điểm so tuần trước`
         : 'ổn định so tuần trước';
-      const prompt = `Bạn là người đồng hành tâm lý ấm áp trên ứng dụng nhật ký cảm xúc "Soul Diary" dành cho học sinh Việt Nam.
+      const prompt = `Bạn là người đồng hành tâm lý ấm áp trên ứng dụng nhật ký cảm xúc "Soul Diary" dành cho người dùng Việt Nam (có thể là học sinh, sinh viên, người đi làm, phụ huynh, người lớn tuổi... — đoán từ nội dung, đừng mặc định là học sinh).
 
 Dữ liệu tuần này:
 - Ngày ghi: ${thisDays}/7 ngày
@@ -146,7 +146,7 @@ router.get('/ai-coach', async (req, res) => {
       const summary = entries.slice(0, 10).map((e, i) =>
         `#${i+1}: Mood ${e.mood_score}/10. "${(e.event_text || '').slice(0, 100)}"`
       ).join('\n');
-      const prompt = `Bạn là coach tâm lý ấm áp cho học sinh/sinh viên Việt Nam. Phân tích nhật ký cảm xúc (mood TB: ${avgMood.toFixed(1)}/10) và đưa ra đúng 3 lời khuyên thực tế, cụ thể, ấm áp.
+      const prompt = `Bạn là coach tâm lý ấm áp cho người dùng Việt Nam (có thể là học sinh, sinh viên, người đi làm, phụ huynh, người lớn tuổi... — đoán từ nội dung, đừng mặc định là học sinh). Phân tích nhật ký cảm xúc (mood TB: ${avgMood.toFixed(1)}/10) và đưa ra đúng 3 lời khuyên thực tế, cụ thể, ấm áp.
 Trả về JSON thuần (không markdown): {"advice":[{"emoji":"🌱","title":"Tiêu đề ngắn","body":"2-3 câu cụ thể"}]}
 "emoji" CHỈ được chọn 1 trong danh sách: ${COACH_EMOJI.join(' ')}
 Nhật ký gần nhất:\n${summary}`;
@@ -184,7 +184,7 @@ Nhật ký gần nhất:\n${summary}`;
         { emoji: '📓', title: 'Kiên trì với nhật ký', body: `Bạn đã ghi ${entries.length} nhật ký gần đây — đây là nền tảng tuyệt vời. Thử đặt nhắc nhở mỗi tối để không bỏ lỡ ngày nào.` },
         topTag
           ? { emoji: '🔍', title: `Khám phá chủ đề "${topTag}"`, body: `Bạn thường xuyên ghi về "${topTag}". Hãy suy ngẫm sâu hơn: điều này ảnh hưởng tới bạn thế nào và bạn có thể phát triển ở đây không?` }
-          : { emoji: '🏷️', title: 'Thêm nhãn cảm xúc', body: 'Thử thêm tags vào nhật ký để dễ nhìn lại xu hướng. Ví dụ: "học tập", "gia đình", "bạn bè", "stress".' },
+          : { emoji: '🏷️', title: 'Thêm nhãn cảm xúc', body: 'Thử thêm tags vào nhật ký để dễ nhìn lại xu hướng. Ví dụ: "công việc", "gia đình", "bạn bè", "stress".' },
       ];
     }
     advice = fixCoachEmoji(advice);
@@ -283,7 +283,7 @@ router.get('/roleplay', async (req, res) => {
     const text = (entry.event_text || '').trim();
     if (!text) return res.json({ roleplay: null, message: 'Nhật ký gần nhất chưa có nội dung để phân tích.' });
 
-    const prompt = `Bạn là coach tâm lý CBT ấm áp cho học sinh/sinh viên Việt Nam. Đọc đoạn nhật ký sau và dựng ra MỘT tình huống ngắn kiểu "nếu chuyện tương tự xảy ra lần nữa" để người viết luyện cách phản ứng. Không lặp lại nguyên văn nhật ký, không phán xét, không giả định chi tiết nhạy cảm không có trong bài viết.
+    const prompt = `Bạn là coach tâm lý CBT ấm áp cho người dùng Việt Nam (có thể là học sinh, sinh viên, người đi làm, phụ huynh, người lớn tuổi... — đoán từ nội dung, đừng mặc định là học sinh). Đọc đoạn nhật ký sau và dựng ra MỘT tình huống ngắn kiểu "nếu chuyện tương tự xảy ra lần nữa" để người viết luyện cách phản ứng. Không lặp lại nguyên văn nhật ký, không phán xét, không giả định chi tiết nhạy cảm không có trong bài viết.
 Trả về JSON thuần (không markdown): {"scenario":"1-2 câu mô tả tình huống giả định","question":"câu hỏi mời người dùng viết cách họ sẽ phản ứng"}
 Nhật ký: "${text.slice(0, 500)}"`;
 
@@ -318,7 +318,7 @@ router.post('/roleplay-feedback', async (req, res) => {
     if (!scenario || !response || !response.trim())
       return res.status(400).json({ message: 'Thiếu tình huống hoặc câu trả lời.' });
 
-    const prompt = `Bạn là coach tâm lý CBT ấm áp cho học sinh/sinh viên Việt Nam.
+    const prompt = `Bạn là coach tâm lý CBT ấm áp cho người dùng Việt Nam (có thể là học sinh, sinh viên, người đi làm, phụ huynh, người lớn tuổi... — đoán từ nội dung, đừng mặc định là học sinh).
 Tình huống: "${String(scenario).slice(0, 300)}"
 Cách người dùng dự định phản ứng: "${String(response).slice(0, 500)}"
 Viết đúng 2-3 câu tiếng Việt góp ý: khen điểm tốt trong cách phản ứng (nếu có), gợi ý nhẹ nhàng để cải thiện. Giọng ấm áp, không phán xét, không chẩn đoán. Không dùng tiêu đề, bullet.`;

@@ -169,7 +169,129 @@ router.post('/me', async (req, res) => {
   } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
 });
 
+// ── Lịch hẹn tư vấn ─────────────────────────────────────────────────────────
+const APPT_STATUS_VI = { pending: 'chờ xác nhận', confirmed: 'đã xác nhận', declined: 'bị từ chối', cancelled: 'đã huỷ' };
+const fmtAppt = d => new Date(d).toLocaleString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+const mapAppt = a => ({
+  id: a.id, start_at: a.start_at, mode: a.mode, status: a.status, location: a.location, reply: a.reply,
+  note: a.note ? decryptField(a.note) : '', user_id: a.user_id, full_name: a.full_name, username: a.username,
+  counselor_name: a.counselor_name || null,
+});
+
+// GET /api/counseling/me/appointments — lịch hẹn của tôi với tổ chức hiện tại (sắp tới + 30 ngày qua)
+router.get('/me/appointments', async (req, res) => {
+  try {
+    const db = await getPool();
+    const r = await db.request().input('uid', sql.Int, req.user.id).query(`
+      SELECT a.*, c.full_name AS counselor_name
+      FROM CounselingAppointments a JOIN Users u ON u.id=a.user_id AND u.org_id=a.org_id
+      LEFT JOIN Users c ON c.id=a.counselor_id
+      WHERE a.user_id=@uid AND a.start_at >= DATEADD(DAY, -30, GETDATE())
+      ORDER BY a.start_at DESC
+    `);
+    res.json({ appointments: r.recordset.map(mapAppt) });
+  } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
+});
+
+// POST /api/counseling/me/appointments — { start_at:'YYYY-MM-DDTHH:mm' (giờ VN), mode:'offline'|'online', note }
+router.post('/me/appointments', async (req, res) => {
+  const { start_at, mode, note } = req.body;
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(start_at || '')))
+    return res.status(400).json({ message: 'Vui lòng chọn ngày giờ hẹn.' });
+  const start = new Date(start_at);
+  const now = Date.now();
+  if (isNaN(start) || start.getTime() < now + 60 * 60 * 1000)
+    return res.status(400).json({ message: 'Giờ hẹn phải sau thời điểm hiện tại ít nhất 1 tiếng.' });
+  if (start.getTime() > now + 60 * 24 * 60 * 60 * 1000)
+    return res.status(400).json({ message: 'Chỉ đặt hẹn trong vòng 60 ngày tới.' });
+  const noteStr = String(note || '').trim();
+  if (noteStr.length > 500) return res.status(400).json({ message: 'Ghi chú tối đa 500 ký tự.' });
+  try {
+    const db = await getPool();
+    const meR = await db.request().input('uid', sql.Int, req.user.id).query(`
+      SELECT u.org_id, u.full_name,
+             (SELECT COUNT(*) FROM CounselingAppointments WHERE user_id=u.id AND status='pending') AS pending_cnt
+      FROM Users u WHERE u.id=@uid AND u.org_id IS NOT NULL
+    `);
+    const me = meR.recordset[0];
+    if (!me) return res.status(400).json({ message: 'Bạn chưa chọn tổ chức trong Cài đặt → Hồ sơ.' });
+    if (me.pending_cnt >= 3) return res.status(400).json({ message: 'Bạn đang có 3 lịch hẹn chờ xác nhận — vui lòng chờ tư vấn viên phản hồi.' });
+    const cR = await db.request().input('org', sql.Int, me.org_id).query(`SELECT id FROM Users WHERE org_id=@org AND role='counselor'`);
+    if (!cR.recordset.length) return res.status(400).json({ message: 'Tổ chức của bạn chưa có tư vấn viên.' });
+    await db.request()
+      .input('org', sql.Int, me.org_id).input('uid', sql.Int, req.user.id).input('start', sql.DateTime2, start)
+      .input('mode', sql.NVarChar, mode === 'online' ? 'online' : 'offline')
+      .input('note', sql.NVarChar, noteStr ? encryptField(noteStr) : null)
+      .query(`INSERT INTO CounselingAppointments (org_id, user_id, start_at, mode, note) VALUES (@org, @uid, @start, @mode, @note)`);
+    for (const c of cR.recordset) {
+      createNotification(c.id, 'counseling', 'Yêu cầu lịch hẹn mới', `${me.full_name || 'Một thành viên'} muốn hẹn lúc ${fmtAppt(start)}`, 'counselor');
+    }
+    res.json({ message: 'Đã gửi yêu cầu hẹn — bạn sẽ nhận thông báo khi tư vấn viên xác nhận.' });
+  } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
+});
+
+// POST /api/counseling/me/appointments/:id/cancel — tự huỷ hẹn chưa diễn ra
+router.post('/me/appointments/:id/cancel', async (req, res) => {
+  try {
+    const db = await getPool();
+    const r = await db.request().input('id', sql.Int, parseInt(req.params.id)).input('uid', sql.Int, req.user.id).query(`
+      UPDATE CounselingAppointments SET status='cancelled', updated_at=GETDATE()
+      OUTPUT INSERTED.org_id, INSERTED.counselor_id, INSERTED.start_at
+      WHERE id=@id AND user_id=@uid AND status IN ('pending','confirmed') AND start_at > GETDATE()
+    `);
+    const a = r.recordset[0];
+    if (!a) return res.status(404).json({ message: 'Không tìm thấy lịch hẹn có thể huỷ.' });
+    const cR = await db.request().input('org', sql.Int, a.org_id).input('cid', sql.Int, a.counselor_id)
+      .query(`SELECT id FROM Users WHERE role='counselor' AND org_id=@org AND (@cid IS NULL OR id=@cid)`);
+    cR.recordset.forEach(c => createNotification(c.id, 'counseling', 'Thành viên đã huỷ lịch hẹn', `Lịch hẹn ${fmtAppt(a.start_at)} đã bị huỷ`, 'counselor'));
+    res.json({ message: 'Đã huỷ lịch hẹn.' });
+  } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
+});
+
 // ── Tư vấn viên ─────────────────────────────────────────────────────────────
+
+// GET /api/counseling/c/appointments — lịch hẹn của tổ chức: đang chờ + sắp tới + 7 ngày qua
+router.get('/c/appointments', counselorMiddleware, async (req, res) => {
+  try {
+    const db = await getPool();
+    const r = await db.request().input('org', sql.Int, req.orgId).query(`
+      SELECT a.*, u.full_name, u.username, c.full_name AS counselor_name
+      FROM CounselingAppointments a JOIN Users u ON u.id=a.user_id LEFT JOIN Users c ON c.id=a.counselor_id
+      WHERE a.org_id=@org AND (a.status='pending' OR a.start_at >= DATEADD(DAY, -7, GETDATE()))
+      ORDER BY CASE WHEN a.status='pending' THEN 0 ELSE 1 END, a.start_at
+    `);
+    res.json({ appointments: r.recordset.map(mapAppt) });
+  } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
+});
+
+// POST /api/counseling/c/appointments/:id — { status:'confirmed'|'declined'|'cancelled', location, reply }
+router.post('/c/appointments/:id', counselorMiddleware, async (req, res) => {
+  const { status } = req.body;
+  const location = String(req.body.location || '').trim().slice(0, 300);
+  const reply    = String(req.body.reply || '').trim().slice(0, 300);
+  if (!['confirmed', 'declined', 'cancelled'].includes(status)) return res.status(400).json({ message: 'Trạng thái không hợp lệ.' });
+  if (status === 'confirmed' && !location) return res.status(400).json({ message: 'Nhập phòng gặp hoặc link họp online để xác nhận.' });
+  // Chỉ chuyển hợp lệ: chờ → xác nhận/từ chối; đã xác nhận → huỷ
+  const from = status === 'cancelled' ? "'confirmed'" : "'pending'";
+  try {
+    const db = await getPool();
+    const r = await db.request()
+      .input('id', sql.Int, parseInt(req.params.id)).input('org', sql.Int, req.orgId).input('cid', sql.Int, req.user.id)
+      .input('status', sql.NVarChar, status).input('loc', sql.NVarChar, location || null).input('reply', sql.NVarChar, reply || null)
+      .query(`
+        UPDATE CounselingAppointments
+        SET status=@status, counselor_id=@cid, updated_at=GETDATE(),
+            location=CASE WHEN @status='confirmed' THEN @loc ELSE location END, reply=@reply
+        OUTPUT INSERTED.user_id, INSERTED.start_at
+        WHERE id=@id AND org_id=@org AND status=${from}
+      `);
+    const a = r.recordset[0];
+    if (!a) return res.status(404).json({ message: 'Lịch hẹn không còn ở trạng thái phù hợp — tải lại trang.' });
+    const body = `Lịch hẹn ${fmtAppt(a.start_at)} ${APPT_STATUS_VI[status]}` + (status === 'confirmed' ? ` — ${location}` : reply ? ` — ${reply}` : '');
+    createNotification(a.user_id, 'counseling', 'Cập nhật lịch hẹn tư vấn', body, 'counseling');
+    res.json({ message: 'Đã cập nhật lịch hẹn.' });
+  } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
+});
 
 // GET /api/counseling/c/overview — thông tin tổ chức + mood tổng hợp ẩn danh + danh sách hội thoại
 router.get('/c/overview', counselorMiddleware, async (req, res) => {
@@ -303,6 +425,7 @@ router.delete('/admin/orgs/:id', adminMiddleware, async (req, res) => {
     const db = await getPool();
     await db.request().input('id', sql.Int, id).query(`
       DELETE FROM CounselingMessages WHERE org_id=@id;
+      DELETE FROM CounselingAppointments WHERE org_id=@id;
       UPDATE Users SET role='user' WHERE org_id=@id AND role='counselor';
       DELETE FROM Organizations WHERE id=@id;
     `);

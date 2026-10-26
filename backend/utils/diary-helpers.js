@@ -111,7 +111,7 @@ function ruleBasedCompanion(moodScore) {
 
 async function companionMessage(text, moodScore) {
   if ((text || '').trim().length > 20) {
-    const prompt = `Bạn là người đồng hành ấm áp, không phán xét, trong ứng dụng nhật ký "Soul Diary" dành cho học sinh/sinh viên Việt Nam. Họ vừa viết:
+    const prompt = `Bạn là người đồng hành ấm áp, không phán xét, trong ứng dụng nhật ký "Soul Diary" dành cho người dùng Việt Nam (có thể là học sinh, sinh viên, người đi làm, phụ huynh, người lớn tuổi... — đoán từ nội dung, đừng mặc định là học sinh). Họ vừa viết:
 "${text.slice(0,800)}"
 Điểm tâm trạng: ${moodScore}/10
 Hãy viết đúng 2-3 câu tiếng Việt thuần văn xuôi (không markdown, không gạch đầu dòng, không JSON): một lời phản hồi ấm áp, đồng cảm, KHÔNG lặp lại nguyên văn nhật ký, và kết thúc bằng một câu hỏi gợi mở nhẹ nhàng để họ suy ngẫm thêm. Giọng văn tự nhiên, gần gũi, không giáo điều, không dùng emoji.`;

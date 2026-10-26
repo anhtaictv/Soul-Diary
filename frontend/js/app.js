@@ -732,7 +732,7 @@ const App = (() => {
     const box = document.getElementById('ambience-music-suggest');
     if (!box) return;
     const moodCat = ambienceMoodCategory(score);
-    const labels  = { chill:'🌿 Thư giãn', focus:'📖 Tập trung học bài', sleep:'🌙 Dễ ngủ', nature:'🍃 Thiên nhiên' };
+    const labels  = { chill:'🌿 Thư giãn', focus:'📖 Tập trung', sleep:'🌙 Dễ ngủ', nature:'🍃 Thiên nhiên' };
     box.style.display = '';
     box.innerHTML = `<button class="tag ambience-suggest-btn" onclick="App.suggestAmbienceMusic('${moodCat}')">🎵 Nghe nhạc ${labels[moodCat]} phù hợp tâm trạng này</button>`;
   }
@@ -3844,7 +3844,7 @@ const App = (() => {
   }
 
   // ── Lịch Học tập (v1.8) ───────────────────────────────────────────────
-  const STUDY_TYPE_LABEL = { exam:'🔴 Thi/Kiểm tra', deadline:'🔶 Deadline', assignment:'💛 Bài tập', other:'🔵 Khác' };
+  const STUDY_TYPE_LABEL = { exam:'🔴 Thi/Kiểm tra', deadline:'🔶 Deadline', assignment:'💛 Bài tập / Công việc', other:'🔵 Khác' };
 
   async function initStudyPage() {
     const today = new Date().toISOString().split('T')[0];
@@ -5278,13 +5278,124 @@ const App = (() => {
           </div>
           <textarea class="form-input" id="counseling-input" rows="3" maxlength="2000" placeholder="Viết tin nhắn cho tư vấn viên..."></textarea>
           <button class="btn-primary" id="counseling-send-btn" style="margin-top:8px" onclick="App.sendCounseling()">Gửi</button>
-        </div>`;
+        </div>
+        <div id="my-appointments" style="margin-top:12px"></div>`;
       const t = document.getElementById('counseling-thread');
       if (t) t.scrollTop = t.scrollHeight;
       loadCounselingBadge();
+      renderMyAppointments();
     } catch (err) {
       el.innerHTML = `<div class="card" style="padding:16px;color:var(--text-muted)">Không tải được: ${escapeHtml(err.message)}</div>`;
     }
+  }
+
+  // ── Lịch hẹn tư vấn ──
+  const APPT_STATUS = {
+    pending:   { label: '⏳ Chờ xác nhận', color: '#d97706' },
+    confirmed: { label: '✅ Đã xác nhận',  color: '#059669' },
+    declined:  { label: '✕ Bị từ chối',    color: '#dc2626' },
+    cancelled: { label: '⊘ Đã huỷ',        color: 'var(--text-muted)' },
+  };
+  const _fmtAppt = d => new Date(d).toLocaleString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const _apptMode = m => m === 'online' ? '💻 Online' : '🏢 Gặp trực tiếp';
+
+  // datetime-local cần 'YYYY-MM-DDTHH:mm' theo giờ máy — min = 1 tiếng nữa (khớp kiểm tra ở server)
+  function _localDateTimeInput(offsetMs) {
+    const d = new Date(Date.now() + offsetMs);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  }
+
+  async function renderMyAppointments() {
+    const el = document.getElementById('my-appointments');
+    if (!el) return;
+    let list = [];
+    try { list = (await API.getMyAppointments()).appointments; } catch (_) {}
+    el.innerHTML = `<div class="card" style="padding:14px">
+      <div style="font-weight:700;margin-bottom:10px">📅 Đặt lịch hẹn gặp tư vấn viên</div>
+      ${list.map(a => {
+        const st = APPT_STATUS[a.status] || APPT_STATUS.pending;
+        const canCancel = ['pending', 'confirmed'].includes(a.status) && new Date(a.start_at) > new Date();
+        return `<div style="padding:10px 0;border-top:1px solid var(--border);font-size:13px;line-height:1.6">
+          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <strong>${_fmtAppt(a.start_at)}</strong><span style="color:${st.color};font-weight:600">${st.label}</span>
+          </div>
+          <div style="color:var(--text-muted)">${_apptMode(a.mode)}${a.counselor_name ? ' · ' + escapeHtml(a.counselor_name) : ''}</div>
+          ${a.status === 'confirmed' && a.location ? `<div>📍 ${escapeHtml(a.location)}</div>` : ''}
+          ${a.reply ? `<div style="color:var(--text-muted)">💬 ${escapeHtml(a.reply)}</div>` : ''}
+          ${canCancel ? `<button class="btn-outline" style="width:auto;padding:4px 12px;font-size:12px;margin-top:4px" onclick="App.cancelMyAppointment(${a.id})">Huỷ hẹn</button>` : ''}
+        </div>`;
+      }).join('')}
+      <div style="border-top:1px solid var(--border);padding-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px">
+        <input type="datetime-local" class="form-input" id="appt-start" min="${_localDateTimeInput(3600000)}" max="${_localDateTimeInput(60 * 86400000)}" />
+        <select class="form-input" id="appt-mode">
+          <option value="offline">🏢 Gặp trực tiếp</option>
+          <option value="online">💻 Online</option>
+        </select>
+      </div>
+      <textarea class="form-input" id="appt-note" rows="2" maxlength="500" style="margin-top:8px" placeholder="Muốn trao đổi về điều gì? (không bắt buộc, chỉ tư vấn viên đọc được)"></textarea>
+      <button class="btn-primary" id="appt-book-btn" style="margin-top:8px" onclick="App.bookAppointment()">Gửi yêu cầu hẹn</button>
+    </div>`;
+  }
+
+  async function bookAppointment() {
+    const start_at = document.getElementById('appt-start')?.value;
+    if (!start_at) { showToast('⚠️ Chọn ngày giờ muốn hẹn'); return; }
+    const btn = document.getElementById('appt-book-btn');
+    if (btn) btn.disabled = true;
+    try {
+      const d = await API.bookAppointment({ start_at, mode: document.getElementById('appt-mode')?.value, note: document.getElementById('appt-note')?.value });
+      showToast('✅ ' + d.message);
+      renderMyAppointments();
+    } catch (err) { showToast('❌ ' + err.message); if (btn) btn.disabled = false; }
+  }
+
+  async function cancelMyAppointment(id) {
+    if (!confirm('Huỷ lịch hẹn này?')) return;
+    try { await API.cancelMyAppointment(id); showToast('Đã huỷ lịch hẹn.'); renderMyAppointments(); }
+    catch (err) { showToast('❌ ' + err.message); }
+  }
+
+  async function renderCounselorAppointments() {
+    const el = document.getElementById('counselor-appointments');
+    if (!el) return;
+    let list = [];
+    try { list = (await API.counselorAppointments()).appointments; } catch (_) {}
+    el.innerHTML = `<div class="card" style="padding:14px;margin-bottom:12px">
+      <div style="font-weight:700;margin-bottom:6px">📅 Lịch hẹn</div>
+      ${list.length ? list.map(a => {
+        const st = APPT_STATUS[a.status] || APPT_STATUS.pending;
+        const upcoming = new Date(a.start_at) > new Date();
+        return `<div style="padding:10px 0;border-top:1px solid var(--border);font-size:13px;line-height:1.6">
+          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <span><strong>${_fmtAppt(a.start_at)}</strong> · ${escapeHtml(a.full_name || a.username)} · ${_apptMode(a.mode)}</span>
+            <span style="color:${st.color};font-weight:600">${st.label}</span>
+          </div>
+          ${a.note ? `<div style="white-space:pre-wrap">📝 ${escapeHtml(a.note)}</div>` : ''}
+          ${a.status === 'confirmed' && a.location ? `<div>📍 ${escapeHtml(a.location)}${a.counselor_name ? ' · ' + escapeHtml(a.counselor_name) : ''}</div>` : ''}
+          ${a.status === 'pending' ? `
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+              <input class="form-input" id="appt-loc-${a.id}" style="flex:1;min-width:180px" maxlength="300" placeholder="${a.mode === 'online' ? 'Link Google Meet / Zoom' : 'Phòng / địa điểm gặp'}" />
+              <button class="btn-primary" style="width:auto;padding:6px 14px" onclick="App.counselorSetAppointment(${a.id},'confirmed')">Xác nhận</button>
+              <button class="btn-outline" style="width:auto;padding:6px 14px" onclick="App.counselorSetAppointment(${a.id},'declined')">Từ chối</button>
+            </div>` : ''}
+          ${a.status === 'confirmed' && upcoming ? `<button class="btn-outline" style="width:auto;padding:4px 12px;font-size:12px;margin-top:4px" onclick="App.counselorSetAppointment(${a.id},'cancelled')">Huỷ hẹn</button>` : ''}
+        </div>`;
+      }).join('') : '<div style="font-size:13px;color:var(--text-muted)">Chưa có lịch hẹn nào.</div>'}
+    </div>`;
+  }
+
+  async function counselorSetAppointment(id, status) {
+    const body = { status };
+    if (status === 'confirmed') {
+      body.location = (document.getElementById(`appt-loc-${id}`)?.value || '').trim();
+      if (!body.location) { showToast('⚠️ Nhập phòng gặp hoặc link họp trước khi xác nhận'); return; }
+    } else {
+      const reply = prompt(status === 'declined' ? 'Lý do từ chối / đề xuất giờ khác (gửi cho thành viên, có thể bỏ trống):' : 'Lý do huỷ (gửi cho thành viên, có thể bỏ trống):');
+      if (reply === null) return;
+      body.reply = reply;
+    }
+    try { await API.counselorSetAppointment(id, body); showToast('✅ Đã cập nhật lịch hẹn'); renderCounselorAppointments(); }
+    catch (err) { showToast('❌ ' + err.message); }
   }
 
   async function sendCounseling() {
@@ -5329,6 +5440,7 @@ const App = (() => {
           ${stat(s.low_mood_members_7d, 'Người có ngày mood ≤3')}
         </div>
         ${s.active_7d === null ? `<div style="font-size:12px;color:var(--text-muted);margin:-4px 0 12px">Số liệu tổng hợp chỉ hiện khi có từ ${s.min_aggregate} người ghi nhật ký trong 7 ngày (tránh lộ danh tính).</div>` : ''}
+        <div id="counselor-appointments"></div>
         <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:12px" class="counselor-grid">
           <div class="card" style="padding:8px">
             ${d.threads.length ? d.threads.map(t => `
@@ -5338,12 +5450,13 @@ const App = (() => {
                   ${t.unread ? `<span class="nav-badge-dot" style="position:static;display:inline-block"></span>` : ''}
                 </div>
                 <div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(t.last_content)}</div>
-              </div>`).join('') : '<div style="padding:16px;font-size:13px;color:var(--text-muted)">Chưa có ai nhắn. Thành viên chọn tổ chức của bạn trong hồ sơ sẽ thấy mục 💬 Tư vấn viên.</div>'}
+              </div>`).join('') : '<div style="padding:16px;font-size:13px;color:var(--text-muted)">Chưa có ai nhắn. Thành viên chọn tổ chức của bạn trong hồ sơ sẽ thấy mục 🙋 Tư vấn viên.</div>'}
           </div>
           <div class="card" style="padding:14px" id="counselor-thread-pane">
             <div style="font-size:13px;color:var(--text-muted)">Chọn một hội thoại để xem.</div>
           </div>
         </div>`;
+      renderCounselorAppointments();
     } catch (err) {
       el.innerHTML = `<div class="card" style="padding:16px;color:var(--text-muted)">Không tải được: ${escapeHtml(err.message)}</div>`;
     }
@@ -7109,7 +7222,7 @@ const App = (() => {
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   }
 
-  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,toggleExerciseTimer,toggleNavGroup,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openPsychTest,startPsychTest,selectPsychTestAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,toggleAdvancedSearch,applyTheme,toggleThemePicker,loadMoreDiary,saveSafetyPlan,sendCounseling,openCounselorThread,counselorReply,
+  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,toggleExerciseTimer,toggleNavGroup,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openPsychTest,startPsychTest,selectPsychTestAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,toggleAdvancedSearch,applyTheme,toggleThemePicker,loadMoreDiary,saveSafetyPlan,sendCounseling,openCounselorThread,counselorReply,bookAppointment,cancelMyAppointment,counselorSetAppointment,
     pinInput,pinDelete,setPinLock,managePinLock,installPWA,showMemoryCard,showYearInReviewCard,setA11yFontSize,toggleHighContrast,toggleReduceMotion,toggleLooseText,createFutureLetter,deleteFutureLetter,exportUserData,
     openPMRModal,openBodyScanModal,openGroundingModal,startGrounding,toggleGroundingItem,nextGroundingStep,openGratitudeModal,gratitudeNext,gratitudeBack,
     handleAvatarUpload,removeAvatar,_applyWritingHour,renderEmotionRadar,
