@@ -6,6 +6,7 @@ const Auth = (() => {
     document.getElementById('form-register').style.display        = tab === 'register' ? 'block' : 'none';
     document.getElementById('form-forgot-password').style.display = 'none';
     document.getElementById('form-reset-password').style.display  = 'none';
+    document.getElementById('form-org-register').style.display    = 'none';
     document.querySelector('.auth-tabs').style.display = '';
     document.getElementById('tab-login').classList.toggle('active',    tab === 'login');
     document.getElementById('tab-register').classList.toggle('active', tab === 'register');
@@ -17,6 +18,7 @@ const Auth = (() => {
     document.getElementById('form-register').style.display        = 'none';
     document.getElementById('form-forgot-password').style.display = 'block';
     document.getElementById('form-reset-password').style.display  = 'none';
+    document.getElementById('form-org-register').style.display    = 'none';
     document.querySelector('.auth-tabs').style.display = 'none';
     clearAlert();
   }
@@ -26,6 +28,7 @@ const Auth = (() => {
     document.getElementById('form-register').style.display        = 'none';
     document.getElementById('form-forgot-password').style.display = 'none';
     document.getElementById('form-reset-password').style.display  = 'block';
+    document.getElementById('form-org-register').style.display    = 'none';
     document.querySelector('.auth-tabs').style.display = 'none';
     document.getElementById('reset-token-value').value = token;
     clearAlert();
@@ -119,6 +122,40 @@ const Auth = (() => {
       showAlert(err.message || 'Đăng ký thất bại.');
     } finally {
       setLoading('btn-register', false);
+    }
+  }
+
+  // ── Đăng ký tổ chức (v3.11) ───────────────────────────────────────────
+  function showOrgRegister() {
+    showForgot();
+    document.getElementById('form-forgot-password').style.display = 'none';
+    document.getElementById('form-org-register').style.display    = 'block';
+  }
+
+  async function registerOrg() {
+    clearAlert();
+    const v = id => document.getElementById(id).value.trim();
+    const body = {
+      org_name: v('org-reg-name'), org_type: v('org-reg-type'), proof: v('org-reg-proof'),
+      full_name: v('org-reg-fullname'), phone: v('org-reg-phone'),
+      username: v('org-reg-username'), email: v('org-reg-email'),
+      password: document.getElementById('org-reg-password').value,
+    };
+    if (!body.org_name || !body.proof || !body.full_name || !body.username || !body.email || !body.password) {
+      showAlert('Vui lòng điền đầy đủ thông tin (số điện thoại có thể bỏ trống).');
+      return;
+    }
+    if (body.password.length < 6) { showAlert('Mật khẩu phải ít nhất 6 ký tự.'); return; }
+    setLoading('btn-org-register', true);
+    try {
+      const d = await API.registerOrg(body);
+      document.querySelectorAll('#form-org-register input, #form-org-register textarea').forEach(el => { el.value = ''; });
+      showTab('login');
+      showAlert(d.message, 'success');
+    } catch (err) {
+      showAlert(err.message || 'Gửi đăng ký thất bại.');
+    } finally {
+      setLoading('btn-org-register', false);
     }
   }
 
@@ -287,7 +324,7 @@ const Auth = (() => {
     }
   }
 
-  return { showTab, showForgot, showReset, forgotPassword, resetPassword, login, register, logout, togglePwd, updateSidebarUser, getUser, bootstrap };
+  return { showTab, showForgot, showReset, showOrgRegister, registerOrg, forgotPassword, resetPassword, login, register, logout, togglePwd, updateSidebarUser, getUser, bootstrap };
 })();
 
 document.addEventListener('DOMContentLoaded', () => {

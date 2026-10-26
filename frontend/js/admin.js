@@ -155,8 +155,22 @@ const Admin = (() => {
     if (!el) return;
     el.innerHTML = '<div class="loading-text">Đang tải...</div>';
     try {
-      const { orgs } = await API.adminOrgs();
+      const [{ orgs }, { registrations }] = await Promise.all([API.adminOrgs(), API.adminOrgRegistrations()]);
       el.innerHTML = `
+        ${registrations.length ? `
+        <div class="card" style="padding:16px;margin-bottom:16px;border-left:3px solid #d97706">
+          <div style="font-weight:700;margin-bottom:10px">⏳ Chờ duyệt (${registrations.length})</div>
+          ${registrations.map(g => `
+            <div style="padding:10px 0;border-top:1px solid var(--border);font-size:13px;line-height:1.6">
+              <div><strong>${escapeHtml(g.org_name)}</strong> <span style="color:var(--text-muted)">· ${ORG_TYPES[g.org_type] || ''} · ${new Date(g.created_at).toLocaleDateString('vi-VN')}</span></div>
+              <div>👤 ${escapeHtml(g.full_name)} · ${escapeHtml(g.email)}${g.phone ? ' · 📞 ' + escapeHtml(g.phone) : ''} · <span style="color:var(--text-muted)">tài khoản: ${escapeHtml(g.username)}</span></div>
+              <div style="background:var(--bg);border-radius:8px;padding:8px;margin:6px 0;white-space:pre-wrap">🔎 ${escapeHtml(g.proof)}</div>
+              <div style="display:flex;gap:8px">
+                <button class="btn-primary" style="width:auto;padding:6px 16px" onclick="Admin.approveOrg(${g.id})">✅ Duyệt</button>
+                <button class="btn-outline" style="width:auto;padding:6px 16px" onclick="Admin.rejectOrg(${g.id})">✕ Từ chối</button>
+              </div>
+            </div>`).join('')}
+        </div>` : ''}
         <div class="card" style="padding:16px;margin-bottom:16px">
           <div style="font-weight:700;margin-bottom:4px">➕ Thêm tổ chức</div>
           <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">Thành viên chọn đúng tên này trong Cài đặt → Hồ sơ sẽ thuộc tổ chức. Người đã nhập trùng tên từ trước được gắn tự động.</div>
@@ -221,6 +235,19 @@ const Admin = (() => {
       showToast('✅ Đã cấp tài khoản — gửi tên đăng nhập & mật khẩu cho tư vấn viên.');
       loadOrgsPanel();
     } catch (e) { showToast('❌ ' + e.message); }
+  }
+
+  async function approveOrg(id) {
+    if (!confirm('Duyệt đăng ký này? Hệ thống sẽ tạo tổ chức và tài khoản tư vấn viên cho người đăng ký.')) return;
+    try { const d = await API.adminApproveOrg(id); showToast('✅ ' + d.message); loadOrgsPanel(); }
+    catch (e) { showToast('❌ ' + e.message); }
+  }
+
+  async function rejectOrg(id) {
+    const reason = prompt('Lý do từ chối (gửi kèm email cho người đăng ký, có thể bỏ trống):');
+    if (reason === null) return;
+    try { await API.adminRejectOrg(id, reason); showToast('Đã từ chối.'); loadOrgsPanel(); }
+    catch (e) { showToast('❌ ' + e.message); }
   }
 
   async function revokeCounselor(id) {
@@ -1019,6 +1046,6 @@ const Admin = (() => {
     showAddFlagForm, submitAddFlag,
     toggleFlag, deleteFlag, releaseAll, scheduleRelease, revokeAll,
     showNewAnnouncementForm, submitNewAnnouncement, toggleAnnouncement, deleteAnnouncementConfirm,
-    createOrg, deleteOrg, createCounselor, revokeCounselor,
+    createOrg, deleteOrg, createCounselor, revokeCounselor, approveOrg, rejectOrg,
   };
 })();

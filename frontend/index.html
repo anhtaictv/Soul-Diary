@@ -91,6 +91,66 @@
           <input class="text-input" type="password" id="reg-confirm" placeholder="Nhập lại mật khẩu" />
         </div>
         <button class="btn-auth" id="btn-register" onclick="Auth.register()"><span>Tạo tài khoản</span></button>
+        <div style="text-align:center;margin-top:12px">
+          <button type="button" class="auth-text-btn" onclick="Auth.showOrgRegister()">🏫 Đăng ký cho trường, công ty, tổ chức</button>
+        </div>
+      </div>
+
+      <!-- ĐĂNG KÝ TỔ CHỨC (v3.11) — admin xác minh rồi duyệt -->
+      <div id="form-org-register" style="display:none">
+        <div style="text-align:center;margin-bottom:16px">
+          <div style="font-size:32px;margin-bottom:8px">🏫</div>
+          <p style="color:var(--text-muted);font-size:13px;margin:0">Đưa Soul Diary đến thành viên của tổ chức bạn. Người đăng ký sẽ là tư vấn viên đầu tiên — quản trị viên xác minh rồi duyệt.</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tên tổ chức</label>
+          <input class="text-input" type="text" id="org-reg-name" placeholder="VD: THPT Nguyễn Du, Công ty ABC" maxlength="100" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Loại tổ chức</label>
+          <select class="text-input" id="org-reg-type">
+            <option value="school">🏫 Trường học</option>
+            <option value="company">🏢 Công ty</option>
+            <option value="community">🤝 Cộng đồng</option>
+            <option value="clinic">🏥 Phòng khám</option>
+            <option value="other">📌 Khác</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Thông tin xác minh</label>
+          <textarea class="text-input" id="org-reg-proof" rows="3" maxlength="500" placeholder="Website, địa chỉ, chức vụ của bạn trong tổ chức... để quản trị viên xác minh"></textarea>
+        </div>
+        <div class="grid-2" style="gap:12px">
+          <div class="form-group">
+            <label class="form-label">Họ tên người phụ trách</label>
+            <input class="text-input" type="text" id="org-reg-fullname" placeholder="Nguyễn Văn A" maxlength="100" autocomplete="name" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Số điện thoại</label>
+            <input class="text-input" type="tel" id="org-reg-phone" placeholder="09xx xxx xxx" maxlength="30" autocomplete="tel" />
+          </div>
+        </div>
+        <div class="grid-2" style="gap:12px">
+          <div class="form-group">
+            <label class="form-label">Tên đăng nhập</label>
+            <input class="text-input" type="text" id="org-reg-username" placeholder="vd: tuvan_nguyendu" maxlength="50" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input class="text-input" type="email" id="org-reg-email" placeholder="abc@truong.edu.vn" maxlength="100" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mật khẩu (ít nhất 6 ký tự)</label>
+          <div class="input-wrap">
+            <input class="text-input" type="password" id="org-reg-password" placeholder="Tạo mật khẩu" autocomplete="new-password" />
+            <button class="eye-btn" onclick="Auth.togglePwd('org-reg-password',this)" aria-label="Hiện/ẩn mật khẩu">👁</button>
+          </div>
+        </div>
+        <button class="btn-auth" id="btn-org-register" onclick="Auth.registerOrg()"><span>Gửi đăng ký</span></button>
+        <div style="text-align:center;margin-top:12px">
+          <button type="button" class="auth-text-btn" onclick="Auth.showTab('login')">← Quay lại đăng nhập</button>
+        </div>
       </div>
       <!-- QUÊN MẬT KHẨU -->
       <div id="form-forgot-password" style="display:none">

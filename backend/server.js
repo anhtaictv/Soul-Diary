@@ -96,6 +96,7 @@ app.use('/api/notes',          apiLimiter, require('./routes/notes'));
 app.use('/api/notifications',  apiLimiter, require('./routes/notifications'));
 app.use('/api/announcements',  apiLimiter, require('./routes/announcements'));
 app.use('/api/game',           apiLimiter, require('./routes/game'));
+app.use('/api/counseling/register', authLimiter); // form đăng ký tổ chức công khai — giới hạn như đăng ký tài khoản
 app.use('/api/counseling',     apiLimiter, require('./routes/counseling'));
 
 // Health check

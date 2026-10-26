@@ -1664,6 +1664,27 @@ async function initSchema() {
     CREATE INDEX IX_CounselingMessages_thread ON CounselingMessages(org_id, user_id, created_at)
   `);
 
+  // Tổ chức tự đăng ký → admin duyệt. Người đăng ký thành tư vấn viên đầu tiên khi được duyệt;
+  // mật khẩu băm ngay lúc gửi. Organizations chỉ chứa tổ chức đã duyệt.
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='OrgRegistrations' AND xtype='U')
+    CREATE TABLE OrgRegistrations (
+      id            INT IDENTITY(1,1) PRIMARY KEY,
+      org_name      NVARCHAR(100) NOT NULL,
+      org_type      NVARCHAR(20)  NOT NULL,
+      full_name     NVARCHAR(100) NOT NULL,
+      phone         NVARCHAR(30)  NULL,
+      proof         NVARCHAR(500) NULL,
+      username      NVARCHAR(50)  NOT NULL,
+      email         NVARCHAR(100) NOT NULL,
+      password_hash NVARCHAR(255) NOT NULL,
+      status        NVARCHAR(20)  NOT NULL DEFAULT 'pending',
+      reject_reason NVARCHAR(300) NULL,
+      created_at    DATETIME2 DEFAULT GETDATE(),
+      reviewed_at   DATETIME2 NULL
+    )
+  `);
+
   // ── v3.11: Kế hoạch an toàn cá nhân (Stanley-Brown Safety Plan) — mã hoá at-rest ──
   await db.request().query(`
     IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='SafetyPlans' AND xtype='U')

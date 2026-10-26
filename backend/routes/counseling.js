@@ -11,10 +11,67 @@ const adminMiddleware  = require('../middleware/admin');
 const { encryptField, decryptField } = require('../utils/diary-crypto');
 const { createNotification } = require('../utils/notifier');
 
-const router = express.Router();
-router.use(authMiddleware);
+const { createTransporter } = require('../utils/mailer');
 
+const router = express.Router();
 const ORG_TYPES = ['school', 'company', 'community', 'clinic', 'other'];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const escHtml = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// Báo kết quả duyệt qua email nếu server có cấu hình SMTP — không có thì bỏ qua (admin tự báo)
+async function mailRegistrant(to, subject, html) {
+  const transporter = createTransporter();
+  if (!transporter) return;
+  try {
+    await transporter.sendMail({ from: process.env.SMTP_FROM || `Soul Diary <${process.env.SMTP_USER}>`, to, subject, html });
+  } catch (err) { console.error('[org-register] Lỗi gửi email:', err.message); }
+}
+
+// ── Công khai: tổ chức tự đăng ký (rate limit chặt ở server.js) ─────────────
+// POST /api/counseling/register — { org_name, org_type, full_name, phone, proof, username, email, password }
+router.post('/register', async (req, res) => {
+  const b = req.body || {};
+  const orgName  = String(b.org_name || '').trim();
+  const fullName = String(b.full_name || '').trim();
+  const username = String(b.username || '').trim();
+  const email    = String(b.email || '').trim();
+  const phone    = String(b.phone || '').trim().slice(0, 30);
+  const proof    = String(b.proof || '').trim();
+  const orgType  = ORG_TYPES.includes(b.org_type) ? b.org_type : 'other';
+  if (!orgName || !fullName || !username || !email || !b.password)
+    return res.status(400).json({ message: 'Vui lòng điền đầy đủ thông tin bắt buộc.' });
+  if (orgName.length > 100 || fullName.length > 100 || username.length > 50 || email.length > 100 || proof.length > 500)
+    return res.status(400).json({ message: 'Có trường thông tin quá dài.' });
+  if (String(b.password).length < 6) return res.status(400).json({ message: 'Mật khẩu phải ít nhất 6 ký tự.' });
+  if (!EMAIL_RE.test(email)) return res.status(400).json({ message: 'Email không hợp lệ.' });
+  if (!proof) return res.status(400).json({ message: 'Vui lòng cung cấp thông tin xác minh (website, địa chỉ, chức vụ...).' });
+  try {
+    const db = await getPool();
+    const dup = await db.request()
+      .input('org', sql.NVarChar, orgName).input('u', sql.NVarChar, username).input('e', sql.NVarChar, email)
+      .query(`
+        SELECT
+          (SELECT COUNT(*) FROM Organizations WHERE name=@org)
+            + (SELECT COUNT(*) FROM OrgRegistrations WHERE org_name=@org AND status='pending') AS org_dup,
+          (SELECT COUNT(*) FROM Users WHERE username=@u OR email=@e)
+            + (SELECT COUNT(*) FROM OrgRegistrations WHERE (username=@u OR email=@e) AND status='pending') AS user_dup
+      `);
+    if (dup.recordset[0].org_dup) return res.status(409).json({ message: 'Tổ chức này đã có trên Soul Diary hoặc đang chờ duyệt.' });
+    if (dup.recordset[0].user_dup) return res.status(409).json({ message: 'Tên đăng nhập hoặc email đã được sử dụng.' });
+    const hashed = await bcrypt.hash(String(b.password), 12);
+    await db.request()
+      .input('org', sql.NVarChar, orgName).input('type', sql.NVarChar, orgType).input('n', sql.NVarChar, fullName)
+      .input('phone', sql.NVarChar, phone || null).input('proof', sql.NVarChar, proof)
+      .input('u', sql.NVarChar, username).input('e', sql.NVarChar, email).input('p', sql.NVarChar, hashed)
+      .query(`INSERT INTO OrgRegistrations (org_name, org_type, full_name, phone, proof, username, email, password_hash)
+              VALUES (@org, @type, @n, @phone, @proof, @u, @e, @p)`);
+    const admins = await db.request().query(`SELECT id FROM Users WHERE role='admin'`);
+    admins.recordset.forEach(a => createNotification(a.id, 'counseling', 'Tổ chức mới đăng ký', `${orgName} — chờ bạn duyệt`, 'admin'));
+    res.json({ message: 'Đã gửi đăng ký! Quản trị viên sẽ xác minh và duyệt — sau khi được duyệt bạn đăng nhập bằng tài khoản vừa tạo.' });
+  } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
+});
+
+router.use(authMiddleware);
 const MIN_AGGREGATE = 5; // giống Bản đồ cảm xúc trường: < 5 người thì không hiện số liệu tổng hợp (tránh lộ danh tính)
 
 function cleanContent(raw) {
@@ -276,6 +333,84 @@ router.post('/admin/counselors', adminMiddleware, async (req, res) => {
       .query(`INSERT INTO Users (username, email, password, full_name, avatar_text, role, org_id, school_name)
               VALUES (@u, @e, @p, @n, @a, 'counselor', @org, @school)`);
     res.json({ message: 'Đã cấp tài khoản tư vấn viên.' });
+  } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
+});
+
+// GET /api/counseling/admin/registrations — đăng ký tổ chức chờ duyệt (mới nhất trước)
+router.get('/admin/registrations', adminMiddleware, async (req, res) => {
+  try {
+    const db = await getPool();
+    const r = await db.request().query(`
+      SELECT id, org_name, org_type, full_name, phone, proof, username, email, created_at
+      FROM OrgRegistrations WHERE status='pending' ORDER BY created_at DESC
+    `);
+    res.json({ registrations: r.recordset });
+  } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
+});
+
+// POST /api/counseling/admin/registrations/:id/approve — tạo tổ chức + tài khoản tư vấn viên trong 1 transaction
+router.post('/admin/registrations/:id/approve', adminMiddleware, async (req, res) => {
+  try {
+    const db = await getPool();
+    const r = await db.request().input('id', sql.Int, parseInt(req.params.id))
+      .query(`SELECT * FROM OrgRegistrations WHERE id=@id AND status='pending'`);
+    const g = r.recordset[0];
+    if (!g) return res.status(404).json({ message: 'Không tìm thấy đăng ký đang chờ.' });
+    // Có thể đã bị trùng trong lúc chờ duyệt (admin tạo tay / user khác đăng ký cùng username)
+    const dup = await db.request()
+      .input('org', sql.NVarChar, g.org_name).input('u', sql.NVarChar, g.username).input('e', sql.NVarChar, g.email)
+      .query(`SELECT (SELECT COUNT(*) FROM Organizations WHERE name=@org) AS org_dup,
+                     (SELECT COUNT(*) FROM Users WHERE username=@u OR email=@e) AS user_dup`);
+    if (dup.recordset[0].org_dup) return res.status(409).json({ message: 'Tên tổ chức đã tồn tại — từ chối đăng ký này hoặc gắn tay.' });
+    if (dup.recordset[0].user_dup) return res.status(409).json({ message: 'Tên đăng nhập/email đã có người dùng — hãy từ chối và đề nghị đăng ký lại.' });
+    const linked = await db.request()
+      .input('id', sql.Int, g.id).input('org', sql.NVarChar, g.org_name).input('type', sql.NVarChar, g.org_type)
+      .input('u', sql.NVarChar, g.username).input('e', sql.NVarChar, g.email).input('p', sql.NVarChar, g.password_hash)
+      .input('n', sql.NVarChar, g.full_name).input('a', sql.NVarChar, g.full_name.substring(0, 2).toUpperCase())
+      .query(`
+        SET XACT_ABORT ON;
+        BEGIN TRAN;
+          INSERT INTO Organizations (name, org_type) VALUES (@org, @type);
+          DECLARE @oid INT = SCOPE_IDENTITY();
+          INSERT INTO Users (username, email, password, full_name, avatar_text, role, org_id, school_name)
+          VALUES (@u, @e, @p, @n, @a, 'counselor', @oid, @org);
+          UPDATE OrgRegistrations SET status='approved', reviewed_at=GETDATE() WHERE id=@id;
+          UPDATE Users SET org_id=@oid WHERE school_name=@org AND org_id IS NULL AND role='user';
+          SELECT @@ROWCOUNT AS linked;
+        COMMIT;
+      `);
+    const appUrl = process.env.APP_URL || 'https://souldiary.work.gd';
+    mailRegistrant(g.email, 'Tổ chức của bạn đã được duyệt trên Soul Diary', `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+        <h2 style="color:#2563eb">✅ Đăng ký đã được duyệt</h2>
+        <p>Xin chào <strong>${escHtml(g.full_name)}</strong>,</p>
+        <p><strong>${escHtml(g.org_name)}</strong> đã có mặt trên Soul Diary. Đăng nhập bằng tên đăng nhập <strong>${escHtml(g.username)}</strong> để vào Bàn tư vấn.</p>
+        <p>Thành viên của tổ chức chọn đúng tên tổ chức trong Cài đặt → Hồ sơ là có thể nhắn tin với bạn.</p>
+        <p><a href="${appUrl}" style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Mở Soul Diary</a></p>
+      </div>`);
+    res.json({ message: `Đã duyệt ${g.org_name}, gắn ${linked.recordset[0]?.linked || 0} thành viên có sẵn.` });
+  } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
+});
+
+// POST /api/counseling/admin/registrations/:id/reject — { reason }
+router.post('/admin/registrations/:id/reject', adminMiddleware, async (req, res) => {
+  const reason = String(req.body.reason || '').trim().slice(0, 300);
+  try {
+    const db = await getPool();
+    const r = await db.request().input('id', sql.Int, parseInt(req.params.id)).input('reason', sql.NVarChar, reason || null)
+      .query(`UPDATE OrgRegistrations SET status='rejected', reject_reason=@reason, reviewed_at=GETDATE()
+              OUTPUT INSERTED.email, INSERTED.full_name, INSERTED.org_name
+              WHERE id=@id AND status='pending'`);
+    const g = r.recordset[0];
+    if (!g) return res.status(404).json({ message: 'Không tìm thấy đăng ký đang chờ.' });
+    mailRegistrant(g.email, 'Kết quả đăng ký tổ chức trên Soul Diary', `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+        <p>Xin chào <strong>${escHtml(g.full_name)}</strong>,</p>
+        <p>Rất tiếc, đăng ký <strong>${escHtml(g.org_name)}</strong> chưa được duyệt.</p>
+        ${reason ? `<p>Lý do: ${escHtml(reason)}</p>` : ''}
+        <p>Bạn có thể bổ sung thông tin xác minh và đăng ký lại.</p>
+      </div>`);
+    res.json({ message: 'Đã từ chối.' });
   } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
 });
 
