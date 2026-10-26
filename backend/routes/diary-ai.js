@@ -113,6 +113,12 @@ Viết đúng 2-3 câu tiếng Việt: nhận xét ngắn về tuần cảm xúc
   } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
 });
 
+// AI tự chọn emoji hay ra emoji Unicode 12+ (🫂, 🪫, 🥱...) — Windows 10 không có font, hiện ô lỗi.
+// Cho AI chọn trong danh sách emoji cũ (≤ Unicode 11), ngoài danh sách thì thay 💡.
+const COACH_EMOJI = ['🌱','💙','🌟','📓','🔍','🏷️','😴','🧘','🌿','☀️','🌙','💪','🤝','💬','🎯','📚','🎵',
+  '🚶','☕','🍎','💧','🌈','✨','❤️','😊','🙏','⏰','📝','🌸','🔋','👂','🛌','🏃','🎨','📵','💡'];
+const fixCoachEmoji = advice => advice.map(a => ({ ...a, emoji: COACH_EMOJI.includes(a.emoji) ? a.emoji : '💡' }));
+
 // ── GET /api/diary/ai-coach — AI Coach phân tích nhật ký, cache 7 ngày ──
 router.get('/ai-coach', async (req, res) => {
   try {
@@ -123,7 +129,7 @@ router.get('/ai-coach', async (req, res) => {
       .query(`SELECT ai_coach_text, ai_coach_date FROM Users WHERE id = @id`);
     const row = cacheR.recordset[0];
     if (row && row.ai_coach_text && row.ai_coach_date && localDayKey(fromDateOnly(row.ai_coach_date)) === localDayKey())
-      return res.json({ advice: JSON.parse(row.ai_coach_text), cached: true });
+      return res.json({ advice: fixCoachEmoji(JSON.parse(row.ai_coach_text)), cached: true });
 
     const entriesR = await db.request().input('uid', sql.Int, uid).query(`
       SELECT TOP 30 mood_score, event_text, tags, created_at
@@ -142,6 +148,7 @@ router.get('/ai-coach', async (req, res) => {
       ).join('\n');
       const prompt = `Bạn là coach tâm lý ấm áp cho học sinh/sinh viên Việt Nam. Phân tích nhật ký cảm xúc (mood TB: ${avgMood.toFixed(1)}/10) và đưa ra đúng 3 lời khuyên thực tế, cụ thể, ấm áp.
 Trả về JSON thuần (không markdown): {"advice":[{"emoji":"🌱","title":"Tiêu đề ngắn","body":"2-3 câu cụ thể"}]}
+"emoji" CHỈ được chọn 1 trong danh sách: ${COACH_EMOJI.join(' ')}
 Nhật ký gần nhất:\n${summary}`;
 
       // 1. Gateway
@@ -180,6 +187,7 @@ Nhật ký gần nhất:\n${summary}`;
           : { emoji: '🏷️', title: 'Thêm nhãn cảm xúc', body: 'Thử thêm tags vào nhật ký để dễ nhìn lại xu hướng. Ví dụ: "học tập", "gia đình", "bạn bè", "stress".' },
       ];
     }
+    advice = fixCoachEmoji(advice);
 
     await db.request()
       .input('id',   sql.Int,      uid)
