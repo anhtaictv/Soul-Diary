@@ -515,7 +515,7 @@ const PAGES = {
   counseling: () => `
     <div class="page active" id="page-counseling">
       <div class="page-header">
-        <div class="page-title">Tư vấn viên 💬</div>
+        <div class="page-title">Tư vấn viên 🙋</div>
         <div class="page-sub">Nhắn tin riêng với tư vấn viên của trường / công ty / tổ chức bạn</div>
       </div>
       <div id="counseling-content"></div>

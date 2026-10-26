@@ -240,7 +240,9 @@ const App = (() => {
     const entriesRes = entriesSettled.status === 'fulfilled' ? entriesSettled.value : null;
     cachedEntries = entriesRes ? (entriesRes.entries || []) : [];
     const totalEntries = entriesRes ? entriesRes.pagination.total : 0;
-    const recent7    = cachedEntries.slice(0,7);
+    // Đúng nghĩa "7 ngày qua" — trước đây lấy 7 bài gần nhất nên nghỉ viết 2 tháng vẫn hiện điểm cũ
+    const weekAgo    = Date.now() - 7 * 86400000;
+    const recent7    = cachedEntries.filter(e => new Date(e.created_at).getTime() >= weekAgo);
     const avg        = recent7.length ? (recent7.reduce((a,e)=>a+e.mood_score,0)/recent7.length).toFixed(1) : '—';
     const today      = new Date().toDateString();
     const todayEntry = cachedEntries.find(e => new Date(e.created_at).toDateString() === today);

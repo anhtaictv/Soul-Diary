@@ -528,6 +528,23 @@ cron.schedule('0 3 * * *', async () => {
 });
 
 // ── Cron: Tự động phát hành tính năng theo lịch hẹn (chạy lúc 00:05 giờ VN = 17:05 UTC) ──
+// ── Cron: đặt streak về 0 khi chuỗi đã đứt (mỗi giờ, idempotent) ──────────
+// streak chỉ được tính lại lúc user viết bài → bỏ viết thì Tổng quan/sidebar/push vẫn hiện chuỗi cũ mãi.
+// Cùng luật với POST /api/diary: còn chuỗi nếu bài cuối là hôm qua, hoặc hôm kia và còn streak_freeze.
+cron.schedule('7 * * * *', async () => {
+  try {
+    const db = await getPool();
+    const r = await db.request().query(`
+      UPDATE Users SET streak = 0
+      WHERE streak > 0 AND last_entry IS NOT NULL AND (
+        last_entry < DATEADD(DAY, -2, CAST(GETDATE() AS DATE))
+        OR (last_entry = DATEADD(DAY, -2, CAST(GETDATE() AS DATE)) AND ISNULL(streak_freeze, 0) = 0)
+      )
+    `);
+    if (r.rowsAffected[0]) console.log(`[streak-cron] Đặt lại streak đã đứt cho ${r.rowsAffected[0]} user`);
+  } catch (err) { console.error('[streak-cron] Lỗi:', err.message); }
+});
+
 cron.schedule('5 17 * * *', async () => {
   try {
     const db = await getPool();

@@ -580,6 +580,10 @@ select.form-input{cursor:pointer}
 /* Responsive */
 @media(max-width:720px){
   #sidebar-hamburger{display:flex}
+  /* Nút ☰ cố định ở góc trái (10px + 44px) — chừa chỗ để không đè chữ thanh thông báo hệ thống */
+  .announcement-banner{padding-left:64px!important}
+  /* Bàn tư vấn: danh sách hội thoại + khung chat xếp dọc thay vì 1:2 (cột danh sách chỉ còn ~110px) */
+  .counselor-grid{grid-template-columns:1fr!important}
   .sidebar{
     position:fixed!important;top:0;left:0;
     height:100dvh!important;width:min(260px,80vw)!important;
