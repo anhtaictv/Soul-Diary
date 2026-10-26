@@ -1069,7 +1069,7 @@ const PAGES = {
   reflection: () => `
     <div class="page active" id="page-reflection">
       <div class="page-header">
-        <div class="page-title">🪞 Phản tư tuần</div>
+        <div class="page-title">💭 Phản tư tuần</div>
         <div class="page-sub">5 câu hỏi giúp bạn nhìn lại và phát triển mỗi tuần</div>
       </div>
 
