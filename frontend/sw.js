@@ -1,12 +1,11 @@
 // sw.js — Soul Diary Service Worker v2.5 (v3.3.1 — security/bug review follow-up)
-const CACHE_NAME    = 'souldiary-v31';
-const OFFLINE_URL   = '/offline.html';
+const CACHE_NAME    = 'souldiary-v32';
+// admin.js/game.js không precache — trang chính nạp lười, chỉ cache khi user thật sự mở tới
 const STATIC_ASSETS = [
   '/', '/index.html',
   '/css/style.css',
-  '/js/config.js', '/js/data.js', '/js/api.js',
-  '/js/auth.js', '/js/pages.js', '/js/admin.js', '/js/app.js',
-  '/js/game.js', '/js/games-extra.js',
+  '/js/config.js', '/js/data.js', '/js/app-utils.js', '/js/api.js',
+  '/js/auth.js', '/js/pages.js', '/js/app.js',
   '/soul-diary-logo.jpg', '/app-icon.jpg',
   '/manifest.webmanifest',
 ];
@@ -46,19 +45,24 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Static assets: cache-first
+  // Static assets: stale-while-revalidate — trả bản cache ngay cho nhanh, đồng thời tải bản mới
+  // về cache cho lần mở sau. Nhờ vậy deploy JS/CSS mới tự tới người dùng, không phải nhớ bump CACHE_NAME.
+  const network = fetch(event.request).then(response => {
+    // Cache API chỉ nhận request http/https — request từ extension khác
+    // (chrome-extension://, ...) lọt vào đây sẽ làm cache.put() ném lỗi.
+    if (response && response.status === 200 && event.request.method === 'GET' && url.protocol.startsWith('http')) {
+      const clone = response.clone();
+      caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+    }
+    return response;
+  });
   event.respondWith(
     caches.match(event.request).then(cached => {
-      if (cached) return cached;
-      return fetch(event.request).then(response => {
-        // Cache API chỉ nhận request http/https — request từ extension khác
-        // (chrome-extension://, ...) lọt vào đây sẽ làm cache.put() ném lỗi.
-        if (response && response.status === 200 && event.request.method === 'GET' && url.protocol.startsWith('http')) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-        }
-        return response;
-      }).catch(() => caches.match('/index.html'));
+      if (cached) {
+        event.waitUntil(network.catch(() => {}));
+        return cached;
+      }
+      return network.catch(() => caches.match('/index.html'));
     })
   );
 });

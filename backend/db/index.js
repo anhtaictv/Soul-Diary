@@ -46,14 +46,21 @@ const DEFAULT_SOS_TEXT =
 🌐 Mạng lưới Sức khỏe Tâm thần VN
 info@tamthanhvn.org — Cộng đồng trực tuyến, danh sách chuyên gia chứng nhận. (Online 24/7)`;
 
+// Giữ Promise thay vì pool: nhiều request đến cùng lúc lúc khởi động/mất kết nối sẽ chờ
+// chung 1 lần connect thay vì mỗi request tự mở thêm 1 pool. Connect lỗi → xoá để lần sau thử lại.
 async function getPool() {
   if (!pool) {
-    pool = await sql.connect(config);
-    pool.on('error', err => {
-      console.error('SQL Pool error:', err);
-      pool = null;
-    });
-    console.log('✅ Kết nối SQL Server thành công');
+    pool = new sql.ConnectionPool(config).connect()
+      .then(p => {
+        p.on('error', err => {
+          console.error('SQL Pool error:', err);
+          pool = null;
+          p.close().catch(() => {});
+        });
+        console.log('✅ Kết nối SQL Server thành công');
+        return p;
+      })
+      .catch(err => { pool = null; throw err; });
   }
   return pool;
 }

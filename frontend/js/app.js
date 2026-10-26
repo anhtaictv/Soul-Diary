@@ -6475,7 +6475,16 @@ const App = (() => {
 
   async function initAdminPage() {
     if (!_adminScriptLoaded) {
-      if (!_adminScriptLoading) _adminScriptLoading = _loadScript('js/admin.js');
+      if (!_adminScriptLoading) {
+        // EasyMDE chỉ trang admin dùng → nạp cùng admin.js thay vì chặn render index.html của mọi user
+        const css = document.createElement('link');
+        css.rel = 'stylesheet'; css.href = 'https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.css';
+        document.head.appendChild(css);
+        _adminScriptLoading = Promise.all([
+          _loadScript('https://cdn.jsdelivr.net/npm/easymde@2.18.0/dist/easymde.min.js'),
+          _loadScript('js/admin.js'),
+        ]);
+      }
       try {
         await _adminScriptLoading;
         _adminScriptLoaded = true;

@@ -76,3 +76,11 @@ jobs:
             if (Test-Path $target) { Remove-Item $target -Recurse -Force }
           }
           Copy-Item -Path "frontend\*" -Destination $dest -Recurse -Force
+
+          # Minify JS ngay tại IIS (repo vẫn giữ bản dễ đọc): app.js 87KB -> 65KB gzip.
+          # Lỗi minify không làm hỏng deploy — file gốc đã copy sẵn ở trên vẫn chạy được.
+          Push-Location $dest
+          npx -y esbuild@0.24.0 "js/*.js" --minify --outdir=js --allow-overwrite --log-level=warning
+          if ($LASTEXITCODE -ne 0) { Write-Warning "Minify JS loi, giu ban goc chua minify" }
+          Pop-Location
+          $global:LASTEXITCODE = 0
