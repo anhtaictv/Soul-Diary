@@ -595,7 +595,9 @@ select.form-input{cursor:pointer}
   .main{height:auto;padding-top:60px}
   .nav{display:block;padding:4px 0}
   .nav-item{flex:none!important;min-width:unset!important;justify-content:flex-start!important;flex-direction:row!important;gap:10px;font-size:13px!important;padding:10px 16px}
-  .grid-2,.grid-3,.grid-4{grid-template-columns:1fr}
+  .grid-2,.grid-3{grid-template-columns:1fr}
+  /* grid-4 chỉ chứa ô số liệu ngắn — 2x2 thay vì 4 ô xếp dọc chiếm gần cả màn hình */
+  .grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}
   .page{padding:16px}
   .auth-card{padding:28px 20px}
   .streak-days-row{gap:4px}

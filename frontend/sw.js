@@ -1,5 +1,5 @@
 // sw.js — Soul Diary Service Worker v2.5 (v3.3.1 — security/bug review follow-up)
-const CACHE_NAME    = 'souldiary-v40';
+const CACHE_NAME    = 'souldiary-v41';
 // admin.js/game.js không precache — trang chính nạp lười, chỉ cache khi user thật sự mở tới
 const STATIC_ASSETS = [
   '/', '/index.html',
