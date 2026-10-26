@@ -6983,7 +6983,11 @@ const App = (() => {
           else h.streak = Math.max(0, (h.streak || 1) - 1);
         }
       }
-      if (btn) {
+      // Widget Tổng quan dùng nút tròn 28px — chữ "✅ Xong" của trang Thói quen sẽ tràn ra ngoài,
+      // và số "x/y hoàn thành" + thanh tiến độ cũng phải cập nhật → vẽ lại cả widget
+      if (btn && btn.closest('#habit-dashboard-widget')) {
+        renderHabitDashboardWidget();
+      } else if (btn) {
         btn.style.background   = d.done ? 'var(--primary)' : 'transparent';
         btn.style.color        = d.done ? '#fff' : 'var(--primary)';
         btn.textContent        = d.done ? '✅ Xong' : '○ Làm';
