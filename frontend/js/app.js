@@ -2660,7 +2660,7 @@ const App = (() => {
     svg.classList.add(isTense?'pmr-tense':'pmr-relax');
     document.getElementById('pmr-zone-name').textContent=isTense?grp.tip:grp.name+' — thả lỏng hoàn toàn';
     const lbl=document.getElementById('pmr-phase-label');
-    lbl.textContent=isTense?'🔴 CO CƠ':'🟢 THẢ LỎNG'; lbl.className='pmr-phase-label '+(isTense?'tense':'relax');
+    lbl.textContent=isTense?'🔴 CO CƠ':'💚 THẢ LỎNG'; lbl.className='pmr-phase-label '+(isTense?'tense':'relax');
     document.getElementById('pmr-progress').textContent=`Nhóm cơ ${pmrGroupIdx+1} / ${PMR_ZONES.length}`;
     pmrCountdown=dur; document.getElementById('pmr-countdown').textContent=pmrCountdown;
     clearInterval(pmrInterval);
@@ -3844,7 +3844,7 @@ const App = (() => {
   }
 
   // ── Lịch Học tập (v1.8) ───────────────────────────────────────────────
-  const STUDY_TYPE_LABEL = { exam:'🔴 Thi/Kiểm tra', deadline:'🟠 Deadline', assignment:'🟡 Bài tập', other:'🔵 Khác' };
+  const STUDY_TYPE_LABEL = { exam:'🔴 Thi/Kiểm tra', deadline:'🔶 Deadline', assignment:'💛 Bài tập', other:'🔵 Khác' };
 
   async function initStudyPage() {
     const today = new Date().toISOString().split('T')[0];
@@ -5221,13 +5221,13 @@ const App = (() => {
     const filled = plan && SAFETY_SECTIONS.filter(s => (plan[s.key] || []).length);
     if (!filled || !filled.length) {
       el.innerHTML = `<div class="card" style="padding:14px;margin-bottom:12px;font-size:13px">
-        🛟 Bạn chưa có <strong>kế hoạch an toàn</strong> — chuẩn bị sẵn khi đang ổn để lúc khó khăn biết ngay mình cần làm gì.
+        🛡️ Bạn chưa có <strong>kế hoạch an toàn</strong> — chuẩn bị sẵn khi đang ổn để lúc khó khăn biết ngay mình cần làm gì.
         <button class="btn-outline" style="margin-top:8px;width:auto;padding:6px 14px" onclick="App.closeLowMoodAlert();App.nav('safety-plan')">Tạo kế hoạch</button>
       </div>`;
       return;
     }
     el.innerHTML = `<div class="card" style="padding:14px;margin-bottom:12px;text-align:left">
-      <div style="font-weight:700;margin-bottom:8px">🛟 Kế hoạch an toàn của bạn</div>
+      <div style="font-weight:700;margin-bottom:8px">🛡️ Kế hoạch an toàn của bạn</div>
       ${filled.map(s => `<div style="margin-bottom:8px"><div style="font-size:12px;font-weight:600">${s.icon} ${s.title}</div>
         <ul style="margin:4px 0 0 18px;font-size:13px;line-height:1.6">${plan[s.key].map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul></div>`).join('')}
       <button class="btn-outline" style="width:auto;padding:6px 14px" onclick="App.closeLowMoodAlert();App.nav('safety-plan')">✏️ Sửa</button>

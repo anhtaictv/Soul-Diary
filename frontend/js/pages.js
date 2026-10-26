@@ -505,7 +505,7 @@ const PAGES = {
   'safety-plan': () => `
     <div class="page active" id="page-safety-plan">
       <div class="page-header">
-        <div class="page-title">Kế hoạch an toàn 🛟</div>
+        <div class="page-title">Kế hoạch an toàn 🛡️</div>
         <div class="page-sub">Viết sẵn lúc đang ổn — để lúc khó khăn không phải tự nghĩ ra mình nên làm gì</div>
       </div>
       <div class="disclaimer">💙 <span>Theo mô hình Safety Plan (Stanley &amp; Brown) được dùng rộng rãi trong hỗ trợ khủng hoảng. Chỉ bạn xem được, nội dung được mã hoá. Nếu đang gặp nguy hiểm, hãy gọi ngay <strong>1800 599 920</strong> hoặc <strong>115</strong>.</span></div>
@@ -697,8 +697,8 @@ const PAGES = {
         <div class="grid-2" style="gap:10px;margin-bottom:12px">
           <select class="text-input" id="study-type">
             <option value="exam">🔴 Thi / Kiểm tra</option>
-            <option value="deadline">🟠 Deadline / Nộp bài</option>
-            <option value="assignment">🟡 Bài tập / Thực hành</option>
+            <option value="deadline">🔶 Deadline / Nộp bài</option>
+            <option value="assignment">💛 Bài tập / Thực hành</option>
             <option value="other">🔵 Khác</option>
           </select>
           <input class="text-input" id="study-notes" placeholder="Ghi chú (không bắt buộc)" maxlength="200" />
