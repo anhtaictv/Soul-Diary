@@ -96,6 +96,7 @@ app.use('/api/notes',          apiLimiter, require('./routes/notes'));
 app.use('/api/notifications',  apiLimiter, require('./routes/notifications'));
 app.use('/api/announcements',  apiLimiter, require('./routes/announcements'));
 app.use('/api/game',           apiLimiter, require('./routes/game'));
+app.use('/api/counseling',     apiLimiter, require('./routes/counseling'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -122,6 +123,9 @@ cron.schedule('0 * * * *', async () => {
       `SELECT enabled FROM FeatureFlags WHERE flag_key='smart_push_reminder'`
     );
     if (!flagRes.recordset.length || !flagRes.recordset[0].enabled) return;
+    // v3.11: nhắc nhở kèm nút 😊 😐 😢 ghi mood ngay trên thông báo (sw.js dựng nút khi quick_mood=true)
+    const qmRes = await db.request().query(`SELECT enabled FROM FeatureFlags WHERE flag_key='push_quick_mood'`);
+    const quickMood = !!qmRes.recordset[0]?.enabled;
 
     // Giờ hiện tại theo múi giờ Việt Nam (UTC+7)
     const vnHour = (new Date().getUTCHours() + 7) % 24;
@@ -172,7 +176,7 @@ cron.schedule('0 * * * *', async () => {
       try {
         await webpush.sendNotification(
           { endpoint: u.endpoint, keys: { p256dh: u.p256dh, auth: u.auth } },
-          JSON.stringify({ title: 'Soul Diary 📖', body }),
+          JSON.stringify({ title: 'Soul Diary 📖', body, quick_mood: quickMood }),
         );
         sentIds.push(u.id);
       } catch (pushErr) {

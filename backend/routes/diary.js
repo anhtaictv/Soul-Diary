@@ -267,18 +267,25 @@ router.get('/', async (req, res) => {
 // ── POST /api/diary — tạo nhật ký mới ───────────────────────────────────
 router.post('/', async (req, res) => {
   try {
-    let { mood_score, event_text, thoughts, gratitude, tags, audio_data, cbt_data, photos } = req.body;
+    let { mood_score, event_text, thoughts, gratitude, tags, audio_data, cbt_data, photos, quick, sleep_hours, sleep_quality } = req.body;
 
     const moodInt = parseInt(mood_score);
     if (!moodInt || moodInt < 1 || moodInt > 10)
       return res.status(400).json({ message: 'Điểm tâm trạng phải từ 1 đến 10.' });
     mood_score = moodInt;
-    if (!event_text && !thoughts && !cbt_data)
+    // quick=true: Quick Mood Log (dashboard/nút trên thông báo) chỉ ghi điểm mood, không có nội dung
+    if (!quick && !event_text && !thoughts && !cbt_data)
       return res.status(400).json({ message: 'Vui lòng viết ít nhất một dòng nhật ký.' });
     if (event_text) { event_text = String(event_text).trim(); if (event_text.length > 5000) return res.status(400).json({ message: 'Nội dung quá dài (tối đa 5000 ký tự).' }); }
     if (gratitude)  { gratitude  = String(gratitude).trim();  if (gratitude.length  > 2000) return res.status(400).json({ message: 'Phần biết ơn quá dài (tối đa 2000 ký tự).' }); }
     if (thoughts)   { thoughts   = String(thoughts).trim();   if (thoughts.length   > 3000) return res.status(400).json({ message: 'Suy nghĩ quá dài (tối đa 3000 ký tự).' }); }
     if (tags && String(tags).length > 500) return res.status(400).json({ message: 'Tags quá dài.' });
+
+    // Giờ ngủ đêm qua (tuỳ chọn) — null nếu không nhập
+    const sleepH = sleep_hours === undefined || sleep_hours === null || sleep_hours === '' ? null : Number(sleep_hours);
+    if (sleepH !== null && !(sleepH >= 0 && sleepH <= 24)) return res.status(400).json({ message: 'Giờ ngủ phải từ 0 đến 24.' });
+    const sleepQ = sleep_quality ? parseInt(sleep_quality) : null;
+    if (sleepQ !== null && !(sleepQ >= 1 && sleepQ <= 5)) return res.status(400).json({ message: 'Chất lượng giấc ngủ phải từ 1 đến 5.' });
 
     let cbtJson = null;
     if (cbt_data && typeof cbt_data === 'object') cbtJson = JSON.stringify(cbt_data);
@@ -300,10 +307,12 @@ router.post('/', async (req, res) => {
       .input('gratitude',  sql.NVarChar, encryptField(gratitude   || ''))
       .input('tags',       sql.NVarChar, tagsStr)
       .input('cbt_data',   sql.NVarChar, encryptField(cbtJson))
+      .input('sleep_hours',   sql.Float, sleepH)
+      .input('sleep_quality', sql.Int,   sleepQ)
       .query(`
-        INSERT INTO DiaryEntries (user_id, mood_score, event_text, thoughts, gratitude, tags, cbt_data)
+        INSERT INTO DiaryEntries (user_id, mood_score, event_text, thoughts, gratitude, tags, cbt_data, sleep_hours, sleep_quality)
         OUTPUT INSERTED.id, INSERTED.mood_score, INSERTED.tags, INSERTED.created_at
-        VALUES (@user_id, @mood_score, @event_text, @thoughts, @gratitude, @tags, @cbt_data)
+        VALUES (@user_id, @mood_score, @event_text, @thoughts, @gratitude, @tags, @cbt_data, @sleep_hours, @sleep_quality)
       `);
 
     // event_text/thoughts/gratitude/cbt_data đã mã hoá trong OUTPUT INSERTED — dùng lại giá trị

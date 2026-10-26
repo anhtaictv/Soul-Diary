@@ -51,6 +51,44 @@ router.put('/emergency-contact', async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
+// Kế hoạch an toàn (Stanley-Brown): mỗi mục là danh sách dòng chữ ngắn user tự viết
+const SAFETY_FIELDS = ['warning_signs', 'coping', 'distractions', 'people', 'professionals', 'environment', 'reasons'];
+
+// GET /api/user/safety-plan
+router.get('/safety-plan', async (req, res) => {
+  try {
+    const db = await getPool();
+    const r = await db.request().input('uid', sql.Int, req.user.id)
+      .query('SELECT plan_json, updated_at FROM SafetyPlans WHERE user_id=@uid');
+    if (!r.recordset.length) return res.json({ plan: null });
+    const { plan_json, updated_at } = decryptRow(r.recordset[0], ['plan_json']);
+    let plan = null;
+    try { plan = JSON.parse(plan_json); } catch {}
+    res.json({ plan, updated_at });
+  } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
+});
+
+// PUT /api/user/safety-plan — body { warning_signs:[...], coping:[...], ... }
+router.put('/safety-plan', async (req, res) => {
+  const plan = {};
+  for (const f of SAFETY_FIELDS) {
+    const arr = Array.isArray(req.body[f]) ? req.body[f] : [];
+    plan[f] = arr.map(s => String(s || '').trim().slice(0, 300)).filter(Boolean).slice(0, 10);
+  }
+  try {
+    const db = await getPool();
+    await db.request()
+      .input('uid', sql.Int, req.user.id)
+      .input('plan', sql.NVarChar, encryptField(JSON.stringify(plan)))
+      .query(`
+        MERGE SafetyPlans AS t USING (SELECT @uid AS user_id) AS s ON t.user_id = s.user_id
+        WHEN MATCHED THEN UPDATE SET plan_json=@plan, updated_at=GETDATE()
+        WHEN NOT MATCHED THEN INSERT (user_id, plan_json) VALUES (@uid, @plan);
+      `);
+    res.json({ message: 'Đã lưu kế hoạch an toàn.', plan });
+  } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
+});
+
 // GET /api/user/export — xuất toàn bộ dữ liệu người dùng
 router.get('/export', async (req, res) => {
   try {

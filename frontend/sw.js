@@ -1,5 +1,5 @@
 // sw.js — Soul Diary Service Worker v2.5 (v3.3.1 — security/bug review follow-up)
-const CACHE_NAME    = 'souldiary-v32';
+const CACHE_NAME    = 'souldiary-v33';
 // admin.js/game.js không precache — trang chính nạp lười, chỉ cache khi user thật sự mở tới
 const STATIC_ASSETS = [
   '/', '/index.html',
@@ -81,17 +81,31 @@ self.addEventListener('push', event => {
     renotify: false,
     data:    { url: data.url || '/' },
   };
+  // v3.11: nút ghi mood ngay trên thông báo — Chrome tối đa 2 nút (Notification.maxActions)
+  if (data.quick_mood) {
+    options.actions = [
+      { action: 'mood-8', title: '🙂 Tốt' },
+      { action: 'mood-4', title: '😕 Buồn' },
+    ];
+  }
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
 // ── Notification click → mở app ──────────────────────────────────────────
+// Bấm nút mood: SW không đọc được token đăng nhập (nằm ở localStorage của trang) nên mở app với
+// ?quickmood=<điểm>, App.init tự ghi Quick Mood rồi xoá tham số khỏi URL.
 self.addEventListener('notificationclick', event => {
   event.notification.close();
+  const mood = /^mood-(\d+)$/.exec(event.action || '');
+  const url  = mood ? `/?quickmood=${mood[1]}` : (event.notification.data?.url || '/');
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       const existing = list.find(c => c.url.includes(self.location.origin));
-      if (existing) return existing.focus();
-      return clients.openWindow(event.notification.data?.url || '/');
+      // navigate() chỉ chạy với tab do SW này điều khiển — tab chưa được điều khiển thì mở tab mới
+      if (existing) return mood
+        ? existing.navigate(url).then(c => (c || existing).focus()).catch(() => clients.openWindow(url))
+        : existing.focus();
+      return clients.openWindow(url);
     })
   );
 });

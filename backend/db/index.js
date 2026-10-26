@@ -1626,6 +1626,78 @@ async function initSchema() {
             'v3.10',N'Kết nối ẩn danh',1,391,GETDATE())
   `);
 
+  // ── v3.11: Tổ chức & Tư vấn viên ────────────────────────────────────────
+  // Tổ chức không chỉ là trường học: công ty, cộng đồng, phòng khám... Admin tạo tổ chức +
+  // tài khoản tư vấn viên (role='counselor', org_id). User tự chọn tổ chức trong hồ sơ
+  // (cột school_name cũ) → khớp đúng tên thì gắn org_id, tư vấn viên của tổ chức đó mới thấy.
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Organizations' AND xtype='U')
+    CREATE TABLE Organizations (
+      id         INT IDENTITY(1,1) PRIMARY KEY,
+      name       NVARCHAR(100) NOT NULL UNIQUE,
+      org_type   NVARCHAR(20)  NOT NULL DEFAULT 'school',
+      created_at DATETIME2     DEFAULT GETDATE()
+    )
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Users' AND COLUMN_NAME='org_id')
+    ALTER TABLE Users ADD org_id INT NULL REFERENCES Organizations(id) ON DELETE SET NULL
+  `);
+  // Hội thoại 1-1 giữa thành viên và (các) tư vấn viên của tổ chức — mỗi (org_id, user_id) là 1 luồng.
+  // content mã hoá at-rest như nhật ký. org_id KHÔNG cascade: SQL Server chặn 2 đường cascade
+  // (Organizations→đây và Organizations→Users→đây) — route xoá tổ chức tự xoá tin nhắn trước.
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='CounselingMessages' AND xtype='U')
+    CREATE TABLE CounselingMessages (
+      id            INT IDENTITY(1,1) PRIMARY KEY,
+      org_id        INT NOT NULL REFERENCES Organizations(id),
+      user_id       INT NOT NULL REFERENCES Users(id) ON DELETE CASCADE,
+      sender        NVARCHAR(10) NOT NULL,
+      counselor_id  INT NULL,
+      content       NVARCHAR(MAX) NOT NULL,
+      is_read       BIT NOT NULL DEFAULT 0,
+      created_at    DATETIME2 DEFAULT GETDATE()
+    )
+  `);
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name='IX_CounselingMessages_thread')
+    CREATE INDEX IX_CounselingMessages_thread ON CounselingMessages(org_id, user_id, created_at)
+  `);
+
+  // ── v3.11: Kế hoạch an toàn cá nhân (Stanley-Brown Safety Plan) — mã hoá at-rest ──
+  await db.request().query(`
+    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='SafetyPlans' AND xtype='U')
+    CREATE TABLE SafetyPlans (
+      user_id    INT PRIMARY KEY REFERENCES Users(id) ON DELETE CASCADE,
+      plan_json  NVARCHAR(MAX) NOT NULL,
+      updated_at DATETIME2 DEFAULT GETDATE()
+    )
+  `);
+
+  // sleep_tracking có cột + API thống kê từ v1.8 nhưng chưa từng có ô nhập nên vẫn tắt —
+  // v3.11 làm nốt UI, bật 1 lần (released_at NULL = chưa phát hành bao giờ; admin tắt sau vẫn giữ).
+  await db.request().query(`
+    UPDATE FeatureFlags SET enabled=1, released_at=GETDATE(), version='v3.11', version_title=N'Hiểu mình & Được hỗ trợ'
+    WHERE flag_key='sleep_tracking' AND released_at IS NULL
+  `);
+
+  const v311 = [
+    ['mood_insights',   "Điều gì ảnh hưởng tâm trạng", "Đối chiếu tag nhật ký, thói quen và giờ ngủ 90 ngày qua với điểm mood — chỉ ra những yếu tố thật sự kéo mood lên/xuống của riêng bạn", 400],
+    ['push_quick_mood', "Ghi mood ngay trên thông báo", "Thông báo nhắc nhở có sẵn nút 😊 😐 😢 — chạm 1 lần là ghi mood, không cần viết", 401],
+    ['safety_plan',     "Kế hoạch an toàn",            "Tự chuẩn bị sẵn khi đang ổn: dấu hiệu báo động, cách tự xoa dịu, người có thể gọi — tự hiện ra khi tâm trạng xuống thấp", 402],
+    ['counseling',      "Tư vấn viên tổ chức",         "Trường học, công ty, cộng đồng có tư vấn viên riêng — thành viên nhắn tin trực tiếp, tư vấn viên xem thống kê tâm trạng ẩn danh của tổ chức", 403],
+  ];
+  for (const [key, label, desc, sort] of v311) {
+    await db.request()
+      .input('key', sql.NVarChar, key).input('label', sql.NVarChar, label)
+      .input('desc', sql.NVarChar, desc).input('sort', sql.Int, sort)
+      .query(`
+        IF NOT EXISTS (SELECT * FROM FeatureFlags WHERE flag_key=@key)
+        INSERT INTO FeatureFlags (flag_key,label,description,version,version_title,enabled,sort_order,released_at)
+        VALUES (@key,@label,@desc,'v3.11',N'Hiểu mình & Được hỗ trợ',1,@sort,GETDATE())
+      `);
+  }
+
   console.log('✅ Schema đã sẵn sàng');
 }
 

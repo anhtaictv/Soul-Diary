@@ -60,6 +60,7 @@ const PAGES = {
 
       <!-- Bản đồ cảm xúc trường (v3.10, ẩn cho đến khi school_mood_map flag bật) -->
       <div id="school-mood-card" style="display:none;margin-bottom:16px"></div>
+      <div id="mood-insights-card" style="display:none;margin-bottom:16px"></div>
 
       <!-- Luyện phản ứng tình huống (v3.10, ẩn cho đến khi roleplay_cbt flag bật) -->
       <div id="roleplay-card" style="display:none;margin-bottom:16px"></div>
@@ -116,6 +117,21 @@ const PAGES = {
               <div id="diary-recent-tags" class="tag-row" style="display:none;margin-bottom:6px;gap:6px"></div>
               <div class="tag-row" id="emotion-tags"></div>
             </div>
+            ${window.FEATURES && window.FEATURES.sleep_tracking ? `
+            <div class="form-group">
+              <label class="form-label">Đêm qua bạn ngủ thế nào? <span style="font-weight:400;color:var(--text-muted)">(không bắt buộc)</span></label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <input type="number" class="form-input" id="diary-sleep-hours" min="0" max="24" step="0.5" placeholder="Số giờ ngủ" style="width:130px" />
+                <select class="form-input" id="diary-sleep-quality" style="width:auto">
+                  <option value="">Chất lượng giấc ngủ</option>
+                  <option value="5">😴 Rất ngon</option>
+                  <option value="4">🙂 Khá tốt</option>
+                  <option value="3">😐 Bình thường</option>
+                  <option value="2">😕 Chập chờn</option>
+                  <option value="1">😫 Rất tệ</option>
+                </select>
+              </div>
+            </div>` : ''}
 
             <!-- Gợi ý chủ đề viết hôm nay (ẩn cho đến khi feature soul_companion được bật) -->
             <div class="daily-prompt-card" id="daily-prompt-card" style="display:none">
@@ -482,7 +498,36 @@ const PAGES = {
           <div class="sos-banner-text">Nếu bạn đang trong tình trạng khẩn cấp hoặc có ý định tự hại, xin hãy liên hệ ngay các đường dây bên dưới.</div>
         </div>
       </div>
+      <div id="sos-safety-plan"></div>
       <div id="sos-contacts"></div>
+    </div>`,
+
+  'safety-plan': () => `
+    <div class="page active" id="page-safety-plan">
+      <div class="page-header">
+        <div class="page-title">Kế hoạch an toàn 🛟</div>
+        <div class="page-sub">Viết sẵn lúc đang ổn — để lúc khó khăn không phải tự nghĩ ra mình nên làm gì</div>
+      </div>
+      <div class="disclaimer">💙 <span>Theo mô hình Safety Plan (Stanley &amp; Brown) được dùng rộng rãi trong hỗ trợ khủng hoảng. Chỉ bạn xem được, nội dung được mã hoá. Nếu đang gặp nguy hiểm, hãy gọi ngay <strong>1800 599 920</strong> hoặc <strong>115</strong>.</span></div>
+      <div id="safety-plan-content"><div class="loading-text">Đang tải...</div></div>
+    </div>`,
+
+  counseling: () => `
+    <div class="page active" id="page-counseling">
+      <div class="page-header">
+        <div class="page-title">Tư vấn viên 💬</div>
+        <div class="page-sub">Nhắn tin riêng với tư vấn viên của trường / công ty / tổ chức bạn</div>
+      </div>
+      <div id="counseling-content"></div>
+    </div>`,
+
+  counselor: () => `
+    <div class="page active" id="page-counselor">
+      <div class="page-header">
+        <div class="page-title">Bàn tư vấn 🤝</div>
+        <div class="page-sub">Hội thoại với thành viên và tình hình chung của tổ chức</div>
+      </div>
+      <div id="counselor-content"></div>
     </div>`,
 
   admin: () => `
@@ -500,7 +545,11 @@ const PAGES = {
         <button class="tag"     data-panel="settings"  onclick="Admin.switchPanel('settings',this)">⚙️ Cài đặt</button>
         <button class="tag"     data-panel="features"  onclick="Admin.switchPanel('features',this)">🚀 Tính năng</button>
         <button class="tag"     data-panel="announcements" onclick="Admin.switchPanel('announcements',this)">📢 Thông báo</button>
+        <button class="tag"     data-panel="orgs"      onclick="Admin.switchPanel('orgs',this)">🏫 Tổ chức</button>
       </div>
+
+      <!-- Tổ chức & tư vấn viên panel (v3.11) -->
+      <div class="panel" id="adm-panel-orgs"></div>
 
       <!-- Dashboard panel -->
       <div class="panel active" id="adm-panel-dashboard">
@@ -780,8 +829,9 @@ const PAGES = {
           '<div style="text-align:right;font-size:11px;color:var(--text-hint);margin-top:3px"><span id="set-bio-count">0</span>/300</div>' +
         '</div>' +
         '<div class="form-group" id="settings-school-group" style="display:none">' +
-          '<label class="form-label">Trường <span style="color:var(--text-hint);font-size:11px">(không bắt buộc — để hiện Bản đồ cảm xúc trường)</span></label>' +
-          '<input class="text-input" id="set-school" placeholder="Ví dụ: THPT Nguyễn Du" maxlength="100" />' +
+          '<label class="form-label">Trường / Công ty / Tổ chức <span style="color:var(--text-hint);font-size:11px">(không bắt buộc — chọn đúng tên trong danh sách gợi ý để nhắn được với tư vấn viên của tổ chức)</span></label>' +
+          '<input class="text-input" id="set-school" list="set-school-orgs" placeholder="Ví dụ: THPT Nguyễn Du, Công ty ABC..." maxlength="100" autocomplete="off" />' +
+          '<datalist id="set-school-orgs"></datalist>' +
         '</div>' +
         '<button class="btn-primary" style="max-width:200px" onclick="App.saveProfileSettings()">&#128190; Lưu thay đổi</button>' +
         '<div id="set-profile-msg" class="settings-msg" style="display:none"></div>' +

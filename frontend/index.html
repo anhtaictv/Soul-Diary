@@ -208,6 +208,7 @@
               <span class="nav-group-arrow">▸</span>
             </button>
             <div class="nav-group-items"><div class="nav-group-items-inner">
+              <button class="nav-item" data-page="counseling" id="nav-counseling" style="display:none"><span class="nav-icon">🧑‍⚕️</span> Tư vấn viên<span id="counseling-badge" class="nav-badge-dot" style="display:none"></span></button>
               <button class="nav-item" data-page="inbox"      id="nav-inbox"      style="display:none"><span class="nav-icon">💌</span> Hộp thư<span id="inbox-badge" class="nav-badge-dot" style="display:none"></span></button>
               <button class="nav-item" data-page="challenges" id="nav-challenges" style="display:none"><span class="nav-icon">🏆</span> Thử thách</button>
               <button class="nav-item" data-page="community"  id="nav-community"  style="display:none"><span class="nav-icon">💙</span> Góc tâm sự</button>
@@ -247,6 +248,8 @@
 
           <div class="nav-separator"></div>
           <button class="nav-item" data-page="sos">            <span class="nav-icon">📞</span> Đường dây hỗ trợ</button>
+          <button class="nav-item" data-page="safety-plan" id="nav-safety-plan" style="display:none"><span class="nav-icon">🛟</span> Kế hoạch an toàn</button>
+          <button class="nav-item" data-page="counselor" id="nav-counselor" style="display:none"><span class="nav-icon">🤝</span> Bàn tư vấn</button>
           <button class="nav-item" data-page="admin" id="nav-admin" style="display:none"><span class="nav-icon">🛠️</span> Quản trị</button>
         </nav>
         <div class="sidebar-footer">
@@ -363,6 +366,7 @@
       <div style="font-size:13px;color:var(--text-muted);line-height:1.7;margin-bottom:22px">
         Bạn vừa trải qua những ngày không dễ dàng liên tiếp. Điều đó hoàn toàn bình thường — nhưng bạn không cần đối mặt một mình.
       </div>
+      <div id="lowmood-safety-plan" style="max-height:40vh;overflow-y:auto"></div>
       <button class="btn-primary" style="margin-bottom:10px" onclick="App.navToSOS()">💙 Xem đường dây hỗ trợ</button>
       <div>
         <button style="background:none;border:none;color:var(--text-muted);font-size:13px;cursor:pointer;padding:6px 0" onclick="App.closeLowMoodAlert()">Tôi ổn, cảm ơn bạn đã hỏi</button>

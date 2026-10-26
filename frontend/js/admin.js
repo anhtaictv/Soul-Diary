@@ -144,6 +144,89 @@ const Admin = (() => {
     if (name === 'settings')  loadSettingsPanel();
     if (name === 'features')  loadFeaturesPanel();
     if (name === 'announcements') loadAnnouncementsPanel();
+    if (name === 'orgs')      loadOrgsPanel();
+  }
+
+  // ── Tổ chức & tư vấn viên (v3.11) ─────────────────────────────────────
+  const ORG_TYPES = { school: '🏫 Trường học', company: '🏢 Công ty', community: '🤝 Cộng đồng', clinic: '🏥 Phòng khám', other: '📌 Khác' };
+
+  async function loadOrgsPanel() {
+    const el = document.getElementById('adm-panel-orgs');
+    if (!el) return;
+    el.innerHTML = '<div class="loading-text">Đang tải...</div>';
+    try {
+      const { orgs } = await API.adminOrgs();
+      el.innerHTML = `
+        <div class="card" style="padding:16px;margin-bottom:16px">
+          <div style="font-weight:700;margin-bottom:4px">➕ Thêm tổ chức</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">Thành viên chọn đúng tên này trong Cài đặt → Hồ sơ sẽ thuộc tổ chức. Người đã nhập trùng tên từ trước được gắn tự động.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <input class="text-input" id="adm-org-name" placeholder="Tên tổ chức, VD: THPT Nguyễn Du" maxlength="100" style="flex:1;min-width:200px" />
+            <select class="text-input" id="adm-org-type" style="max-width:180px">
+              ${Object.entries(ORG_TYPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}
+            </select>
+            <button class="btn-primary" style="width:auto;padding:8px 18px" onclick="Admin.createOrg()">Thêm</button>
+          </div>
+        </div>
+        ${orgs.length ? orgs.map(o => `
+          <div class="card" style="padding:16px;margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">
+              <div><strong>${escapeHtml(o.name)}</strong>
+                <span style="font-size:12px;color:var(--text-muted)"> · ${ORG_TYPES[o.org_type] || ''} · ${o.member_count} thành viên</span></div>
+              <button class="btn-outline" style="width:auto;padding:4px 12px;font-size:12px" onclick="Admin.deleteOrg(${o.id})">🗑 Xoá</button>
+            </div>
+            <div style="margin-top:10px;font-size:13px">
+              ${o.counselors.length ? o.counselors.map(c => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0">
+                  <span>🤝 ${escapeHtml(c.full_name || c.username)} <span style="color:var(--text-muted)">(${escapeHtml(c.username)} · ${escapeHtml(c.email)})</span></span>
+                  <button class="btn-outline" style="width:auto;padding:2px 10px;font-size:12px" onclick="Admin.revokeCounselor(${c.id})">Thu hồi</button>
+                </div>`).join('') : '<div style="color:var(--text-muted)">Chưa có tư vấn viên.</div>'}
+            </div>
+            <details style="margin-top:10px">
+              <summary style="cursor:pointer;font-size:13px;color:var(--primary)">➕ Cấp tài khoản tư vấn viên</summary>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-top:8px">
+                <input class="text-input" id="adm-c-name-${o.id}" placeholder="Họ tên" maxlength="100" />
+                <input class="text-input" id="adm-c-user-${o.id}" placeholder="Tên đăng nhập" maxlength="50" autocomplete="off" />
+                <input class="text-input" id="adm-c-email-${o.id}" type="email" placeholder="Email" maxlength="100" />
+                <input class="text-input" id="adm-c-pass-${o.id}" type="text" placeholder="Mật khẩu (≥ 6 ký tự)" autocomplete="new-password" />
+              </div>
+              <button class="btn-primary" style="width:auto;padding:8px 18px;margin-top:8px" onclick="Admin.createCounselor(${o.id})">Cấp tài khoản</button>
+            </details>
+          </div>`).join('') : '<div style="color:var(--text-muted);text-align:center;padding:20px">Chưa có tổ chức nào.</div>'}`;
+    } catch (e) {
+      el.innerHTML = `<div style="color:var(--text-muted);padding:20px">Không tải được: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  async function createOrg() {
+    const name = document.getElementById('adm-org-name')?.value.trim();
+    if (!name) return showToast('⚠️ Nhập tên tổ chức');
+    try {
+      const d = await API.adminCreateOrg(name, document.getElementById('adm-org-type')?.value);
+      showToast('✅ ' + d.message);
+      loadOrgsPanel();
+    } catch (e) { showToast('❌ ' + e.message); }
+  }
+
+  async function deleteOrg(id) {
+    if (!confirm('Xoá tổ chức này? Toàn bộ tin nhắn tư vấn của tổ chức sẽ bị xoá, tư vấn viên trở về tài khoản thường.')) return;
+    try { await API.adminDeleteOrg(id); showToast('🗑 Đã xoá tổ chức.'); loadOrgsPanel(); }
+    catch (e) { showToast('❌ ' + e.message); }
+  }
+
+  async function createCounselor(orgId) {
+    const v = k => document.getElementById(`adm-c-${k}-${orgId}`)?.value.trim();
+    try {
+      await API.adminCreateCounselor({ org_id: orgId, full_name: v('name'), username: v('user'), email: v('email'), password: v('pass') });
+      showToast('✅ Đã cấp tài khoản — gửi tên đăng nhập & mật khẩu cho tư vấn viên.');
+      loadOrgsPanel();
+    } catch (e) { showToast('❌ ' + e.message); }
+  }
+
+  async function revokeCounselor(id) {
+    if (!confirm('Thu hồi quyền tư vấn viên của tài khoản này?')) return;
+    try { await API.adminRevokeCounselor(id); showToast('Đã thu hồi.'); loadOrgsPanel(); }
+    catch (e) { showToast('❌ ' + e.message); }
   }
 
   // ── Dashboard ─────────────────────────────────────────────────────────
@@ -936,5 +1019,6 @@ const Admin = (() => {
     showAddFlagForm, submitAddFlag,
     toggleFlag, deleteFlag, releaseAll, scheduleRelease, revokeAll,
     showNewAnnouncementForm, submitNewAnnouncement, toggleAnnouncement, deleteAnnouncementConfirm,
+    createOrg, deleteOrg, createCounselor, revokeCounselor,
   };
 })();

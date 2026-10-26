@@ -91,7 +91,7 @@ const App = (() => {
       case 'challenges': initChallengePage();      break;
       case 'community':  initCommunityPage();      break;
       case 'settings':    initSettingsPage();       break;
-      case 'sos':         renderSOSContacts();      break;
+      case 'sos':         renderSOSContacts(); renderSafetyPlanSummary('sos-safety-plan'); break;
       case 'admin':       initAdminPage();          break;
       case 'chat':        initChatPage();           break;
       case 'study':       initStudyPage();          break;
@@ -113,6 +113,9 @@ const App = (() => {
       case 'mood-compare':    initMoodComparePage();       break;
       case 'notifications':   initNotificationsPage();    break;
       case 'profile':         initProfilePage();           break;
+      case 'safety-plan':     initSafetyPlanPage();        break;
+      case 'counseling':      initCounselingPage();        break;
+      case 'counselor':       initCounselorPage();         break;
     }
   }
 
@@ -290,6 +293,8 @@ const App = (() => {
     if (window.FEATURES && window.FEATURES.school_mood_map) loadSchoolMoodMap();
     // Luyện phản ứng tình huống (v3.10)
     if (window.FEATURES && window.FEATURES.roleplay_cbt) renderRoleplayCard();
+    // Điều gì ảnh hưởng tâm trạng (v3.11)
+    if (window.FEATURES && window.FEATURES.mood_insights) loadMoodInsights();
   }
 
   function renderRecommendations(mood) {
@@ -1044,8 +1049,11 @@ const App = (() => {
         audio_data: recordedAudioData,
         cbt_data,
         photos:     uploadedPhotos.filter(Boolean),
+        sleep_hours:   document.getElementById('diary-sleep-hours')?.value || null,
+        sleep_quality: document.getElementById('diary-sleep-quality')?.value || null,
       });
       resetDiaryForm();
+      ['diary-sleep-hours', 'diary-sleep-quality'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
       // #2: save success pulse on form card
       const card = document.getElementById('diary-form-card');
       if (card) { card.classList.add('save-success-flash'); setTimeout(() => card.classList.remove('save-success-flash'), 700); }
@@ -1194,7 +1202,10 @@ const App = (() => {
     loadInboxBadge();
   }
 
-  function showLowMoodAlert() { document.getElementById('lowmood-alert-modal').classList.add('open'); }
+  function showLowMoodAlert() {
+    document.getElementById('lowmood-alert-modal').classList.add('open');
+    renderSafetyPlanSummary('lowmood-safety-plan');
+  }
   function closeLowMoodAlert() { document.getElementById('lowmood-alert-modal').classList.remove('open'); }
   function navToSOS() { closeLowMoodAlert(); nav('sos'); }
 
@@ -2952,6 +2963,7 @@ const App = (() => {
       pushSubscribed = true;
       document.getElementById('push-optin-banner')?.remove();
       showToast('✅ Đã bật thông báo nhắc nhở!');
+      _renderPushSection();
     } catch (err) {
       showToast('⚠️ Không thể bật thông báo: ' + err.message);
     }
@@ -2965,9 +2977,32 @@ const App = (() => {
       await API.unsubscribePush();
       pushSubscribed = false;
       showToast('🔕 Đã tắt thông báo nhắc nhở.');
+      _renderPushSection();
     } catch (err) {
       showToast('⚠️ Lỗi khi tắt thông báo.');
     }
+  }
+
+  // Mục push trong Cài đặt — hiện đúng trạng thái và cho tắt (trước đây chỉ có nút Bật,
+  // bật rồi thì không có cách nào tắt trong app)
+  async function _renderPushSection() {
+    const el = document.getElementById('set-push-section');
+    if (!el) return;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      el.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Trình duyệt này không hỗ trợ thông báo đẩy.</p>';
+      return;
+    }
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      pushSubscribed = !!(reg && await reg.pushManager.getSubscription());
+    } catch (_) {}
+    el.innerHTML = pushSubscribed
+      ? '<p style="color:var(--text-muted);font-size:13px">✅ Đang bật nhắc nhở viết nhật ký trên thiết bị này.</p>' +
+        '<button class="btn-outline" onclick="App.disablePush()">🔕 Tắt thông báo</button>'
+      : Notification.permission === 'denied'
+        ? '<p style="color:var(--text-muted);font-size:13px">Bạn đã chặn thông báo cho trang này — mở cài đặt trình duyệt để cho phép lại.</p>'
+        : '<p style="color:var(--text-muted);font-size:13px">Bật push notification để nhận nhắc nhở viết nhật ký hàng ngày.</p>' +
+          '<button class="btn-outline" onclick="App.enablePush()">🔔 Bật thông báo</button>';
   }
 
   // ── Level bar ────────────────────────────────────────────────────────
@@ -3505,13 +3540,19 @@ const App = (() => {
       _renderAvatarPreview(user.avatar_url, user.avatar_text);
     }
 
-    // Trường học (gated, v3.10)
-    const hasSchoolMap = !!(window.FEATURES && window.FEATURES.school_mood_map);
+    // Trường/tổ chức (gated: Bản đồ cảm xúc trường v3.10 hoặc Tư vấn viên tổ chức v3.11)
+    const hasSchoolMap = _hasOrgField();
     const schoolGroup = document.getElementById('settings-school-group');
     if (schoolGroup) schoolGroup.style.display = hasSchoolMap ? '' : 'none';
     if (hasSchoolMap) {
       const schoolEl = document.getElementById('set-school');
       if (schoolEl) schoolEl.value = user.school_name || '';
+      if (window.FEATURES.counseling) {
+        API.getOrgs().then(d => {
+          const dl = document.getElementById('set-school-orgs');
+          if (dl) dl.innerHTML = d.orgs.map(o => `<option value="${escapeHtml(o.name)}">${ORG_TYPE_LABEL[o.org_type] || ''}</option>`).join('');
+        }).catch(() => {});
+      }
     }
 
     // Tài khoản info
@@ -3640,16 +3681,7 @@ const App = (() => {
 
   function renderSettingsNotif() {
     // Push opt-in section
-    const pushSection = document.getElementById('set-push-section');
-    if (pushSection) {
-      const existing = document.getElementById('push-optin-banner');
-      if (existing && existing.innerHTML) {
-        pushSection.innerHTML = existing.innerHTML;
-      } else {
-        pushSection.innerHTML = '<p style="color:var(--text-muted);font-size:13px">Bật push notification để nhận nhắc nhở viết nhật ký hàng ngày.</p>' +
-          '<button class="btn-outline" onclick="App.enablePush()">🔔 Bật thông báo</button>';
-      }
-    }
+    _renderPushSection();
     // Đánh dấu ngày đã chọn
     document.querySelectorAll('#set-notif-days .notif-day-btn').forEach(btn => {
       const day = parseInt(btn.dataset.day);
@@ -3671,7 +3703,7 @@ const App = (() => {
     if (!fullName) { showSettingsMsg(msgEl, 'Tên không được để trống.', false); return; }
     try {
       const hasAvatarBio  = !!(window.FEATURES && window.FEATURES.avatar_bio);
-      const hasSchoolMap  = !!(window.FEATURES && window.FEATURES.school_mood_map);
+      const hasSchoolMap  = _hasOrgField();
       const school        = (document.getElementById('set-school')?.value || '').trim();
       const payload = { full_name: fullName, bio: hasAvatarBio ? bio : undefined, school_name: hasSchoolMap ? school : undefined };
       if (hasAvatarBio && _pendingAvatarUrl !== null) payload.avatar_url = _pendingAvatarUrl;
@@ -5085,7 +5117,264 @@ const App = (() => {
       const el = document.getElementById('nav-profile');
       if (el) el.style.display = '';
     }
-    nav('dashboard');
+    // v3.11
+    const role = Auth.getUser()?.role;
+    if (window.FEATURES && window.FEATURES.safety_plan) {
+      const el = document.getElementById('nav-safety-plan');
+      if (el) el.style.display = '';
+    }
+    if (window.FEATURES && window.FEATURES.counseling) {
+      const elUser = document.getElementById('nav-counseling');
+      if (elUser && role !== 'counselor') { elUser.style.display = ''; loadCounselingBadge(); }
+      const elC = document.getElementById('nav-counselor');
+      if (elC && role === 'counselor') elC.style.display = '';
+    }
+    // Bấm nút 🙂/😕 trên thông báo đẩy → sw.js mở /?quickmood=<điểm>
+    const qm = parseInt(new URLSearchParams(location.search).get('quickmood'));
+    if (qm >= 1 && qm <= 10) {
+      history.replaceState(null, '', location.pathname);
+      await quickLogMood(qm); // ghi xong rồi mới mở dashboard để widget Quick Mood thấy mood vừa ghi
+    }
+    nav(role === 'counselor' && window.FEATURES && window.FEATURES.counseling ? 'counselor' : 'dashboard');
+  }
+
+  // ── v3.11: Điều gì ảnh hưởng tâm trạng ──────────────────────────────────
+  async function loadMoodInsights() {
+    const el = document.getElementById('mood-insights-card');
+    if (!el) return;
+    try {
+      const d = await API.getMoodInsights();
+      el.style.display = '';
+      if (!d.insights.length) {
+        el.innerHTML = `<div class="card" style="padding:16px">
+          <div style="font-weight:700;margin-bottom:6px">🔍 Điều gì ảnh hưởng tâm trạng bạn</div>
+          <div style="font-size:13px;color:var(--text-muted);line-height:1.6">Chưa đủ dữ liệu để thấy quy luật (${d.sample} nhật ký trong 90 ngày).
+            Hãy gắn tag cho nhật ký, đánh dấu thói quen và ghi giờ ngủ — sau vài tuần app sẽ chỉ ra điều gì thật sự giúp bạn vui hơn.</div>
+        </div>`;
+        return;
+      }
+      el.innerHTML = `<div class="card" style="padding:16px">
+        <div style="font-weight:700;margin-bottom:4px">🔍 Điều gì ảnh hưởng tâm trạng bạn</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Từ ${d.sample} nhật ký trong 90 ngày qua — đây là sự trùng hợp trong dữ liệu của bạn, chưa chắc là nguyên nhân.</div>
+        ${d.insights.map(i => {
+          const up = i.diff > 0;
+          const what = i.kind === 'habit' ? `Những ngày bạn <strong>${escapeHtml(i.label)}</strong>`
+                     : i.kind === 'sleep' ? `Khi bạn <strong>${escapeHtml(i.label.toLowerCase())}</strong>`
+                     : `Nhật ký có tag <strong>${escapeHtml(i.label)}</strong>`;
+          return `<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--border)">
+            <span style="font-size:20px">${i.icon}</span>
+            <div style="flex:1;font-size:13px;line-height:1.5">${what}, mood trung bình
+              <strong style="color:${up ? 'var(--success, #059669)' : 'var(--danger, #dc2626)'}">${up ? 'cao' : 'thấp'} hơn ${Math.abs(i.diff)} điểm</strong>
+              <span style="color:var(--text-muted)">(${i.with_avg} so với ${i.without_avg}, ${i.n} lần)</span></div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    } catch (_) { el.style.display = 'none'; }
+  }
+
+  // ── v3.11: Kế hoạch an toàn (Stanley-Brown Safety Plan) ─────────────────
+  const SAFETY_SECTIONS = [
+    { key: 'warning_signs', icon: '⚠️', title: 'Dấu hiệu báo động của mình',     hint: 'Suy nghĩ, cảm xúc, tình huống cho thấy mình sắp không ổn. VD: mất ngủ nhiều đêm, muốn ở một mình, nghĩ "chẳng ai cần mình"' },
+    { key: 'coping',        icon: '🧘', title: 'Việc mình tự làm để dịu lại',     hint: 'Không cần ai khác. VD: thở hộp 4-4-4-4, tắm nước ấm, đi bộ 10 phút, nghe playlist quen thuộc' },
+    { key: 'distractions',  icon: '☕', title: 'Nơi chốn / người giúp mình phân tâm', hint: 'VD: ra quán cà phê quen, gọi cho bạn thân nói chuyện linh tinh, sang nhà chị gái' },
+    { key: 'people',        icon: '🤝', title: 'Người mình có thể nhờ giúp',      hint: 'Tên + số điện thoại người mình tin tưởng, có thể kể thật lòng' },
+    { key: 'professionals', icon: '🏥', title: 'Chuyên gia / dịch vụ hỗ trợ',     hint: 'Tư vấn viên, bác sĩ, đường dây nóng. VD: Đường dây hỗ trợ 1800 599 920' },
+    { key: 'environment',   icon: '🏠', title: 'Giữ môi trường an toàn',          hint: 'Việc làm để tránh xa thứ có thể gây hại cho mình lúc khủng hoảng' },
+    { key: 'reasons',       icon: '💙', title: 'Lý do để mình tiếp tục',          hint: 'Người, điều, ước mơ quan trọng với mình' },
+  ];
+
+  async function initSafetyPlanPage() {
+    const el = document.getElementById('safety-plan-content');
+    if (!el) return;
+    let plan = null;
+    try { plan = (await API.getSafetyPlan()).plan; } catch (_) {}
+    plan = plan || {};
+    el.innerHTML = SAFETY_SECTIONS.map(s => `
+      <div class="card" style="padding:16px;margin-bottom:12px">
+        <div style="font-weight:700;margin-bottom:4px">${s.icon} ${s.title}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">${s.hint}</div>
+        <textarea class="form-input" id="sp-${s.key}" rows="3" placeholder="Mỗi dòng một ý">${escapeHtml((plan[s.key] || []).join('\n'))}</textarea>
+      </div>`).join('') + `
+      <button class="btn-primary" id="sp-save-btn" onclick="App.saveSafetyPlan()">💾 Lưu kế hoạch</button>`;
+  }
+
+  async function saveSafetyPlan() {
+    const body = {};
+    SAFETY_SECTIONS.forEach(s => {
+      body[s.key] = (document.getElementById('sp-' + s.key)?.value || '').split('\n').map(x => x.trim()).filter(Boolean);
+    });
+    const btn = document.getElementById('sp-save-btn');
+    if (btn) btn.disabled = true;
+    try {
+      await API.saveSafetyPlan(body);
+      showToast('✅ Đã lưu kế hoạch an toàn. Nó sẽ hiện ra khi bạn cần.');
+    } catch (err) { showToast('❌ ' + err.message); }
+    if (btn) btn.disabled = false;
+  }
+
+  // Bản tóm tắt chỉ đọc — hiện trong cảnh báo mood thấp & trang Đường dây hỗ trợ
+  async function renderSafetyPlanSummary(elId) {
+    const el = document.getElementById(elId);
+    if (!el || !(window.FEATURES && window.FEATURES.safety_plan)) return;
+    let plan = null;
+    try { plan = (await API.getSafetyPlan()).plan; } catch (_) { return; }
+    const filled = plan && SAFETY_SECTIONS.filter(s => (plan[s.key] || []).length);
+    if (!filled || !filled.length) {
+      el.innerHTML = `<div class="card" style="padding:14px;margin-bottom:12px;font-size:13px">
+        🛟 Bạn chưa có <strong>kế hoạch an toàn</strong> — chuẩn bị sẵn khi đang ổn để lúc khó khăn biết ngay mình cần làm gì.
+        <button class="btn-outline" style="margin-top:8px;width:auto;padding:6px 14px" onclick="App.closeLowMoodAlert();App.nav('safety-plan')">Tạo kế hoạch</button>
+      </div>`;
+      return;
+    }
+    el.innerHTML = `<div class="card" style="padding:14px;margin-bottom:12px;text-align:left">
+      <div style="font-weight:700;margin-bottom:8px">🛟 Kế hoạch an toàn của bạn</div>
+      ${filled.map(s => `<div style="margin-bottom:8px"><div style="font-size:12px;font-weight:600">${s.icon} ${s.title}</div>
+        <ul style="margin:4px 0 0 18px;font-size:13px;line-height:1.6">${plan[s.key].map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul></div>`).join('')}
+      <button class="btn-outline" style="width:auto;padding:6px 14px" onclick="App.closeLowMoodAlert();App.nav('safety-plan')">✏️ Sửa</button>
+    </div>`;
+  }
+
+  // ── v3.11: Tư vấn viên tổ chức — phía thành viên ────────────────────────
+  const ORG_TYPE_LABEL = { school: 'Trường học', company: 'Công ty', community: 'Cộng đồng', clinic: 'Phòng khám', other: 'Tổ chức' };
+  const _hasOrgField = () => !!(window.FEATURES && (window.FEATURES.school_mood_map || window.FEATURES.counseling));
+
+  function _counselingBubbles(messages, mineSender) {
+    return messages.map(m => `
+      <div style="display:flex;justify-content:${m.sender === mineSender ? 'flex-end' : 'flex-start'};margin-bottom:8px">
+        <div style="max-width:78%;padding:10px 12px;border-radius:14px;font-size:14px;line-height:1.5;white-space:pre-wrap;
+          ${m.sender === mineSender ? 'background:var(--primary);color:#fff' : 'background:var(--bg-soft, #f1f5f9);color:var(--text)'}">${escapeHtml(m.content)}
+          <div style="font-size:10px;opacity:.7;margin-top:4px">${m.sender === 'counselor' && m.counselor_name ? escapeHtml(m.counselor_name) + ' · ' : ''}${new Date(m.created_at).toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })}</div>
+        </div>
+      </div>`).join('');
+  }
+
+  async function initCounselingPage() {
+    const el = document.getElementById('counseling-content');
+    if (!el) return;
+    el.innerHTML = '<div class="loading-text">Đang tải...</div>';
+    try {
+      const d = await API.getMyCounseling();
+      if (!d.org) {
+        el.innerHTML = `<div class="card" style="padding:20px;text-align:center">
+          <div style="font-size:40px;margin-bottom:8px">🏫</div>
+          <div style="font-size:14px;line-height:1.6;margin-bottom:12px">Chọn <strong>trường / công ty / tổ chức</strong> của bạn trong <strong>Cài đặt → Hồ sơ</strong>.
+            Nếu tổ chức có tư vấn viên trên Soul Diary, bạn có thể nhắn tin riêng với họ tại đây.</div>
+          <button class="btn-outline" style="width:auto;padding:8px 18px" onclick="App.nav('settings')">⚙️ Mở Cài đặt</button>
+        </div>`;
+        return;
+      }
+      const head = `<div class="card" style="padding:14px 16px;margin-bottom:12px">
+        <div style="font-weight:700">${ORG_TYPE_LABEL[d.org.org_type] || 'Tổ chức'}: ${escapeHtml(d.org.name)}</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:4px">🔒 Tư vấn viên chỉ thấy tin nhắn bạn gửi tại đây — họ không đọc được nhật ký của bạn.</div>
+      </div>`;
+      if (!d.org.counselor_count) {
+        el.innerHTML = head + `<div class="card" style="padding:16px;font-size:13px;color:var(--text-muted)">Tổ chức của bạn chưa có tư vấn viên trên Soul Diary. Nếu cần hỗ trợ ngay, xem mục 📞 Đường dây hỗ trợ.</div>`;
+        return;
+      }
+      el.innerHTML = head + `
+        <div class="card" style="padding:14px">
+          <div id="counseling-thread" style="max-height:55vh;overflow-y:auto;margin-bottom:12px">
+            ${d.messages.length ? _counselingBubbles(d.messages, 'user') : '<div style="font-size:13px;color:var(--text-muted);text-align:center;padding:16px">Bạn có thể kể điều đang làm mình bận lòng. Tư vấn viên sẽ trả lời sớm nhất có thể.</div>'}
+          </div>
+          <textarea class="form-input" id="counseling-input" rows="3" maxlength="2000" placeholder="Viết tin nhắn cho tư vấn viên..."></textarea>
+          <button class="btn-primary" id="counseling-send-btn" style="margin-top:8px" onclick="App.sendCounseling()">Gửi</button>
+        </div>`;
+      const t = document.getElementById('counseling-thread');
+      if (t) t.scrollTop = t.scrollHeight;
+      loadCounselingBadge();
+    } catch (err) {
+      el.innerHTML = `<div class="card" style="padding:16px;color:var(--text-muted)">Không tải được: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function sendCounseling() {
+    const input = document.getElementById('counseling-input');
+    const content = (input?.value || '').trim();
+    if (!content) return;
+    const btn = document.getElementById('counseling-send-btn');
+    if (btn) btn.disabled = true;
+    try {
+      await API.sendCounseling(content);
+      await initCounselingPage();
+    } catch (err) { showToast('❌ ' + err.message); if (btn) btn.disabled = false; }
+  }
+
+  async function loadCounselingBadge() {
+    const badge = document.getElementById('counseling-badge');
+    if (!badge) return;
+    try {
+      const d = await API.getCounselingUnread();
+      badge.style.display = d.count > 0 ? '' : 'none';
+    } catch (_) {}
+  }
+
+  // ── v3.11: Tư vấn viên tổ chức — phía tư vấn viên ───────────────────────
+  async function initCounselorPage() {
+    const el = document.getElementById('counselor-content');
+    if (!el) return;
+    el.innerHTML = '<div class="loading-text">Đang tải...</div>';
+    try {
+      const d = await API.counselorOverview();
+      const s = d.stats;
+      const stat = (v, lbl) => `<div class="stat-card"><div class="stat-val">${v === null || v === undefined ? '—' : v}</div><div class="stat-lbl">${lbl}</div></div>`;
+      el.innerHTML = `
+        <div class="card" style="padding:14px 16px;margin-bottom:12px">
+          <div style="font-weight:700">${ORG_TYPE_LABEL[d.org.org_type] || 'Tổ chức'}: ${escapeHtml(d.org.name)}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px">🔒 Bạn chỉ thấy người đã chủ động nhắn cho bạn và số liệu tổng hợp ẩn danh — không đọc được nhật ký của ai.</div>
+        </div>
+        <div class="grid-4" style="margin-bottom:12px">
+          ${stat(s.member_count, 'Thành viên')}
+          ${stat(s.active_7d, 'Ghi nhật ký 7 ngày qua')}
+          ${stat(s.avg_mood_7d, 'Mood TB 7 ngày')}
+          ${stat(s.low_mood_members_7d, 'Người có ngày mood ≤3')}
+        </div>
+        ${s.active_7d === null ? `<div style="font-size:12px;color:var(--text-muted);margin:-4px 0 12px">Số liệu tổng hợp chỉ hiện khi có từ ${s.min_aggregate} người ghi nhật ký trong 7 ngày (tránh lộ danh tính).</div>` : ''}
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:12px" class="counselor-grid">
+          <div class="card" style="padding:8px">
+            ${d.threads.length ? d.threads.map(t => `
+              <div onclick="App.openCounselorThread(${t.user_id})" style="cursor:pointer;padding:10px;border-radius:10px;border-bottom:1px solid var(--border)">
+                <div style="display:flex;justify-content:space-between;gap:6px">
+                  <strong style="font-size:14px">${escapeHtml(t.full_name || t.username)}</strong>
+                  ${t.unread ? `<span class="nav-badge-dot" style="position:static;display:inline-block"></span>` : ''}
+                </div>
+                <div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(t.last_content)}</div>
+              </div>`).join('') : '<div style="padding:16px;font-size:13px;color:var(--text-muted)">Chưa có ai nhắn. Thành viên chọn tổ chức của bạn trong hồ sơ sẽ thấy mục 💬 Tư vấn viên.</div>'}
+          </div>
+          <div class="card" style="padding:14px" id="counselor-thread-pane">
+            <div style="font-size:13px;color:var(--text-muted)">Chọn một hội thoại để xem.</div>
+          </div>
+        </div>`;
+    } catch (err) {
+      el.innerHTML = `<div class="card" style="padding:16px;color:var(--text-muted)">Không tải được: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function openCounselorThread(uid) {
+    const pane = document.getElementById('counselor-thread-pane');
+    if (!pane) return;
+    pane.innerHTML = '<div class="loading-text">Đang tải...</div>';
+    try {
+      const d = await API.counselorThread(uid);
+      pane.innerHTML = `
+        <div style="font-weight:700;margin-bottom:10px">${escapeHtml(d.user?.full_name || d.user?.username || '')}</div>
+        <div id="counselor-thread" style="max-height:50vh;overflow-y:auto;margin-bottom:12px">${_counselingBubbles(d.messages, 'counselor')}</div>
+        <textarea class="form-input" id="counselor-input" rows="3" maxlength="2000" placeholder="Trả lời..."></textarea>
+        <button class="btn-primary" id="counselor-send-btn" style="margin-top:8px" onclick="App.counselorReply(${uid})">Gửi</button>`;
+      const t = document.getElementById('counselor-thread');
+      if (t) t.scrollTop = t.scrollHeight;
+      pane.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (err) { pane.innerHTML = `<div style="color:var(--text-muted)">${escapeHtml(err.message)}</div>`; }
+  }
+
+  async function counselorReply(uid) {
+    const content = (document.getElementById('counselor-input')?.value || '').trim();
+    if (!content) return;
+    const btn = document.getElementById('counselor-send-btn');
+    if (btn) btn.disabled = true;
+    try {
+      await API.counselorReply(uid, content);
+      await openCounselorThread(uid);
+    } catch (err) { showToast('❌ ' + err.message); if (btn) btn.disabled = false; }
   }
 
   // ── Streak bạn bè ─────────────────────────────────────────────────────
@@ -5586,8 +5875,8 @@ const App = (() => {
   async function quickLogMood(score) {
     const el = document.getElementById('quick-mood-widget');
     try {
-      const res = await API.createEntry({ mood_score: score, event_text: '', tags: '', gratitude: '' });
-      const m = QUICK_MOODS.find(x => x.score === score);
+      const res = await API.createEntry({ mood_score: score, event_text: '', tags: '', gratitude: '', quick: true });
+      const m = QUICK_MOODS.find(x => x.score === score) || { emoji: '📝', label: '' };
       if (res && res.queued) {
         // v3.3: mất mạng — chưa lưu lên server nên KHÔNG đổi widget thành "đã ghi", tránh log trùng khi mở lại
         showToast('📥 Không có mạng — đã lưu nháp, sẽ tự động đồng bộ khi có mạng trở lại.');
@@ -5847,9 +6136,11 @@ const App = (() => {
         loadNotifBadge();
         return;
       }
-      const typeIcon = { welcome: '🌱', streak_milestone: '🔥', system: '📢' };
+      const typeIcon = { welcome: '🌱', streak_milestone: '🔥', system: '📢', counseling: '💬' };
+      // link dạng 'counseling' hoặc '/diary' — trùng tên trang thì bấm vào là mở trang đó
+      const pageOf = n => { const p = (n.link || '').replace(/^\//, ''); return PAGES[p] ? p : null; };
       el.innerHTML = notifs.map(n => `
-        <div class="card" style="margin-bottom:10px;padding:14px 16px;${!n.is_read ? 'border-left:3px solid var(--primary);' : 'opacity:.75'}">
+        <div class="card" ${pageOf(n) ? `onclick="App.nav('${pageOf(n)}')" style="cursor:pointer;` : 'style="'}margin-bottom:10px;padding:14px 16px;${!n.is_read ? 'border-left:3px solid var(--primary);' : 'opacity:.75'}">
           <div style="display:flex;gap:10px;align-items:flex-start">
             <span style="font-size:22px;flex-shrink:0">${typeIcon[n.type] || '📬'}</span>
             <div style="flex:1">
@@ -6814,7 +7105,7 @@ const App = (() => {
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   }
 
-  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,toggleExerciseTimer,toggleNavGroup,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openPsychTest,startPsychTest,selectPsychTestAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,toggleAdvancedSearch,applyTheme,toggleThemePicker,loadMoreDiary,
+  return {init,nav,saveDiaryEntry,deleteEntry,toggleTag,renderChart,filterArticles,openArticle,closeArticleModal,toggleExerciseTimer,toggleNavGroup,openBreathModal,closeStreakModal,closeLowMoodAlert,navToSOS,readInboxMsg,handlePhotoUpload,removePhoto,toggleRecording,loadMusicMood,toggleTrack,enablePush,disablePush,setDiaryMode,startCheckin,selectCheckinAnswer,openPsychTest,startPsychTest,selectPsychTestAnswer,openEntry,closeEntryModal,openLightbox,closeLightbox,openBoxBreathModal,closeBoxBreathModal,openLetterModal,closeLetterModal,burnLetter,openEvidenceModal,closeEvidenceModal,finishEvidenceTesting,openAboutModal,closeAboutModal,switchChartView,calendarMonthNav,renderHeatmap,heatmapYearNav,refreshDailyPrompt,suggestAmbienceMusic,shareMoodWrapped,exportDiaryCSV,printDiaryPDF,toggleNotifDay,saveNotifPrefs,joinChallenge,doChallengeCheckin,quitChallenge,selectCommunityTag,submitCommunityPost,reactPost,deletePost,loadMoreCommunityPosts,switchSettingsTab,saveProfileSettings,changePasswordSettings,saveNotifSettings,toggleNotifDaySetting,deleteAccountSettings,sendChat,chatKeydown,clearChat,createStudyEvent,doneStudy,removeStudy,openCourseLesson,lessonNav,closeLessonModal,onGoalTypeChange,createGoal,removeGoal,yearReviewNav,toggleDarkMode,searchDiary,clearSearch,toggleAdvancedSearch,applyTheme,toggleThemePicker,loadMoreDiary,saveSafetyPlan,sendCounseling,openCounselorThread,counselorReply,
     pinInput,pinDelete,setPinLock,managePinLock,installPWA,showMemoryCard,showYearInReviewCard,setA11yFontSize,toggleHighContrast,toggleReduceMotion,toggleLooseText,createFutureLetter,deleteFutureLetter,exportUserData,
     openPMRModal,openBodyScanModal,openGroundingModal,startGrounding,toggleGroundingItem,nextGroundingStep,openGratitudeModal,gratitudeNext,gratitudeBack,
     handleAvatarUpload,removeAvatar,_applyWritingHour,renderEmotionRadar,

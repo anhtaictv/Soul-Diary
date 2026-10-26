@@ -4,6 +4,7 @@ const express    = require('express');
 const { getPool, sql } = require('../db');
 const { bufferToDataUri } = require('../utils/media');
 const { decryptField, decryptRow, decryptRows } = require('../utils/diary-crypto');
+const { computeInsights } = require('../utils/mood-insights');
 
 const router = express.Router();
 
@@ -59,6 +60,32 @@ router.get('/patterns', async (req, res) => {
       top_tags:    tagR.recordset,
     });
   } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+// ── GET /api/diary/insights — yếu tố đi kèm mood cao/thấp (tag, thói quen, giấc ngủ) 90 ngày ──
+router.get('/insights', async (req, res) => {
+  try {
+    const db  = await getPool();
+    const uid = req.user.id;
+    const [entR, habR, logR] = await Promise.all([
+      db.request().input('uid', sql.Int, uid).query(`
+        SELECT CONVERT(VARCHAR(10), created_at, 23) AS date, mood_score, tags, sleep_hours
+        FROM DiaryEntries WHERE user_id=@uid AND created_at >= DATEADD(DAY, -90, GETDATE())
+      `),
+      db.request().input('uid', sql.Int, uid).query(`
+        SELECT id, name, icon, CONVERT(VARCHAR(10), created_at, 23) AS created FROM Habits WHERE user_id=@uid
+      `),
+      db.request().input('uid', sql.Int, uid).query(`
+        SELECT habit_id, CONVERT(VARCHAR(10), log_date, 23) AS date
+        FROM HabitLogs WHERE user_id=@uid AND log_date >= DATEADD(DAY, -90, GETDATE())
+      `),
+    ]);
+    const entries = entR.recordset.map(r => ({
+      date: r.date, mood: r.mood_score, sleep_hours: r.sleep_hours,
+      tags: r.tags ? r.tags.split('|').map(t => t.trim()).filter(Boolean) : [],
+    }));
+    res.json({ insights: computeInsights(entries, habR.recordset, logR.recordset), sample: entries.length });
+  } catch (err) { res.status(500).json({ message: 'Lỗi server.' }); }
 });
 
 // ── GET /api/diary/stats ─────────────────────────────────────────────────

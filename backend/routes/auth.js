@@ -237,7 +237,7 @@ router.get('/me', authMiddleware, async (req, res) => {
       .query(`
         SELECT id, username, email, full_name, avatar_text, role,
                streak, streak_freeze, max_streak, last_entry, created_at,
-               notif_hour, notif_days, bio, avatar_url, school_name
+               notif_hour, notif_days, bio, avatar_url, school_name, org_id
         FROM Users WHERE id = @id
       `);
 
@@ -278,7 +278,11 @@ router.put('/profile', authMiddleware, async (req, res) => {
       .query(`
         UPDATE Users
         SET full_name = @full_name, avatar_text = @avatar_text,
-            bio = @bio, avatar_url = @avatar_url, school_name = @school_name, updated_at = GETDATE()
+            bio = @bio, avatar_url = @avatar_url, school_name = @school_name, updated_at = GETDATE(),
+            -- Tên khớp 1 tổ chức admin đã tạo → gắn org_id (tư vấn viên tổ chức đó mới thấy).
+            -- Tư vấn viên giữ nguyên tổ chức được cấp, không tự đổi qua hồ sơ.
+            org_id = CASE WHEN role = 'counselor' THEN org_id
+                          ELSE (SELECT id FROM Organizations WHERE name = @school_name) END
         WHERE id = @id
       `);
 
