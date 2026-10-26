@@ -1,5 +1,5 @@
 // sw.js — Soul Diary Service Worker v2.5 (v3.3.1 — security/bug review follow-up)
-const CACHE_NAME    = 'souldiary-v39';
+const CACHE_NAME    = 'souldiary-v40';
 // admin.js/game.js không precache — trang chính nạp lười, chỉ cache khi user thật sự mở tới
 const STATIC_ASSETS = [
   '/', '/index.html',
@@ -14,7 +14,9 @@ const STATIC_ASSETS = [
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(STATIC_ASSETS).catch(() => {}))
+      // cache:'reload' — tải thẳng từ server, bỏ qua HTTP cache của trình duyệt (IIS không gửi Cache-Control
+      // nên trình duyệt tự đoán hạn và có thể đưa bản cũ → bản cache mới lẫn file cũ sau deploy)
+      .then(cache => cache.addAll(STATIC_ASSETS.map(u => new Request(u, { cache: 'reload' }))).catch(() => {}))
       .then(() => self.skipWaiting())
   );
 });
@@ -47,7 +49,8 @@ self.addEventListener('fetch', event => {
 
   // Static assets: stale-while-revalidate — trả bản cache ngay cho nhanh, đồng thời tải bản mới
   // về cache cho lần mở sau. Nhờ vậy deploy JS/CSS mới tự tới người dùng, không phải nhớ bump CACHE_NAME.
-  const network = fetch(event.request).then(response => {
+  // cache:'no-cache' — luôn hỏi lại server (file không đổi chỉ tốn 1 phản hồi 304), tránh lấy bản cũ từ HTTP cache
+  const network = fetch(event.request, { cache: 'no-cache' }).then(response => {
     // Cache API chỉ nhận request http/https — request từ extension khác
     // (chrome-extension://, ...) lọt vào đây sẽ làm cache.put() ném lỗi.
     if (response && response.status === 200 && event.request.method === 'GET' && url.protocol.startsWith('http')) {
